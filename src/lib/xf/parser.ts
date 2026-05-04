@@ -1,6 +1,7 @@
 import { ByteReader } from '../smf/reader.ts';
 import type { SmfFile, SmfTrack } from '../smf/types.ts';
 import { decodeLatin1, decodeXfText } from './decode.ts';
+import { extractStyle } from './style.ts';
 import type {
   KaraokeEvent,
   VocalPart,
@@ -162,6 +163,7 @@ export function extractXf(smf: SmfFile): XfData {
     commonHeader,
     languageHeaders,
     karaoke: extractKaraoke(smf),
+    style: extractStyle(smf.tracks),
   };
 }
 
@@ -199,9 +201,8 @@ export function parseXfLyricsHeader(text: string): XfLyricsHeader | null {
     }
   }
 
-  const language = fields[2] !== undefined && fields[2] !== ''
-    ? fields[2]
-    : undefined;
+  const language =
+    fields[2] !== undefined && fields[2] !== '' ? fields[2] : undefined;
 
   return { melodyChannels, displayOffset, language };
 }
