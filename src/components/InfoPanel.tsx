@@ -1,16 +1,23 @@
 import type { ReactNode } from 'react';
 import type {
+  KaraokeEvent,
+  VocalPart,
   XfData,
   XfInfoHeaderCommon,
   XfInfoHeaderLanguageSpecific,
+  XfKaraokeData,
+  XfLyricsHeader,
   XfVersion,
 } from '../lib/xf/types.ts';
 
 export function InfoPanel({ data }: { data: XfData }) {
+  const hasKaraoke =
+    data.karaoke.header !== null || data.karaoke.events.length > 0;
   const empty =
     data.version === null &&
     data.commonHeader === null &&
-    data.languageHeaders.length === 0;
+    data.languageHeaders.length === 0 &&
+    !hasKaraoke;
 
   if (empty) {
     return (
@@ -29,6 +36,7 @@ export function InfoPanel({ data }: { data: XfData }) {
       {data.languageHeaders.map((h, i) => (
         <LanguageSection key={`${h.language}-${i}`} header={h} />
       ))}
+      {hasKaraoke && <KaraokeSection data={data.karaoke} />}
     </section>
   );
 }
@@ -121,6 +129,67 @@ function LanguageSection({ header }: { header: XfInfoHeaderLanguageSpecific }) {
       </FieldList>
     </div>
   );
+}
+
+const VOCAL_PART_LABELS: Record<VocalPart, string> = {
+  male: '男性',
+  female: '女性',
+  chorus: 'コーラス',
+  solo: '独唱',
+  mixed: '混声',
+  speech: 'セリフ',
+  nonLyric: '歌詞以外',
+};
+
+function KaraokeSection({ data }: { data: XfKaraokeData }) {
+  return (
+    <div className="card">
+      <h3>XF Karaoke Message</h3>
+      {data.header && <KaraokeHeaderInfo header={data.header} />}
+      {data.events.length > 0 && (
+        <div className="karaoke-stream">
+          {data.events.map((ev, i) => renderKaraokeEvent(ev, i))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function KaraokeHeaderInfo({ header }: { header: XfLyricsHeader }) {
+  return (
+    <FieldList>
+      <Field label="言語" value={header.language ?? '（未指定 / Latin-1）'} />
+      <Field
+        label="メロディCH"
+        value={
+          header.melodyChannels.length > 0
+            ? header.melodyChannels.join(', ')
+            : '（なし）'
+        }
+      />
+      <Field label="表示オフセット" value={`${header.displayOffset} ticks`} />
+    </FieldList>
+  );
+}
+
+function renderKaraokeEvent(ev: KaraokeEvent, index: number): ReactNode {
+  switch (ev.kind) {
+    case 'lyric':
+      return (
+        <span key={index} className="lyric">
+          {ev.text}
+        </span>
+      );
+    case 'carriageReturn':
+    case 'lineFeed':
+      return <br key={index} />;
+    case 'vocalPart':
+      return (
+        <span key={index} className="part-badge">
+          {VOCAL_PART_LABELS[ev.part]}
+        </span>
+      );
+  }
 }
 
 function FieldList({ children }: { children: ReactNode }) {
