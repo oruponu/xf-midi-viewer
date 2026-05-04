@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { formatTickAsBarBeat } from '../lib/smf/timing.ts';
+import type { SmfTiming } from '../lib/smf/timing.ts';
 import type {
   ChordBass,
   ChordRoot,
@@ -44,7 +46,7 @@ export function InfoPanel({ data }: { data: XfData }) {
         <LanguageSection key={`${h.language}-${i}`} header={h} />
       ))}
       {hasKaraoke && <KaraokeSection data={data.karaoke} />}
-      {hasStyle && <StyleSection data={data.style} />}
+      {hasStyle && <StyleSection data={data.style} timing={data.timing} />}
     </section>
   );
 }
@@ -298,8 +300,16 @@ function partitionStyle(events: StyleMessage[]): StyleGroups {
   };
 }
 
-function StyleSection({ data }: { data: XfStyleData }) {
+function StyleSection({
+  data,
+  timing,
+}: {
+  data: XfStyleData;
+  timing: SmfTiming;
+}) {
   const g = partitionStyle(data.events);
+  const formatTick = (tick: number): string =>
+    formatTickAsBarBeat(tick, timing);
   const showSummary =
     g.phraseCount > 0 ||
     g.fingeringCount > 0 ||
@@ -337,7 +347,7 @@ function StyleSection({ data }: { data: XfStyleData }) {
           <div className="style-list">
             {g.chords.map((c, i) => (
               <div key={i} className="style-list-row">
-                <span className="tick">{c.tick}</span>
+                <span className="tick">{formatTick(c.tick)}</span>
                 <span>{formatChord(c.root, c.type, c.bass)}</span>
               </div>
             ))}
@@ -350,7 +360,7 @@ function StyleSection({ data }: { data: XfStyleData }) {
           <div className="style-list">
             {g.rehearsals.map((r, i) => (
               <div key={i} className="style-list-row">
-                <span className="tick">{r.tick}</span>
+                <span className="tick">{formatTick(r.tick)}</span>
                 <span>
                   {r.letter}
                   {r.variation > 0 && "'".repeat(r.variation)}
