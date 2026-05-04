@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
 import { formatTickAsBarBeat } from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
+import { formatChord } from '../lib/xf/format.ts';
 import type {
-  ChordBass,
-  ChordRoot,
   GuitarPart,
   KaraokeEvent,
   StyleMessage,
@@ -16,6 +15,7 @@ import type {
   XfStyleData,
   XfVersion,
 } from '../lib/xf/types.ts';
+import { LeadSheet } from './LeadSheet.tsx';
 
 export function InfoPanel({ data }: { data: XfData }) {
   const hasKaraoke =
@@ -38,9 +38,24 @@ export function InfoPanel({ data }: { data: XfData }) {
     );
   }
 
+  const chordsForChart: ChordMsg[] = [];
+  const rehearsalsForChart: RehearsalMsg[] = [];
+  for (const ev of data.style.events) {
+    if (ev.kind === 'chord') chordsForChart.push(ev);
+    else if (ev.kind === 'rehearsal') rehearsalsForChart.push(ev);
+  }
+  const showChart = chordsForChart.length > 0 || rehearsalsForChart.length > 0;
+
   return (
     <section className="info-panel">
       {data.version && <VersionSection version={data.version} />}
+      {showChart && (
+        <LeadSheet
+          chords={chordsForChart}
+          rehearsals={rehearsalsForChart}
+          timing={data.timing}
+        />
+      )}
       {data.commonHeader && <CommonSection header={data.commonHeader} />}
       {data.languageHeaders.map((h, i) => (
         <LanguageSection key={`${h.language}-${i}`} header={h} />
@@ -208,29 +223,6 @@ const GUITAR_PART_LABELS: Record<GuitarPart, string> = {
   ukulele: 'ウクレレ',
   reserved: '不明',
 };
-
-function formatChordRoot(r: ChordRoot): string {
-  if (r.note === 'reserved') return '?';
-  return r.note + (r.accidental === 'natural' ? '' : r.accidental);
-}
-
-function formatChordType(type: string): string {
-  if (type === 'Maj') return '';
-  if (type.startsWith('min')) return 'm' + type.slice(3);
-  return type;
-}
-
-function formatChord(
-  root: ChordRoot,
-  type: string,
-  bass: ChordBass | null,
-): string {
-  let s = formatChordRoot(root) + formatChordType(type);
-  if (bass) {
-    s += '/' + formatChordRoot(bass.root) + formatChordType(bass.type);
-  }
-  return s;
-}
 
 type ChordMsg = Extract<StyleMessage, { kind: 'chord' }>;
 type RehearsalMsg = Extract<StyleMessage, { kind: 'rehearsal' }>;
