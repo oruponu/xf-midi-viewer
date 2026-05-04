@@ -1,4 +1,5 @@
 import { ByteReader } from '../smf/reader.ts';
+import { extractTiming } from '../smf/timing.ts';
 import type { SmfFile, SmfTrack } from '../smf/types.ts';
 import { decodeLatin1, decodeXfText } from './decode.ts';
 import { extractStyle } from './style.ts';
@@ -164,6 +165,7 @@ export function extractXf(smf: SmfFile): XfData {
     languageHeaders,
     karaoke: extractKaraoke(smf),
     style: extractStyle(smf.tracks),
+    timing: extractTiming(smf),
   };
 }
 
