@@ -1,12 +1,16 @@
 import { ByteReader } from '../smf/reader.ts';
-import type { SmfFile } from '../smf/types.ts';
+import type { SmfFile, SmfTrack } from '../smf/types.ts';
 import { decodeLatin1, decodeXfText } from './decode.ts';
 import type {
+  KaraokeEvent,
+  VocalPart,
   XfData,
   XfFlags,
   XfInfoHeader,
   XfInfoHeaderCommon,
   XfInfoHeaderLanguageSpecific,
+  XfKaraokeData,
+  XfLyricsHeader,
   XfVersion,
 } from './types.ts';
 
@@ -153,7 +157,152 @@ export function extractXf(smf: SmfFile): XfData {
     }
   }
 
-  return { version, commonHeader, languageHeaders };
+  return {
+    version,
+    commonHeader,
+    languageHeaders,
+    karaoke: extractKaraoke(smf),
+  };
+}
+
+const VOCAL_PART_MAP: Record<string, VocalPart> = {
+  m: 'male',
+  f: 'female',
+  c: 'chorus',
+  s: 'solo',
+  p: 'mixed',
+  w: 'speech',
+  x: 'nonLyric',
+};
+
+export function parseXfLyricsHeader(text: string): XfLyricsHeader | null {
+  if (!text.startsWith('$Lyrc:')) return null;
+  const fields = text.slice(6).split(':');
+
+  const channelsField = fields[0] ?? '';
+  const melodyChannels: number[] = [];
+  if (channelsField !== '') {
+    for (const s of channelsField.split(',')) {
+      const n = Number.parseInt(s, 10);
+      if (Number.isFinite(n) && n >= 1 && n <= 16) {
+        melodyChannels.push(n);
+      }
+    }
+  }
+
+  let displayOffset = 0;
+  const offsetField = fields[1] ?? '';
+  if (offsetField !== '') {
+    const n = Number.parseInt(offsetField, 10);
+    if (Number.isFinite(n) && n >= 0) {
+      displayOffset = n;
+    }
+  }
+
+  const language = fields[2] !== undefined && fields[2] !== ''
+    ? fields[2]
+    : undefined;
+
+  return { melodyChannels, displayOffset, language };
+}
+
+export function parseVocalPartCue(text: string): VocalPart | null {
+  if (text.length !== 2 || !text.startsWith('&')) return null;
+  return VOCAL_PART_MAP[text.charAt(1)] ?? null;
+}
+
+type RawMetaAtTick = {
+  tick: number;
+  metaType: number;
+  data: Uint8Array;
+};
+
+function metasFromTrack(track: SmfTrack): RawMetaAtTick[] {
+  const out: RawMetaAtTick[] = [];
+  let tick = 0;
+  for (const tev of track.events) {
+    tick += tev.deltaTime;
+    const ev = tev.event;
+    if (ev.kind === 'meta') {
+      out.push({ tick, metaType: ev.metaType, data: ev.data });
+    }
+  }
+  return out;
+}
+
+function metasFromXfkmChunk(data: Uint8Array): RawMetaAtTick[] {
+  const r = new ByteReader(data);
+  const out: RawMetaAtTick[] = [];
+  let tick = 0;
+  while (!r.eof) {
+    tick += r.readVarLen();
+    const status = r.readUint8();
+    if (status !== 0xff) {
+      throw new Error(
+        `unexpected status 0x${status.toString(16).padStart(2, '0')} in XFKM chunk`,
+      );
+    }
+    const metaType = r.readUint8();
+    const len = r.readVarLen();
+    out.push({ tick, metaType, data: r.readBytes(len) });
+  }
+  return out;
+}
+
+function buildKaraoke(metas: RawMetaAtTick[]): XfKaraokeData {
+  let header: XfLyricsHeader | null = null;
+  for (const m of metas) {
+    if (m.metaType !== 0x07) continue;
+    const hdr = parseXfLyricsHeader(decodeLatin1(m.data));
+    if (hdr) {
+      header = hdr;
+      break;
+    }
+  }
+
+  const language = header?.language;
+  const events: KaraokeEvent[] = [];
+
+  for (const m of metas) {
+    if (m.metaType === 0x07) {
+      const text = decodeLatin1(m.data);
+      if (parseXfLyricsHeader(text) !== null) continue;
+      const part = parseVocalPartCue(text);
+      if (part !== null) {
+        events.push({ kind: 'vocalPart', tick: m.tick, part });
+      }
+    } else if (m.metaType === 0x05) {
+      if (m.data.length === 1 && m.data[0] === 0x0d) {
+        events.push({ kind: 'carriageReturn', tick: m.tick });
+      } else if (m.data.length === 1 && m.data[0] === 0x0a) {
+        events.push({ kind: 'lineFeed', tick: m.tick });
+      } else {
+        const text = decodeXfText(m.data, language);
+        events.push({ kind: 'lyric', tick: m.tick, text });
+      }
+    }
+  }
+
+  return { header, events };
+}
+
+function extractKaraoke(smf: SmfFile): XfKaraokeData {
+  for (const chunk of smf.extraChunks) {
+    if (chunk.type !== 'XFKM') continue;
+    const k = buildKaraoke(metasFromXfkmChunk(chunk.data));
+    if (k.events.length > 0 || k.header !== null) {
+      return k;
+    }
+  }
+
+  for (const track of smf.tracks) {
+    const k = buildKaraoke(metasFromTrack(track));
+    if (k.events.length > 0 || k.header !== null) {
+      return k;
+    }
+  }
+
+  return { header: null, events: [] };
 }
 
 function parseXfihChunk(data: Uint8Array): XfInfoHeader[] {

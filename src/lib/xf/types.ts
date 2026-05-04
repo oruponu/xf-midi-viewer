@@ -39,8 +39,35 @@ export interface XfInfoHeaderLanguageSpecific {
 
 export type XfInfoHeader = XfInfoHeaderCommon | XfInfoHeaderLanguageSpecific;
 
+export interface XfLyricsHeader {
+  melodyChannels: number[];
+  displayOffset: number;
+  language: string | undefined;
+}
+
+export type VocalPart =
+  | 'male'
+  | 'female'
+  | 'chorus'
+  | 'solo'
+  | 'mixed'
+  | 'speech'
+  | 'nonLyric';
+
+export type KaraokeEvent =
+  | { kind: 'lyric'; tick: number; text: string }
+  | { kind: 'carriageReturn'; tick: number }
+  | { kind: 'lineFeed'; tick: number }
+  | { kind: 'vocalPart'; tick: number; part: VocalPart };
+
+export interface XfKaraokeData {
+  header: XfLyricsHeader | null;
+  events: KaraokeEvent[];
+}
+
 export interface XfData {
   version: XfVersion | null;
   commonHeader: XfInfoHeaderCommon | null;
   languageHeaders: XfInfoHeaderLanguageSpecific[];
+  karaoke: XfKaraokeData;
 }
