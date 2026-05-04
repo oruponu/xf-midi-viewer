@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 import type { SmfChunk, SmfFile, SmfTrack, TrackEvent } from '../smf/types.ts';
-import { extractXf, parseXfInfoHeader, parseXfVersion } from './parser.ts';
+import {
+  extractXf,
+  parseVocalPartCue,
+  parseXfInfoHeader,
+  parseXfLyricsHeader,
+  parseXfVersion,
+} from './parser.ts';
+import type { VocalPart } from './types.ts';
 
 const u8 = (...values: number[]): Uint8Array => new Uint8Array(values);
 
@@ -268,6 +275,7 @@ describe('extractXf', () => {
     expect(xf.version).toBeNull();
     expect(xf.commonHeader).toBeNull();
     expect(xf.languageHeaders).toEqual([]);
+    expect(xf.karaoke).toEqual({ header: null, events: [] });
   });
 
   test('throws on non-meta status inside XFIH chunk', () => {
@@ -276,5 +284,198 @@ describe('extractXf', () => {
       [{ type: 'XFIH', data: u8(0x00, 0x90, 0x3c, 0x40) }],
     );
     expect(() => extractXf(smf)).toThrow(/unexpected status.*XFIH/);
+  });
+});
+
+describe('parseXfLyricsHeader', () => {
+  test('parses spec example with multiple channels', () => {
+    expect(parseXfLyricsHeader('$Lyrc:4,12:240:JP')).toEqual({
+      melodyChannels: [4, 12],
+      displayOffset: 240,
+      language: 'JP',
+    });
+  });
+
+  test('parses single channel', () => {
+    expect(parseXfLyricsHeader('$Lyrc:1:480:L1')).toEqual({
+      melodyChannels: [1],
+      displayOffset: 480,
+      language: 'L1',
+    });
+  });
+
+  test('empty language becomes undefined', () => {
+    expect(parseXfLyricsHeader('$Lyrc:1:480:')?.language).toBeUndefined();
+  });
+
+  test('filters out-of-range and non-numeric channels', () => {
+    expect(
+      parseXfLyricsHeader('$Lyrc:0,1,17,abc,16:0:JP')?.melodyChannels,
+    ).toEqual([1, 16]);
+  });
+
+  test('treats negative offset as 0', () => {
+    expect(parseXfLyricsHeader('$Lyrc:1:-10:JP')?.displayOffset).toBe(0);
+  });
+
+  test('empty channels field yields empty array', () => {
+    expect(parseXfLyricsHeader('$Lyrc::240:JP')?.melodyChannels).toEqual([]);
+  });
+
+  test('returns null for non-Lyrc text', () => {
+    expect(parseXfLyricsHeader('&m')).toBeNull();
+    expect(parseXfLyricsHeader('XFhd:...')).toBeNull();
+    expect(parseXfLyricsHeader('')).toBeNull();
+  });
+});
+
+describe('parseVocalPartCue', () => {
+  test.each<[string, VocalPart]>([
+    ['&m', 'male'],
+    ['&f', 'female'],
+    ['&c', 'chorus'],
+    ['&s', 'solo'],
+    ['&p', 'mixed'],
+    ['&w', 'speech'],
+    ['&x', 'nonLyric'],
+  ])('%s -> %s', (input, expected) => {
+    expect(parseVocalPartCue(input)).toBe(expected);
+  });
+
+  test.each(['&z', '&', '&mm', 'm', '', '$Lyrc:1:0:JP'])(
+    'rejects %p',
+    (input) => {
+      expect(parseVocalPartCue(input)).toBeNull();
+    },
+  );
+});
+
+describe('extractXf - karaoke', () => {
+  test('extracts $Lyrc header and lyrics with tick from inline track', () => {
+    const smf = makeSmf([
+      {
+        events: [
+          {
+            deltaTime: 0,
+            event: {
+              kind: 'meta',
+              metaType: 0x07,
+              data: ascii('$Lyrc:1:240:L1'),
+            },
+          },
+          {
+            deltaTime: 96,
+            event: { kind: 'meta', metaType: 0x05, data: ascii('Hello') },
+          },
+          {
+            deltaTime: 96,
+            event: { kind: 'meta', metaType: 0x05, data: ascii('World') },
+          },
+        ],
+      },
+    ]);
+    const k = extractXf(smf).karaoke;
+    expect(k.header).toEqual({
+      melodyChannels: [1],
+      displayOffset: 240,
+      language: 'L1',
+    });
+    expect(k.events).toEqual([
+      { kind: 'lyric', tick: 96, text: 'Hello' },
+      { kind: 'lyric', tick: 192, text: 'World' },
+    ]);
+  });
+
+  test('decodes lyrics using $Lyrc language (JP -> Shift-JIS)', () => {
+    const smf = makeSmf([
+      {
+        events: [
+          {
+            deltaTime: 0,
+            event: {
+              kind: 'meta',
+              metaType: 0x07,
+              data: ascii('$Lyrc:1:0:JP'),
+            },
+          },
+          {
+            deltaTime: 0,
+            event: { kind: 'meta', metaType: 0x05, data: u8(0x8a, 0x79) },
+          },
+        ],
+      },
+    ]);
+    const k = extractXf(smf).karaoke;
+    expect(k.events[0]).toEqual({ kind: 'lyric', tick: 0, text: '楽' });
+  });
+
+  test('identifies CR (FF 05 01 0D) and LF (FF 05 01 0A) as separate kinds', () => {
+    const smf = makeSmf([
+      {
+        events: [
+          {
+            deltaTime: 0,
+            event: { kind: 'meta', metaType: 0x05, data: u8(0x0d) },
+          },
+          {
+            deltaTime: 0,
+            event: { kind: 'meta', metaType: 0x05, data: u8(0x0a) },
+          },
+        ],
+      },
+    ]);
+    const events = extractXf(smf).karaoke.events;
+    expect(events[0]?.kind).toBe('carriageReturn');
+    expect(events[1]?.kind).toBe('lineFeed');
+  });
+
+  test('extracts vocal part cues', () => {
+    const smf = makeSmf([
+      {
+        events: [
+          {
+            deltaTime: 0,
+            event: { kind: 'meta', metaType: 0x07, data: ascii('&f') },
+          },
+          {
+            deltaTime: 480,
+            event: { kind: 'meta', metaType: 0x07, data: ascii('&x') },
+          },
+        ],
+      },
+    ]);
+    const events = extractXf(smf).karaoke.events;
+    expect(events).toEqual([
+      { kind: 'vocalPart', tick: 0, part: 'female' },
+      { kind: 'vocalPart', tick: 480, part: 'nonLyric' },
+    ]);
+  });
+
+  test('XFKM chunk wins over inline lyrics', () => {
+    const xfkmEvents = concat(u8(0x00, 0xff, 0x05, 4), ascii('xfkm'));
+    const smf = makeSmf(
+      [
+        {
+          events: [
+            {
+              deltaTime: 0,
+              event: { kind: 'meta', metaType: 0x05, data: ascii('inline') },
+            },
+          ],
+        },
+      ],
+      [{ type: 'XFKM', data: xfkmEvents }],
+    );
+    const events = extractXf(smf).karaoke.events;
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ kind: 'lyric', text: 'xfkm' });
+  });
+
+  test('throws on non-meta status inside XFKM chunk', () => {
+    const smf = makeSmf(
+      [],
+      [{ type: 'XFKM', data: u8(0x00, 0x90, 0x3c, 0x40) }],
+    );
+    expect(() => extractXf(smf)).toThrow(/unexpected status.*XFKM/);
   });
 });
