@@ -1,23 +1,30 @@
 import type { ReactNode } from 'react';
 import type {
+  ChordBass,
+  ChordRoot,
+  GuitarPart,
   KaraokeEvent,
+  StyleMessage,
   VocalPart,
   XfData,
   XfInfoHeaderCommon,
   XfInfoHeaderLanguageSpecific,
   XfKaraokeData,
   XfLyricsHeader,
+  XfStyleData,
   XfVersion,
 } from '../lib/xf/types.ts';
 
 export function InfoPanel({ data }: { data: XfData }) {
   const hasKaraoke =
     data.karaoke.header !== null || data.karaoke.events.length > 0;
+  const hasStyle = data.style.events.length > 0;
   const empty =
     data.version === null &&
     data.commonHeader === null &&
     data.languageHeaders.length === 0 &&
-    !hasKaraoke;
+    !hasKaraoke &&
+    !hasStyle;
 
   if (empty) {
     return (
@@ -37,6 +44,7 @@ export function InfoPanel({ data }: { data: XfData }) {
         <LanguageSection key={`${h.language}-${i}`} header={h} />
       ))}
       {hasKaraoke && <KaraokeSection data={data.karaoke} />}
+      {hasStyle && <StyleSection data={data.style} />}
     </section>
   );
 }
@@ -190,6 +198,200 @@ function renderKaraokeEvent(ev: KaraokeEvent, index: number): ReactNode {
         </span>
       );
   }
+}
+
+const GUITAR_PART_LABELS: Record<GuitarPart, string> = {
+  guitar: 'ギター',
+  bass: 'ベース',
+  ukulele: 'ウクレレ',
+  reserved: '不明',
+};
+
+function formatChordRoot(r: ChordRoot): string {
+  if (r.note === 'reserved') return '?';
+  return r.note + (r.accidental === 'natural' ? '' : r.accidental);
+}
+
+function formatChordType(type: string): string {
+  if (type === 'Maj') return '';
+  if (type.startsWith('min')) return 'm' + type.slice(3);
+  return type;
+}
+
+function formatChord(
+  root: ChordRoot,
+  type: string,
+  bass: ChordBass | null,
+): string {
+  let s = formatChordRoot(root) + formatChordType(type);
+  if (bass) {
+    s += '/' + formatChordRoot(bass.root) + formatChordType(bass.type);
+  }
+  return s;
+}
+
+type ChordMsg = Extract<StyleMessage, { kind: 'chord' }>;
+type RehearsalMsg = Extract<StyleMessage, { kind: 'rehearsal' }>;
+type GuideTrackMsg = Extract<StyleMessage, { kind: 'guideTrack' }>;
+type GuitarInfoMsg = Extract<StyleMessage, { kind: 'guitarInfo' }>;
+type MaxPhraseMsg = Extract<StyleMessage, { kind: 'maxPhraseMark' }>;
+
+interface StyleGroups {
+  chords: ChordMsg[];
+  rehearsals: RehearsalMsg[];
+  phraseCount: number;
+  maxPhrases: MaxPhraseMsg[];
+  fingeringCount: number;
+  guideTracks: GuideTrackMsg[];
+  guitarInfos: GuitarInfoMsg[];
+  guitarVoicingCount: number;
+}
+
+function partitionStyle(events: StyleMessage[]): StyleGroups {
+  const chords: ChordMsg[] = [];
+  const rehearsals: RehearsalMsg[] = [];
+  const maxPhrases: MaxPhraseMsg[] = [];
+  const guideTracks: GuideTrackMsg[] = [];
+  const guitarInfos: GuitarInfoMsg[] = [];
+  let phraseCount = 0;
+  let fingeringCount = 0;
+  let guitarVoicingCount = 0;
+
+  for (const ev of events) {
+    switch (ev.kind) {
+      case 'chord':
+        chords.push(ev);
+        break;
+      case 'rehearsal':
+        rehearsals.push(ev);
+        break;
+      case 'phraseMark':
+        phraseCount += 1;
+        break;
+      case 'maxPhraseMark':
+        maxPhrases.push(ev);
+        break;
+      case 'fingering':
+        fingeringCount += 1;
+        break;
+      case 'guideTrack':
+        guideTracks.push(ev);
+        break;
+      case 'guitarInfo':
+        guitarInfos.push(ev);
+        break;
+      case 'guitarVoicing':
+        guitarVoicingCount += 1;
+        break;
+    }
+  }
+
+  return {
+    chords,
+    rehearsals,
+    phraseCount,
+    maxPhrases,
+    fingeringCount,
+    guideTracks,
+    guitarInfos,
+    guitarVoicingCount,
+  };
+}
+
+function StyleSection({ data }: { data: XfStyleData }) {
+  const g = partitionStyle(data.events);
+  const showSummary =
+    g.phraseCount > 0 ||
+    g.fingeringCount > 0 ||
+    g.guitarVoicingCount > 0 ||
+    g.maxPhrases.length > 0;
+
+  return (
+    <div className="card">
+      <h3>XF Style Message</h3>
+
+      {g.guideTracks.length > 0 && (
+        <StyleSubSection title="ガイドトラックフラグ">
+          {g.guideTracks.map((gt, i) => (
+            <div key={i} className="style-row">
+              右手: {gt.rightHandChannel ?? '（なし）'} / 左手:{' '}
+              {gt.leftHandChannel ?? '（なし）'}
+            </div>
+          ))}
+        </StyleSubSection>
+      )}
+
+      {g.guitarInfos.length > 0 && (
+        <StyleSubSection title="ギターインフォメーションフラグ">
+          {g.guitarInfos.map((gi, i) => (
+            <div key={i} className="style-row">
+              {GUITAR_PART_LABELS[gi.part]} (CH {gi.channel ?? '全'}), カポ{' '}
+              {gi.capo}, チューニング: {gi.stringNotes.join(', ')}
+            </div>
+          ))}
+        </StyleSubSection>
+      )}
+
+      {g.chords.length > 0 && (
+        <StyleSubSection title={`コード名 (${g.chords.length})`}>
+          <div className="style-list">
+            {g.chords.map((c, i) => (
+              <div key={i} className="style-list-row">
+                <span className="tick">{c.tick}</span>
+                <span>{formatChord(c.root, c.type, c.bass)}</span>
+              </div>
+            ))}
+          </div>
+        </StyleSubSection>
+      )}
+
+      {g.rehearsals.length > 0 && (
+        <StyleSubSection title={`リハーサルマーク (${g.rehearsals.length})`}>
+          <div className="style-list">
+            {g.rehearsals.map((r, i) => (
+              <div key={i} className="style-list-row">
+                <span className="tick">{r.tick}</span>
+                <span>
+                  {r.letter}
+                  {r.variation > 0 && "'".repeat(r.variation)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </StyleSubSection>
+      )}
+
+      {showSummary && (
+        <StyleSubSection title="その他">
+          <div className="style-summary">
+            {g.phraseCount > 0 && <span>フレーズマーク: {g.phraseCount}</span>}
+            {g.maxPhrases[0] && (
+              <span>最大レベル8フレーズ数: {g.maxPhrases[0].count}</span>
+            )}
+            {g.fingeringCount > 0 && <span>運指番号: {g.fingeringCount}</span>}
+            {g.guitarVoicingCount > 0 && (
+              <span>ギター押弦: {g.guitarVoicingCount}</span>
+            )}
+          </div>
+        </StyleSubSection>
+      )}
+    </div>
+  );
+}
+
+function StyleSubSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="style-subsection">
+      <h4>{title}</h4>
+      {children}
+    </div>
+  );
 }
 
 function FieldList({ children }: { children: ReactNode }) {

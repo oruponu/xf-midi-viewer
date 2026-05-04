@@ -212,3 +212,54 @@
   font-weight: 600;
   vertical-align: middle;
 }
+
+.style-subsection {
+  margin-top: 14px;
+}
+
+.style-subsection h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.style-row {
+  font-size: 13px;
+  color: var(--text-h);
+  padding: 2px 0;
+}
+
+.style-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  background: var(--code-bg);
+}
+
+.style-list-row {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 12px;
+  padding: 1px 0;
+}
+
+.style-list-row .tick {
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.style-summary {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text-h);
+}
