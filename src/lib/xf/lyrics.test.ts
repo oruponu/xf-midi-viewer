@@ -137,6 +137,16 @@ describe('parseLyricText', () => {
   test('escaped less-than is literal', () => {
     expect(parseLyricText('a\\<b')).toEqual([{ kind: 'text', text: 'a<b' }]);
   });
+
+  test('greater-than is treated as a horizontal tab', () => {
+    expect(parseLyricText('>やるせなさ')).toEqual([
+      { kind: 'text', text: '\tやるせなさ' },
+    ]);
+  });
+
+  test('escaped greater-than is literal', () => {
+    expect(parseLyricText('a\\>b')).toEqual([{ kind: 'text', text: 'a>b' }]);
+  });
 });
 
 describe('parseLyricStream', () => {
@@ -269,6 +279,14 @@ describe('normalizeLyricText', () => {
   test('preserves ruby brackets as text', () => {
     expect(normalizeLyricText('待(ま)月(つき)')).toBe('待(ま)月(つき)');
   });
+
+  test('greater-than is replaced with a tab', () => {
+    expect(normalizeLyricText('>やるせなさ')).toBe('\tやるせなさ');
+  });
+
+  test('escaped greater-than is literal', () => {
+    expect(normalizeLyricText('a\\>b')).toBe('a>b');
+  });
 });
 
 describe('splitLyricLines', () => {
@@ -313,5 +331,16 @@ describe('splitLyricLines', () => {
 
   test('escaped less-than is literal', () => {
     expect(splitLyricLines('a\\<b')).toEqual(['a<b']);
+  });
+
+  test('greater-than is replaced with a tab within each line', () => {
+    expect(splitLyricLines('>やるせなさ/>つぎ')).toEqual([
+      '\tやるせなさ',
+      '\tつぎ',
+    ]);
+  });
+
+  test('escaped greater-than is literal', () => {
+    expect(splitLyricLines('a\\>b')).toEqual(['a>b']);
   });
 });
