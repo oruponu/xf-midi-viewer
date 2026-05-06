@@ -5,19 +5,13 @@ import type {
   TimeSignatureChange,
 } from '../lib/smf/timing.ts';
 import { formatChord } from '../lib/xf/format.ts';
-import { parseLyricStream } from '../lib/xf/lyrics.ts';
-import type { ParsedLyric } from '../lib/xf/lyrics.ts';
+import type { LyricSyllable } from '../lib/xf/lyrics.ts';
 import type { StyleMessage } from '../lib/xf/types.ts';
 
 const BARS_PER_ROW = 4;
 
 type ChordMsg = Extract<StyleMessage, { kind: 'chord' }>;
 type RehearsalMsg = Extract<StyleMessage, { kind: 'rehearsal' }>;
-
-interface LyricItem {
-  tick: number;
-  text: string;
-}
 
 interface PlacedChord {
   msg: ChordMsg;
@@ -29,34 +23,32 @@ interface PlacedRehearsal {
   xPercent: number;
 }
 
-interface PlacedLyric {
-  parsed: ParsedLyric;
+interface PlacedSyllable {
+  syllable: LyricSyllable;
   xPercent: number;
 }
 
 export function LeadSheet({
   chords,
   rehearsals,
-  lyrics,
+  syllables,
   timing,
 }: {
   chords: ChordMsg[];
   rehearsals: RehearsalMsg[];
-  lyrics: LyricItem[];
+  syllables: LyricSyllable[];
   timing: SmfTiming;
 }) {
   if (timing.ppq <= 0) return null;
-  if (chords.length === 0 && rehearsals.length === 0 && lyrics.length === 0)
+  if (chords.length === 0 && rehearsals.length === 0 && syllables.length === 0)
     return null;
 
-  const parsedLyrics = parseLyricStream(lyrics).filter(
-    (p) => p.parts.length > 0,
-  );
+  const renderable = syllables.filter((s) => s.runs.length > 0);
 
   const allTicks = [
     ...chords.map((c) => c.tick),
     ...rehearsals.map((r) => r.tick),
-    ...lyrics.map((l) => l.tick),
+    ...syllables.map((s) => s.tick),
   ];
   const maxTick = Math.max(...allTicks);
   const maxBarBeat = tickToBarBeat(maxTick, timing);
@@ -79,7 +71,7 @@ export function LeadSheet({
             barCount={row.barCount}
             chords={chords}
             rehearsals={rehearsals}
-            parsedLyrics={parsedLyrics}
+            syllables={renderable}
             timing={timing}
           />
         ))}
@@ -93,14 +85,14 @@ function ScoreRow({
   barCount,
   chords,
   rehearsals,
-  parsedLyrics,
+  syllables,
   timing,
 }: {
   startBar: number;
   barCount: number;
   chords: ChordMsg[];
   rehearsals: RehearsalMsg[];
-  parsedLyrics: ParsedLyric[];
+  syllables: LyricSyllable[];
   timing: SmfTiming;
 }) {
   const startPos = startBar - 1;
@@ -124,10 +116,10 @@ function ScoreRow({
     if (x !== null) placedRehearsals.push({ msg: r, xPercent: x });
   }
 
-  const placedLyrics: PlacedLyric[] = [];
-  for (const p of parsedLyrics) {
-    const x = placeIfInRow(p.tick);
-    if (x !== null) placedLyrics.push({ parsed: p, xPercent: x });
+  const placedSyllables: PlacedSyllable[] = [];
+  for (const s of syllables) {
+    const x = placeIfInRow(s.tick);
+    if (x !== null) placedSyllables.push({ syllable: s, xPercent: x });
   }
 
   const bars = Array.from({ length: barCount }, (_, i) => startBar + i);
@@ -167,27 +159,24 @@ function ScoreRow({
         ))}
       </div>
 
-      {placedLyrics.length > 0 && (
+      {placedSyllables.length > 0 && (
         <div className="score-lyrics">
-          {placedLyrics.map((p, i) => (
+          {placedSyllables.map((p, i) => (
             <span
               key={i}
               className="score-lyric"
               style={{ left: `${p.xPercent}%` }}
             >
-              {p.parsed.parts.map((part, j) => {
-                if (part.kind === 'text') {
-                  return <span key={j}>{part.text}</span>;
+              {p.syllable.runs.map((run, j) => {
+                if (run.kind === 'text') {
+                  return <span key={j}>{run.text}</span>;
                 }
-                if (part.kind === 'ruby') {
-                  return (
-                    <ruby key={j}>
-                      {part.base}
-                      <rt>{part.reading}</rt>
-                    </ruby>
-                  );
-                }
-                return null;
+                return (
+                  <ruby key={j}>
+                    {run.base}
+                    <rt>{run.reading}</rt>
+                  </ruby>
+                );
               })}
             </span>
           ))}

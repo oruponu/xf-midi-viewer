@@ -3,7 +3,7 @@ import { formatTickAsBarBeat } from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 import { formatChord } from '../lib/xf/format.ts';
 import { parseKaraoke } from '../lib/xf/lyrics.ts';
-import type { LyricRun, LyricToken } from '../lib/xf/lyrics.ts';
+import type { LyricRun, LyricToken, ParsedKaraoke } from '../lib/xf/lyrics.ts';
 import type {
   GuitarPart,
   StyleMessage,
@@ -11,7 +11,6 @@ import type {
   XfData,
   XfInfoHeaderCommon,
   XfInfoHeaderLanguageSpecific,
-  XfKaraokeData,
   XfLyricsHeader,
   XfStyleData,
   XfVersion,
@@ -39,21 +38,18 @@ export function InfoPanel({ data }: { data: XfData }) {
     );
   }
 
+  const parsedKaraoke = parseKaraoke(data.karaoke);
+
   const chordsForChart: ChordMsg[] = [];
   const rehearsalsForChart: RehearsalMsg[] = [];
   for (const ev of data.style.events) {
     if (ev.kind === 'chord') chordsForChart.push(ev);
     else if (ev.kind === 'rehearsal') rehearsalsForChart.push(ev);
   }
-  const lyricsForChart: { tick: number; text: string }[] = [];
-  for (const ev of data.karaoke.events) {
-    if (ev.kind === 'lyric')
-      lyricsForChart.push({ tick: ev.tick, text: ev.text });
-  }
   const showChart =
     chordsForChart.length > 0 ||
     rehearsalsForChart.length > 0 ||
-    lyricsForChart.length > 0;
+    parsedKaraoke.syllables.length > 0;
 
   return (
     <section className="info-panel">
@@ -62,7 +58,7 @@ export function InfoPanel({ data }: { data: XfData }) {
         <LeadSheet
           chords={chordsForChart}
           rehearsals={rehearsalsForChart}
-          lyrics={lyricsForChart}
+          syllables={parsedKaraoke.syllables}
           timing={data.timing}
         />
       )}
@@ -70,7 +66,7 @@ export function InfoPanel({ data }: { data: XfData }) {
       {data.languageHeaders.map((h, i) => (
         <LanguageSection key={`${h.language}-${i}`} header={h} />
       ))}
-      {hasKaraoke && <KaraokeSection data={data.karaoke} />}
+      {hasKaraoke && <KaraokeSection parsed={parsedKaraoke} />}
       {hasStyle && <StyleSection data={data.style} timing={data.timing} />}
     </section>
   );
@@ -176,8 +172,7 @@ const VOCAL_PART_LABELS: Record<VocalPart, string> = {
   nonLyric: '歌詞以外',
 };
 
-function KaraokeSection({ data }: { data: XfKaraokeData }) {
-  const parsed = parseKaraoke(data);
+function KaraokeSection({ parsed }: { parsed: ParsedKaraoke }) {
   return (
     <div className="card">
       <h3>XF Karaoke Message</h3>
