@@ -34,20 +34,20 @@ describe('parseStyleMessage - chord (0x01)', () => {
       kind: 'chord',
       tick: 100,
       root: { note: 'C', accidental: 'natural' },
-      type: 'Maj',
+      type: '',
       bass: null,
     });
   });
 
-  test('parses C Maj7 / G with bass', () => {
+  test('parses C M7 / G with bass', () => {
     const msg = parseStyleMessage(
       u8(0x43, 0x7b, 0x01, 0x31, 0x02, 0x35, 0x00),
       0,
     );
     expect(msg).toMatchObject({
       kind: 'chord',
-      type: 'Maj7',
-      bass: { root: { note: 'G', accidental: 'natural' }, type: 'Maj' },
+      type: 'M7',
+      bass: { root: { note: 'G', accidental: 'natural' }, type: '' },
     });
   });
 
