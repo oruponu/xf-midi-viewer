@@ -60,6 +60,18 @@ export function LeadSheet({
     rows.push({ startBar: s, barCount: Math.min(BARS_PER_ROW, remaining) });
   }
 
+  const barTimeSignatures = new Map<number, TimeSignature>();
+  let lastShown: TimeSignature | null = null;
+  for (const change of timing.timeSignatures) {
+    const bb = tickToBarBeat(change.tick, timing);
+    if (!bb) continue;
+    if (bb.bar > totalBars) break;
+    if (lastShown && sameSignatureDisplay(lastShown, change.signature))
+      continue;
+    barTimeSignatures.set(bb.bar, change.signature);
+    lastShown = change.signature;
+  }
+
   return (
     <div className="card lead-sheet">
       <h3>コード進行</h3>
@@ -73,11 +85,16 @@ export function LeadSheet({
             rehearsals={rehearsals}
             syllables={renderable}
             timing={timing}
+            barTimeSignatures={barTimeSignatures}
           />
         ))}
       </div>
     </div>
   );
+}
+
+function sameSignatureDisplay(a: TimeSignature, b: TimeSignature): boolean {
+  return a.numerator === b.numerator && a.denominator === b.denominator;
 }
 
 function ScoreRow({
@@ -87,6 +104,7 @@ function ScoreRow({
   rehearsals,
   syllables,
   timing,
+  barTimeSignatures,
 }: {
   startBar: number;
   barCount: number;
@@ -94,6 +112,7 @@ function ScoreRow({
   rehearsals: RehearsalMsg[];
   syllables: LyricSyllable[];
   timing: SmfTiming;
+  barTimeSignatures: Map<number, TimeSignature>;
 }) {
   const startPos = startBar - 1;
   const endPos = startPos + barCount;
@@ -140,11 +159,24 @@ function ScoreRow({
       </div>
 
       <div className="score-bars">
-        {bars.map((bar) => (
-          <div key={bar} className="score-bar-cell">
-            <span className="score-bar-num">{bar}</span>
-          </div>
-        ))}
+        {bars.map((bar) => {
+          const sig = barTimeSignatures.get(bar);
+          const hasMeta = sig !== undefined;
+          return (
+            <div key={bar} className="score-bar-cell">
+              <span className="score-bar-num">{bar}</span>
+              {hasMeta && (
+                <div className="score-bar-meta">
+                  {sig && (
+                    <span className="score-timesig">
+                      {sig.numerator}/{sig.denominator}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="score-chords">
