@@ -338,3 +338,17 @@
   color: var(--text-h);
   white-space: nowrap;
 }
+
+.score-lyrics {
+  position: relative;
+  min-height: 22px;
+  margin-top: 4px;
+}
+
+.score-lyric {
+  position: absolute;
+  top: 0;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+}

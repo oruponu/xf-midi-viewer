@@ -12,6 +12,11 @@ const BARS_PER_ROW = 4;
 type ChordMsg = Extract<StyleMessage, { kind: 'chord' }>;
 type RehearsalMsg = Extract<StyleMessage, { kind: 'rehearsal' }>;
 
+interface LyricItem {
+  tick: number;
+  text: string;
+}
+
 interface PlacedChord {
   msg: ChordMsg;
   xPercent: number;
@@ -22,21 +27,30 @@ interface PlacedRehearsal {
   xPercent: number;
 }
 
+interface PlacedLyric {
+  item: LyricItem;
+  xPercent: number;
+}
+
 export function LeadSheet({
   chords,
   rehearsals,
+  lyrics,
   timing,
 }: {
   chords: ChordMsg[];
   rehearsals: RehearsalMsg[];
+  lyrics: LyricItem[];
   timing: SmfTiming;
 }) {
   if (timing.ppq <= 0) return null;
-  if (chords.length === 0 && rehearsals.length === 0) return null;
+  if (chords.length === 0 && rehearsals.length === 0 && lyrics.length === 0)
+    return null;
 
   const allTicks = [
     ...chords.map((c) => c.tick),
     ...rehearsals.map((r) => r.tick),
+    ...lyrics.map((l) => l.tick),
   ];
   const maxTick = Math.max(...allTicks);
   const maxBarBeat = tickToBarBeat(maxTick, timing);
@@ -59,6 +73,7 @@ export function LeadSheet({
             barCount={row.barCount}
             chords={chords}
             rehearsals={rehearsals}
+            lyrics={lyrics}
             timing={timing}
           />
         ))}
@@ -72,12 +87,14 @@ function ScoreRow({
   barCount,
   chords,
   rehearsals,
+  lyrics,
   timing,
 }: {
   startBar: number;
   barCount: number;
   chords: ChordMsg[];
   rehearsals: RehearsalMsg[];
+  lyrics: LyricItem[];
   timing: SmfTiming;
 }) {
   const startPos = startBar - 1;
@@ -99,6 +116,12 @@ function ScoreRow({
   for (const r of rehearsals) {
     const x = placeIfInRow(r.tick);
     if (x !== null) placedRehearsals.push({ msg: r, xPercent: x });
+  }
+
+  const placedLyrics: PlacedLyric[] = [];
+  for (const l of lyrics) {
+    const x = placeIfInRow(l.tick);
+    if (x !== null) placedLyrics.push({ item: l, xPercent: x });
   }
 
   const bars = Array.from({ length: barCount }, (_, i) => startBar + i);
@@ -137,6 +160,20 @@ function ScoreRow({
           </span>
         ))}
       </div>
+
+      {placedLyrics.length > 0 && (
+        <div className="score-lyrics">
+          {placedLyrics.map((p, i) => (
+            <span
+              key={i}
+              className="score-lyric"
+              style={{ left: `${p.xPercent}%` }}
+            >
+              {p.item.text}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

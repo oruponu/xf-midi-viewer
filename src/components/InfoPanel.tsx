@@ -44,7 +44,15 @@ export function InfoPanel({ data }: { data: XfData }) {
     if (ev.kind === 'chord') chordsForChart.push(ev);
     else if (ev.kind === 'rehearsal') rehearsalsForChart.push(ev);
   }
-  const showChart = chordsForChart.length > 0 || rehearsalsForChart.length > 0;
+  const lyricsForChart: { tick: number; text: string }[] = [];
+  for (const ev of data.karaoke.events) {
+    if (ev.kind === 'lyric')
+      lyricsForChart.push({ tick: ev.tick, text: ev.text });
+  }
+  const showChart =
+    chordsForChart.length > 0 ||
+    rehearsalsForChart.length > 0 ||
+    lyricsForChart.length > 0;
 
   return (
     <section className="info-panel">
@@ -53,6 +61,7 @@ export function InfoPanel({ data }: { data: XfData }) {
         <LeadSheet
           chords={chordsForChart}
           rehearsals={rehearsalsForChart}
+          lyrics={lyricsForChart}
           timing={data.timing}
         />
       )}
