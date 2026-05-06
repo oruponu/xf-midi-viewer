@@ -1,5 +1,6 @@
-import { tickToBarBeat } from '../lib/smf/timing.ts';
+import { formatKeySignature, tickToBarBeat } from '../lib/smf/timing.ts';
 import type {
+  KeySignature,
   SmfTiming,
   TimeSignature,
   TimeSignatureChange,
@@ -72,6 +73,17 @@ export function LeadSheet({
     lastShown = change.signature;
   }
 
+  const barKeySignatures = new Map<number, KeySignature>();
+  let lastKey: KeySignature | null = null;
+  for (const change of timing.keySignatures) {
+    const bb = tickToBarBeat(change.tick, timing);
+    if (!bb) continue;
+    if (bb.bar > totalBars) break;
+    if (lastKey && sameKeyDisplay(lastKey, change.signature)) continue;
+    barKeySignatures.set(bb.bar, change.signature);
+    lastKey = change.signature;
+  }
+
   return (
     <div className="card lead-sheet">
       <h3>コード進行</h3>
@@ -86,6 +98,7 @@ export function LeadSheet({
             syllables={renderable}
             timing={timing}
             barTimeSignatures={barTimeSignatures}
+            barKeySignatures={barKeySignatures}
           />
         ))}
       </div>
@@ -97,6 +110,10 @@ function sameSignatureDisplay(a: TimeSignature, b: TimeSignature): boolean {
   return a.numerator === b.numerator && a.denominator === b.denominator;
 }
 
+function sameKeyDisplay(a: KeySignature, b: KeySignature): boolean {
+  return a.sharps === b.sharps && a.mode === b.mode;
+}
+
 function ScoreRow({
   startBar,
   barCount,
@@ -105,6 +122,7 @@ function ScoreRow({
   syllables,
   timing,
   barTimeSignatures,
+  barKeySignatures,
 }: {
   startBar: number;
   barCount: number;
@@ -113,6 +131,7 @@ function ScoreRow({
   syllables: LyricSyllable[];
   timing: SmfTiming;
   barTimeSignatures: Map<number, TimeSignature>;
+  barKeySignatures: Map<number, KeySignature>;
 }) {
   const startPos = startBar - 1;
   const endPos = startPos + barCount;
@@ -161,12 +180,18 @@ function ScoreRow({
       <div className="score-bars">
         {bars.map((bar) => {
           const sig = barTimeSignatures.get(bar);
-          const hasMeta = sig !== undefined;
+          const key = barKeySignatures.get(bar);
+          const hasMeta = sig !== undefined || key !== undefined;
           return (
             <div key={bar} className="score-bar-cell">
               <span className="score-bar-num">{bar}</span>
               {hasMeta && (
                 <div className="score-bar-meta">
+                  {key && (
+                    <span className="score-key">
+                      Key: {formatKeySignature(key)}
+                    </span>
+                  )}
                   {sig && (
                     <span className="score-timesig">
                       {sig.numerator}/{sig.denominator}

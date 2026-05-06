@@ -3,6 +3,7 @@ import type { SmfFile, SmfTrack } from './types.ts';
 import {
   extractTiming,
   formatBarBeat,
+  formatKeySignature,
   formatTickAsBarBeat,
   tickToBarBeat,
 } from './timing.ts';
@@ -31,6 +32,15 @@ const timeSigMeta = (
     kind: 'meta' as const,
     metaType: 0x58,
     data: u8(numerator, denominatorPow, 24, 8),
+  },
+});
+
+const keySigMeta = (sharps: number, minor: boolean, deltaTime = 0) => ({
+  deltaTime,
+  event: {
+    kind: 'meta' as const,
+    metaType: 0x59,
+    data: u8(sharps & 0xff, minor ? 1 : 0),
   },
 });
 
@@ -96,6 +106,62 @@ describe('extractTiming', () => {
   test('SMPTE division yields ppq=0', () => {
     const timing = extractTiming(makeSmf([], 480, true));
     expect(timing.ppq).toBe(0);
+  });
+
+  test('returns empty keySignatures when no Key Signature events', () => {
+    const timing = extractTiming(makeSmf([]));
+    expect(timing.keySignatures).toEqual([]);
+  });
+
+  test('extracts a major Key Signature', () => {
+    const timing = extractTiming(makeSmf([{ events: [keySigMeta(2, false)] }]));
+    expect(timing.keySignatures).toEqual([
+      { tick: 0, signature: { sharps: 2, mode: 'major' } },
+    ]);
+  });
+
+  test('extracts a minor Key Signature', () => {
+    const timing = extractTiming(makeSmf([{ events: [keySigMeta(0, true)] }]));
+    expect(timing.keySignatures).toEqual([
+      { tick: 0, signature: { sharps: 0, mode: 'minor' } },
+    ]);
+  });
+
+  test('decodes flats as negative sharps via sign-extension', () => {
+    const timing = extractTiming(
+      makeSmf([{ events: [keySigMeta(-3, false)] }]),
+    );
+    expect(timing.keySignatures[0]?.signature.sharps).toBe(-3);
+  });
+
+  test('sorts Key Signatures from multiple tracks', () => {
+    const timing = extractTiming(
+      makeSmf([
+        { events: [keySigMeta(2, false, 480)] },
+        { events: [keySigMeta(-1, true, 240)] },
+      ]),
+    );
+    const ticks = timing.keySignatures.map((c) => c.tick);
+    expect(ticks).toEqual([240, 480]);
+  });
+});
+
+describe('formatKeySignature', () => {
+  test.each([
+    [0, 'major', 'C'],
+    [1, 'major', 'G'],
+    [2, 'major', 'D'],
+    [7, 'major', 'C#'],
+    [-1, 'major', 'F'],
+    [-2, 'major', 'Bb'],
+    [-7, 'major', 'Cb'],
+    [0, 'minor', 'Am'],
+    [1, 'minor', 'Em'],
+    [3, 'minor', 'F#m'],
+    [-1, 'minor', 'Dm'],
+    [-5, 'minor', 'Bbm'],
+  ] as const)('sharps=%i mode=%s -> %s', (sharps, mode, expected) => {
+    expect(formatKeySignature({ sharps, mode })).toBe(expected);
   });
 });
 

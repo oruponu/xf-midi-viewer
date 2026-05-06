@@ -12,9 +12,20 @@ export interface TimeSignatureChange {
   signature: TimeSignature;
 }
 
+export interface KeySignature {
+  sharps: number;
+  mode: 'major' | 'minor';
+}
+
+export interface KeySignatureChange {
+  tick: number;
+  signature: KeySignature;
+}
+
 export interface SmfTiming {
   ppq: number;
   timeSignatures: TimeSignatureChange[];
+  keySignatures: KeySignatureChange[];
 }
 
 export interface BarBeat {
@@ -37,12 +48,14 @@ export function extractTiming(smf: SmfFile): SmfTiming {
       : 0;
 
   const changes: TimeSignatureChange[] = [];
+  const keyChanges: KeySignatureChange[] = [];
   for (const track of smf.tracks) {
     let tick = 0;
     for (const tev of track.events) {
       tick += tev.deltaTime;
       const ev = tev.event;
-      if (ev.kind === 'meta' && ev.metaType === 0x58 && ev.data.length >= 4) {
+      if (ev.kind !== 'meta') continue;
+      if (ev.metaType === 0x58 && ev.data.length >= 4) {
         changes.push({
           tick,
           signature: {
@@ -52,17 +65,49 @@ export function extractTiming(smf: SmfFile): SmfTiming {
             thirtySecondNotesPerQuarter: ev.data[3]!,
           },
         });
+      } else if (ev.metaType === 0x59 && ev.data.length >= 2) {
+        const sfRaw = ev.data[0]!;
+        const sharps = sfRaw > 127 ? sfRaw - 256 : sfRaw;
+        keyChanges.push({
+          tick,
+          signature: {
+            sharps,
+            mode: ev.data[1]! === 1 ? 'minor' : 'major',
+          },
+        });
       }
     }
   }
 
   changes.sort((a, b) => a.tick - b.tick);
+  keyChanges.sort((a, b) => a.tick - b.tick);
 
   if (changes.length === 0 || changes[0]!.tick > 0) {
     changes.unshift({ tick: 0, signature: DEFAULT_SIGNATURE });
   }
 
-  return { ppq, timeSignatures: changes };
+  return { ppq, timeSignatures: changes, keySignatures: keyChanges };
+}
+
+const MAJOR_KEYS_SHARP = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#'] as const;
+const MAJOR_KEYS_FLAT = ['C', 'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'] as const;
+const MINOR_KEYS_SHARP = ['A', 'E', 'B', 'F#', 'C#', 'G#', 'D#', 'A#'] as const;
+const MINOR_KEYS_FLAT = ['A', 'D', 'G', 'C', 'F', 'Bb', 'Eb', 'Ab'] as const;
+
+export function formatKeySignature(key: KeySignature): string {
+  const idx = Math.abs(key.sharps);
+  if (idx > 7) return '?';
+  const useFlat = key.sharps < 0;
+  const table =
+    key.mode === 'major'
+      ? useFlat
+        ? MAJOR_KEYS_FLAT
+        : MAJOR_KEYS_SHARP
+      : useFlat
+        ? MINOR_KEYS_FLAT
+        : MINOR_KEYS_SHARP;
+  const root = table[idx]!;
+  return key.mode === 'minor' ? `${root}m` : root;
 }
 
 function ticksPerBeat(ppq: number, sig: TimeSignature): number {
