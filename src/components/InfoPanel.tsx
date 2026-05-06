@@ -195,22 +195,55 @@ function KaraokeSection({
       {parsed.header && <KaraokeHeaderInfo header={parsed.header} />}
       {parsed.tokens.length > 0 && (
         <div className="karaoke-stream">
-          {parsed.tokens.flatMap((tok, i) => {
-            const out: ReactNode[] = [];
-            if (dividerBefore.has(i)) {
-              out.push(<hr key={`d-${i}`} className="karaoke-section-break" />);
-            }
-            if (replaceWithDivider.has(i)) {
-              out.push(<hr key={i} className="karaoke-section-break" />);
-            } else {
-              out.push(renderToken(tok, i));
-            }
-            return out;
-          })}
+          {renderKaraokeStream(
+            parsed.tokens,
+            replaceWithDivider,
+            dividerBefore,
+          )}
         </div>
       )}
     </div>
   );
+}
+
+function renderKaraokeStream(
+  tokens: LyricToken[],
+  replaceWithDivider: Set<number>,
+  dividerBefore: Set<number>,
+): ReactNode[] {
+  const out: ReactNode[] = [];
+  let last: 'br' | 'hr' | 'inline' = 'br';
+
+  for (let i = 0; i < tokens.length; i += 1) {
+    const tok = tokens[i]!;
+
+    if (dividerBefore.has(i)) {
+      if (last === 'br') out.pop();
+      out.push(<hr key={`d-${i}`} className="karaoke-section-break" />);
+      last = 'hr';
+    }
+
+    if (replaceWithDivider.has(i)) {
+      if (last === 'br') out.pop();
+      out.push(<hr key={i} className="karaoke-section-break" />);
+      last = 'hr';
+      continue;
+    }
+
+    if (tok.kind === 'lineBreak' || tok.kind === 'pageBreak') {
+      if (last === 'br' || last === 'hr') continue;
+      out.push(<br key={i} />);
+      last = 'br';
+      continue;
+    }
+
+    out.push(renderToken(tok, i));
+    if (tok.kind === 'syllable' || tok.kind === 'vocalPart') {
+      last = 'inline';
+    }
+  }
+
+  return out;
 }
 
 function computeKaraokeSectionBreaks(
