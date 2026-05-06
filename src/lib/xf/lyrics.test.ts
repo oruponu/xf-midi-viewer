@@ -147,6 +147,16 @@ describe('parseLyricText', () => {
   test('escaped greater-than is literal', () => {
     expect(parseLyricText('a\\>b')).toEqual([{ kind: 'text', text: 'a>b' }]);
   });
+
+  test('percent (sub-newline) is removed from output', () => {
+    expect(parseLyricText('まえ%つぎ')).toEqual([
+      { kind: 'text', text: 'まえつぎ' },
+    ]);
+  });
+
+  test('escaped percent is literal', () => {
+    expect(parseLyricText('a\\%b')).toEqual([{ kind: 'text', text: 'a%b' }]);
+  });
 });
 
 describe('parseLyricStream', () => {
@@ -287,6 +297,14 @@ describe('normalizeLyricText', () => {
   test('escaped greater-than is literal', () => {
     expect(normalizeLyricText('a\\>b')).toBe('a>b');
   });
+
+  test('percent (sub-newline) is removed', () => {
+    expect(normalizeLyricText('まえ%つぎ')).toBe('まえつぎ');
+  });
+
+  test('escaped percent is literal', () => {
+    expect(normalizeLyricText('a\\%b')).toBe('a%b');
+  });
 });
 
 describe('splitLyricLines', () => {
@@ -342,5 +360,13 @@ describe('splitLyricLines', () => {
 
   test('escaped greater-than is literal', () => {
     expect(splitLyricLines('a\\>b')).toEqual(['a>b']);
+  });
+
+  test('percent (sub-newline) is removed within each line', () => {
+    expect(splitLyricLines('まえ%つぎ/さ%き')).toEqual(['まえつぎ', 'さき']);
+  });
+
+  test('escaped percent is literal', () => {
+    expect(splitLyricLines('a\\%b')).toEqual(['a%b']);
   });
 });

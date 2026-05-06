@@ -117,6 +117,11 @@ export function parseLyricStream(items: LyricInput[]): ParsedLyric[] {
         continue;
       }
 
+      if (ch === '%') {
+        i += 1;
+        continue;
+      }
+
       if (ch === '(') {
         const close = text.indexOf(')', i + 1);
         if (close !== -1 && close !== i + 1 && buffer.length > 0) {
@@ -221,6 +226,10 @@ export function normalizeLyricText(text: string): string {
       i += 1;
       continue;
     }
+    if (ch === '%') {
+      i += 1;
+      continue;
+    }
     out += ch;
     i += 1;
   }
@@ -258,6 +267,10 @@ export function splitLyricLines(text: string): string[] {
     }
     if (ch === '>') {
       current += '\t';
+      i += 1;
+      continue;
+    }
+    if (ch === '%') {
       i += 1;
       continue;
     }
