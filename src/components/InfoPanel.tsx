@@ -188,62 +188,118 @@ function KaraokeSection({
     parsed.tokens,
     rehearsals,
   );
+  const blocks = buildKaraokeBlocks(
+    parsed.tokens,
+    replaceWithDivider,
+    dividerBefore,
+  );
 
   return (
     <div className="card">
       <h3>XF Karaoke Message</h3>
       {parsed.header && <KaraokeHeaderInfo header={parsed.header} />}
-      {parsed.tokens.length > 0 && (
+      {blocks.length > 0 && (
         <div className="karaoke-stream">
-          {renderKaraokeStream(
-            parsed.tokens,
-            replaceWithDivider,
-            dividerBefore,
-          )}
+          {blocks.flatMap((block, idx) => {
+            if (block.kind === 'divider') {
+              return [
+                <hr key={`div-${idx}`} className="karaoke-section-break" />,
+              ];
+            }
+            return [
+              <div key={`bc-${idx}`} className="karaoke-badge-cell">
+                {block.part !== null && (
+                  <span className="part-badge">
+                    {VOCAL_PART_LABELS[block.part]}
+                  </span>
+                )}
+              </div>,
+              <div key={`lc-${idx}`} className="karaoke-lyric-cell">
+                {block.tokens}
+              </div>,
+            ];
+          })}
         </div>
       )}
     </div>
   );
 }
 
-function renderKaraokeStream(
+type KaraokeBlock =
+  | { kind: 'divider' }
+  | { kind: 'lyrics'; part: VocalPart | null; tokens: ReactNode[] };
+
+function buildKaraokeBlocks(
   tokens: LyricToken[],
   replaceWithDivider: Set<number>,
   dividerBefore: Set<number>,
-): ReactNode[] {
-  const out: ReactNode[] = [];
-  let last: 'br' | 'hr' | 'inline' = 'br';
+): KaraokeBlock[] {
+  const blocks: KaraokeBlock[] = [];
+  let pendingPart: VocalPart | null = null;
+  let activePart: VocalPart | null = null;
+  let displayedPart: VocalPart | null = null;
+  let currentContent: ReactNode[] = [];
+  let lastEmitted: 'br' | 'inline' | null = null;
+
+  const flushLyrics = (): void => {
+    if (lastEmitted === 'br') {
+      currentContent.pop();
+    }
+    if (currentContent.length > 0) {
+      const partForBlock =
+        activePart !== null && activePart !== displayedPart ? activePart : null;
+      blocks.push({
+        kind: 'lyrics',
+        part: partForBlock,
+        tokens: currentContent,
+      });
+      if (partForBlock !== null) {
+        displayedPart = partForBlock;
+      }
+    }
+    currentContent = [];
+    lastEmitted = null;
+  };
 
   for (let i = 0; i < tokens.length; i += 1) {
     const tok = tokens[i]!;
 
     if (dividerBefore.has(i)) {
-      if (last === 'br') out.pop();
-      out.push(<hr key={`d-${i}`} className="karaoke-section-break" />);
-      last = 'hr';
+      flushLyrics();
+      blocks.push({ kind: 'divider' });
     }
 
     if (replaceWithDivider.has(i)) {
-      if (last === 'br') out.pop();
-      out.push(<hr key={i} className="karaoke-section-break" />);
-      last = 'hr';
+      flushLyrics();
+      blocks.push({ kind: 'divider' });
+      continue;
+    }
+
+    if (tok.kind === 'vocalPart') {
+      pendingPart = tok.part;
       continue;
     }
 
     if (tok.kind === 'lineBreak' || tok.kind === 'pageBreak') {
-      if (last === 'br' || last === 'hr') continue;
-      out.push(<br key={i} />);
-      last = 'br';
+      if (lastEmitted === null || lastEmitted === 'br') continue;
+      currentContent.push(<br key={i} />);
+      lastEmitted = 'br';
       continue;
     }
 
-    out.push(renderToken(tok, i));
-    if (tok.kind === 'syllable' || tok.kind === 'vocalPart') {
-      last = 'inline';
+    if (tok.kind === 'syllable' && pendingPart !== activePart) {
+      flushLyrics();
+      activePart = pendingPart;
+    }
+
+    currentContent.push(renderToken(tok, i));
+    if (tok.kind === 'syllable') {
+      lastEmitted = 'inline';
     }
   }
 
-  return out;
+  flushLyrics();
+  return blocks;
 }
 
 function computeKaraokeSectionBreaks(
@@ -322,7 +378,10 @@ function KaraokeHeaderInfo({ header }: { header: XfLyricsHeader }) {
   );
 }
 
-function renderToken(tok: LyricToken, index: number): ReactNode {
+function renderToken(
+  tok: Exclude<LyricToken, { kind: 'vocalPart' }>,
+  index: number,
+): ReactNode {
   switch (tok.kind) {
     case 'syllable':
       return (
@@ -335,12 +394,6 @@ function renderToken(tok: LyricToken, index: number): ReactNode {
       return <br key={index} />;
     case 'subBreak':
       return <wbr key={index} />;
-    case 'vocalPart':
-      return (
-        <span key={index} className="part-badge">
-          {VOCAL_PART_LABELS[tok.part]}
-        </span>
-      );
   }
 }
 
