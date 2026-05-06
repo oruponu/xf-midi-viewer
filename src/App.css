@@ -201,6 +201,11 @@
   color: var(--text-h);
 }
 
+.lyric ruby rt {
+  font-size: 0.55em;
+  color: var(--text-m);
+}
+
 .part-badge {
   display: inline-block;
   padding: 1px 6px;

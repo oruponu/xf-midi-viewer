@@ -2,10 +2,10 @@ import type { ReactNode } from 'react';
 import { formatTickAsBarBeat } from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 import { formatChord } from '../lib/xf/format.ts';
-import { splitLyricLines } from '../lib/xf/lyrics.ts';
+import { parseKaraoke } from '../lib/xf/lyrics.ts';
+import type { LyricRun, LyricToken } from '../lib/xf/lyrics.ts';
 import type {
   GuitarPart,
-  KaraokeEvent,
   StyleMessage,
   VocalPart,
   XfData,
@@ -177,13 +177,14 @@ const VOCAL_PART_LABELS: Record<VocalPart, string> = {
 };
 
 function KaraokeSection({ data }: { data: XfKaraokeData }) {
+  const parsed = parseKaraoke(data);
   return (
     <div className="card">
       <h3>XF Karaoke Message</h3>
-      {data.header && <KaraokeHeaderInfo header={data.header} />}
-      {data.events.length > 0 && (
+      {parsed.header && <KaraokeHeaderInfo header={parsed.header} />}
+      {parsed.tokens.length > 0 && (
         <div className="karaoke-stream">
-          {data.events.map((ev, i) => renderKaraokeEvent(ev, i))}
+          {parsed.tokens.map((tok, i) => renderToken(tok, i))}
         </div>
       )}
     </div>
@@ -207,29 +208,38 @@ function KaraokeHeaderInfo({ header }: { header: XfLyricsHeader }) {
   );
 }
 
-function renderKaraokeEvent(ev: KaraokeEvent, index: number): ReactNode {
-  switch (ev.kind) {
-    case 'lyric':
+function renderToken(tok: LyricToken, index: number): ReactNode {
+  switch (tok.kind) {
+    case 'syllable':
       return (
         <span key={index} className="lyric">
-          {splitLyricLines(ev.text).map((line, j) => (
-            <span key={j}>
-              {j > 0 && <br />}
-              {line}
-            </span>
-          ))}
+          {tok.runs.map((run, j) => renderRun(run, j))}
         </span>
       );
-    case 'carriageReturn':
-    case 'lineFeed':
+    case 'lineBreak':
+    case 'pageBreak':
       return <br key={index} />;
+    case 'subBreak':
+      return <wbr key={index} />;
     case 'vocalPart':
       return (
         <span key={index} className="part-badge">
-          {VOCAL_PART_LABELS[ev.part]}
+          {VOCAL_PART_LABELS[tok.part]}
         </span>
       );
   }
+}
+
+function renderRun(run: LyricRun, index: number): ReactNode {
+  if (run.kind === 'text') {
+    return <span key={index}>{run.text}</span>;
+  }
+  return (
+    <ruby key={index}>
+      {run.base}
+      <rt>{run.reading}</rt>
+    </ruby>
+  );
 }
 
 const GUITAR_PART_LABELS: Record<GuitarPart, string> = {
