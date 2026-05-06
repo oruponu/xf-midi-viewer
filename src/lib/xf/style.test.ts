@@ -81,6 +81,18 @@ describe('parseStyleMessage - chord (0x01)', () => {
     );
     expect(msg).toMatchObject({ kind: 'chord', bass: null });
   });
+
+  test('parses on-chord with bt=127 as bass note only', () => {
+    const msg = parseStyleMessage(
+      u8(0x43, 0x7b, 0x01, 0x31, 0x02, 0x35, 0x7f),
+      0,
+    );
+    expect(msg).toMatchObject({
+      kind: 'chord',
+      type: 'M7',
+      bass: { root: { note: 'G', accidental: 'natural' }, type: '' },
+    });
+  });
 });
 
 describe('parseStyleMessage - rehearsal (0x02)', () => {

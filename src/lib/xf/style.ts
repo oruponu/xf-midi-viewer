@@ -151,10 +151,12 @@ function parseChord(data: Uint8Array, tick: number): StyleMessage | null {
   const bn = data[5]!;
   const bt = data[6]!;
   let bass: ChordBass | null = null;
-  if (bn !== 127 && bt !== 127) {
+  if (bn !== 127) {
     const bassRoot = decodeChordRoot(bn);
-    if (bassRoot !== null && bt < CHORD_TYPES.length) {
-      bass = { root: bassRoot, type: CHORD_TYPES[bt]! };
+    if (bassRoot !== null) {
+      const btType =
+        bt !== 127 && bt < CHORD_TYPES.length ? CHORD_TYPES[bt]! : '';
+      bass = { root: bassRoot, type: btType };
     }
   }
 
