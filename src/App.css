@@ -341,14 +341,23 @@
 
 .score-lyrics {
   position: relative;
-  min-height: 22px;
+  min-height: 32px;
   margin-top: 4px;
 }
 
 .score-lyric {
   position: absolute;
-  top: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: flex-end;
   font-size: 13px;
   color: var(--text);
   white-space: nowrap;
+  line-height: 1;
+}
+
+.score-lyric rt {
+  font-size: 9px;
+  color: var(--text);
+  line-height: 1;
 }

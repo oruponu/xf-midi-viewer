@@ -5,6 +5,8 @@ import type {
   TimeSignatureChange,
 } from '../lib/smf/timing.ts';
 import { formatChord } from '../lib/xf/format.ts';
+import { parseLyricStream } from '../lib/xf/lyrics.ts';
+import type { ParsedLyric } from '../lib/xf/lyrics.ts';
 import type { StyleMessage } from '../lib/xf/types.ts';
 
 const BARS_PER_ROW = 4;
@@ -28,7 +30,7 @@ interface PlacedRehearsal {
 }
 
 interface PlacedLyric {
-  item: LyricItem;
+  parsed: ParsedLyric;
   xPercent: number;
 }
 
@@ -46,6 +48,10 @@ export function LeadSheet({
   if (timing.ppq <= 0) return null;
   if (chords.length === 0 && rehearsals.length === 0 && lyrics.length === 0)
     return null;
+
+  const parsedLyrics = parseLyricStream(lyrics).filter(
+    (p) => p.parts.length > 0,
+  );
 
   const allTicks = [
     ...chords.map((c) => c.tick),
@@ -73,7 +79,7 @@ export function LeadSheet({
             barCount={row.barCount}
             chords={chords}
             rehearsals={rehearsals}
-            lyrics={lyrics}
+            parsedLyrics={parsedLyrics}
             timing={timing}
           />
         ))}
@@ -87,14 +93,14 @@ function ScoreRow({
   barCount,
   chords,
   rehearsals,
-  lyrics,
+  parsedLyrics,
   timing,
 }: {
   startBar: number;
   barCount: number;
   chords: ChordMsg[];
   rehearsals: RehearsalMsg[];
-  lyrics: LyricItem[];
+  parsedLyrics: ParsedLyric[];
   timing: SmfTiming;
 }) {
   const startPos = startBar - 1;
@@ -119,9 +125,9 @@ function ScoreRow({
   }
 
   const placedLyrics: PlacedLyric[] = [];
-  for (const l of lyrics) {
-    const x = placeIfInRow(l.tick);
-    if (x !== null) placedLyrics.push({ item: l, xPercent: x });
+  for (const p of parsedLyrics) {
+    const x = placeIfInRow(p.tick);
+    if (x !== null) placedLyrics.push({ parsed: p, xPercent: x });
   }
 
   const bars = Array.from({ length: barCount }, (_, i) => startBar + i);
@@ -169,7 +175,16 @@ function ScoreRow({
               className="score-lyric"
               style={{ left: `${p.xPercent}%` }}
             >
-              {p.item.text}
+              {p.parsed.parts.map((part, j) =>
+                part.kind === 'text' ? (
+                  <span key={j}>{part.text}</span>
+                ) : (
+                  <ruby key={j}>
+                    {part.base}
+                    <rt>{part.reading}</rt>
+                  </ruby>
+                ),
+              )}
             </span>
           ))}
         </div>
