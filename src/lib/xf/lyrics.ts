@@ -1,6 +1,7 @@
 export type LyricPart =
   | { kind: 'text'; text: string }
-  | { kind: 'ruby'; base: string; reading: string };
+  | { kind: 'ruby'; base: string; reading: string }
+  | { kind: 'newline' };
 
 export interface LyricInput {
   tick: number;
@@ -85,8 +86,22 @@ export function parseLyricStream(items: LyricInput[]): ParsedLyric[] {
       const ch = text[i]!;
 
       if (ch === '\\' && i + 1 < text.length) {
-        buffer += text[i + 1]!;
+        const next = text[i + 1]!;
+        if (next === 'r' || next === 'n') {
+          flushBuffer();
+          parsed.parts.push({ kind: 'newline' });
+          i += 2;
+          continue;
+        }
+        buffer += next;
         i += 2;
+        continue;
+      }
+
+      if (ch === '/' || ch === '\r' || ch === '\n') {
+        flushBuffer();
+        parsed.parts.push({ kind: 'newline' });
+        i += 1;
         continue;
       }
 
@@ -199,4 +214,40 @@ export function normalizeLyricText(text: string): string {
     i += 1;
   }
   return out;
+}
+
+export function splitLyricLines(text: string): string[] {
+  const lines: string[] = [];
+  let current = '';
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i]!;
+    if (ch === '\\' && i + 1 < text.length) {
+      const next = text[i + 1]!;
+      if (next === 'r' || next === 'n') {
+        lines.push(current);
+        current = '';
+        i += 2;
+        continue;
+      }
+      current += next;
+      i += 2;
+      continue;
+    }
+    if (ch === '/' || ch === '\r' || ch === '\n') {
+      lines.push(current);
+      current = '';
+      i += 1;
+      continue;
+    }
+    if (ch === '^') {
+      current += ' ';
+      i += 1;
+      continue;
+    }
+    current += ch;
+    i += 1;
+  }
+  lines.push(current);
+  return lines;
 }

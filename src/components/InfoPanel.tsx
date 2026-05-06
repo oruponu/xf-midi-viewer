@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { formatTickAsBarBeat } from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 import { formatChord } from '../lib/xf/format.ts';
-import { normalizeLyricText } from '../lib/xf/lyrics.ts';
+import { splitLyricLines } from '../lib/xf/lyrics.ts';
 import type {
   GuitarPart,
   KaraokeEvent,
@@ -212,7 +212,12 @@ function renderKaraokeEvent(ev: KaraokeEvent, index: number): ReactNode {
     case 'lyric':
       return (
         <span key={index} className="lyric">
-          {normalizeLyricText(ev.text)}
+          {splitLyricLines(ev.text).map((line, j) => (
+            <span key={j}>
+              {j > 0 && <br />}
+              {line}
+            </span>
+          ))}
         </span>
       );
     case 'carriageReturn':

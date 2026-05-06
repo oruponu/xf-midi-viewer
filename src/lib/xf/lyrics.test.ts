@@ -3,6 +3,7 @@ import {
   normalizeLyricText,
   parseLyricStream,
   parseLyricText,
+  splitLyricLines,
 } from './lyrics.ts';
 
 describe('parseLyricText', () => {
@@ -85,6 +86,44 @@ describe('parseLyricText', () => {
 
   test('escaped caret is literal', () => {
     expect(parseLyricText('a\\^b')).toEqual([{ kind: 'text', text: 'a^b' }]);
+  });
+
+  test('slash is treated as a newline', () => {
+    expect(parseLyricText('待てど/来ぬ')).toEqual([
+      { kind: 'text', text: '待てど' },
+      { kind: 'newline' },
+      { kind: 'text', text: '来ぬ' },
+    ]);
+  });
+
+  test('escaped slash is literal', () => {
+    expect(parseLyricText('a\\/b')).toEqual([{ kind: 'text', text: 'a/b' }]);
+  });
+
+  test('CR and LF chars in text are treated as newlines', () => {
+    expect(parseLyricText('a\rb\nc')).toEqual([
+      { kind: 'text', text: 'a' },
+      { kind: 'newline' },
+      { kind: 'text', text: 'b' },
+      { kind: 'newline' },
+      { kind: 'text', text: 'c' },
+    ]);
+  });
+
+  test('backslash-r and backslash-n escape sequences are newlines', () => {
+    expect(parseLyricText('a\\rb\\nc')).toEqual([
+      { kind: 'text', text: 'a' },
+      { kind: 'newline' },
+      { kind: 'text', text: 'b' },
+      { kind: 'newline' },
+      { kind: 'text', text: 'c' },
+    ]);
+  });
+
+  test('newline inside ruby reading is part of text', () => {
+    expect(parseLyricText('待(ま/た)')).toEqual([
+      { kind: 'ruby', base: '待', reading: 'ま/た' },
+    ]);
   });
 });
 
@@ -217,5 +256,42 @@ describe('normalizeLyricText', () => {
 
   test('preserves ruby brackets as text', () => {
     expect(normalizeLyricText('待(ま)月(つき)')).toBe('待(ま)月(つき)');
+  });
+});
+
+describe('splitLyricLines', () => {
+  test('plain text stays as single segment', () => {
+    expect(splitLyricLines('hello')).toEqual(['hello']);
+  });
+
+  test('splits on slash', () => {
+    expect(splitLyricLines('待てど/来ぬ')).toEqual(['待てど', '来ぬ']);
+  });
+
+  test('splits on raw CR and LF chars', () => {
+    expect(splitLyricLines('a\rb\nc')).toEqual(['a', 'b', 'c']);
+  });
+
+  test('splits on backslash-r and backslash-n escape sequences', () => {
+    expect(splitLyricLines('a\\rb\\nc')).toEqual(['a', 'b', 'c']);
+  });
+
+  test('escaped slash is literal', () => {
+    expect(splitLyricLines('a\\/b')).toEqual(['a/b']);
+  });
+
+  test('escaped backslash is literal', () => {
+    expect(splitLyricLines('a\\\\b')).toEqual(['a\\b']);
+  });
+
+  test('preserves ruby brackets as text', () => {
+    expect(splitLyricLines('待(ま)/暮(く)')).toEqual(['待(ま)', '暮(く)']);
+  });
+
+  test('caret is replaced with space within each line', () => {
+    expect(splitLyricLines('こよいは^月も/待(ま)てど')).toEqual([
+      'こよいは 月も',
+      '待(ま)てど',
+    ]);
   });
 });

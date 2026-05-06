@@ -175,16 +175,20 @@ function ScoreRow({
               className="score-lyric"
               style={{ left: `${p.xPercent}%` }}
             >
-              {p.parsed.parts.map((part, j) =>
-                part.kind === 'text' ? (
-                  <span key={j}>{part.text}</span>
-                ) : (
-                  <ruby key={j}>
-                    {part.base}
-                    <rt>{part.reading}</rt>
-                  </ruby>
-                ),
-              )}
+              {p.parsed.parts.map((part, j) => {
+                if (part.kind === 'text') {
+                  return <span key={j}>{part.text}</span>;
+                }
+                if (part.kind === 'ruby') {
+                  return (
+                    <ruby key={j}>
+                      {part.base}
+                      <rt>{part.reading}</rt>
+                    </ruby>
+                  );
+                }
+                return null;
+              })}
             </span>
           ))}
         </div>
