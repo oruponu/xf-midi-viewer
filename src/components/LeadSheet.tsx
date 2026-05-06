@@ -188,13 +188,25 @@ function ScoreRow({
               {hasMeta && (
                 <div className="score-bar-meta">
                   {key && (
-                    <span className="score-key">
-                      Key: {formatKeySignature(key)}
+                    <span
+                      className="score-key"
+                      aria-label={`Key ${formatKeySignature(key)}`}
+                    >
+                      <span className="score-key-label">KEY</span>
+                      <span className="score-key-value">
+                        {formatKeySignature(key)}
+                      </span>
                     </span>
                   )}
                   {sig && (
-                    <span className="score-timesig">
-                      {sig.numerator}/{sig.denominator}
+                    <span
+                      className="score-timesig"
+                      aria-label={`Time signature ${sig.numerator}/${sig.denominator}`}
+                    >
+                      <span className="score-timesig-num">{sig.numerator}</span>
+                      <span className="score-timesig-den">
+                        {sig.denominator}
+                      </span>
                     </span>
                   )}
                 </div>

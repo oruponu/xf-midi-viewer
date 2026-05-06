@@ -5,6 +5,8 @@
   --border: #e5e4e7;
   --code-bg: #f4f3ec;
   --accent: #aa3bff;
+  --key-color: #0f766e;
+  --timesig-color: #b45309;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
@@ -25,6 +27,8 @@
     --border: #2e303a;
     --code-bg: #1f2028;
     --accent: #c084fc;
+    --key-color: #2dd4bf;
+    --timesig-color: #fbbf24;
   }
 }
 
