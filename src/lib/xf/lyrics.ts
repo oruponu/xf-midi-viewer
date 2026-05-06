@@ -90,6 +90,12 @@ export function parseLyricStream(items: LyricInput[]): ParsedLyric[] {
         continue;
       }
 
+      if (ch === '^') {
+        buffer += ' ';
+        i += 1;
+        continue;
+      }
+
       if (ch === '(') {
         const close = text.indexOf(')', i + 1);
         if (close !== -1 && close !== i + 1 && buffer.length > 0) {
@@ -172,4 +178,25 @@ function appendText(parts: LyricPart[], text: string): void {
 
 export function parseLyricText(text: string): LyricPart[] {
   return parseLyricStream([{ tick: 0, text }])[0]?.parts ?? [];
+}
+
+export function normalizeLyricText(text: string): string {
+  let out = '';
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i]!;
+    if (ch === '\\' && i + 1 < text.length) {
+      out += text[i + 1]!;
+      i += 2;
+      continue;
+    }
+    if (ch === '^') {
+      out += ' ';
+      i += 1;
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
 }

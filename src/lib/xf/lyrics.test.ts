@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { parseLyricStream, parseLyricText } from './lyrics.ts';
+import {
+  normalizeLyricText,
+  parseLyricStream,
+  parseLyricText,
+} from './lyrics.ts';
 
 describe('parseLyricText', () => {
   test('plain text', () => {
@@ -64,6 +68,23 @@ describe('parseLyricText', () => {
 
   test('backslash escapes backslash', () => {
     expect(parseLyricText('a\\\\b')).toEqual([{ kind: 'text', text: 'a\\b' }]);
+  });
+
+  test('caret is treated as a space', () => {
+    expect(parseLyricText('こよいは^月も')).toEqual([
+      { kind: 'text', text: 'こよいは 月も' },
+    ]);
+  });
+
+  test('caret as space does not break following ruby', () => {
+    expect(parseLyricText('は^月(つき)')).toEqual([
+      { kind: 'text', text: 'は ' },
+      { kind: 'ruby', base: '月', reading: 'つき' },
+    ]);
+  });
+
+  test('escaped caret is literal', () => {
+    expect(parseLyricText('a\\^b')).toEqual([{ kind: 'text', text: 'a^b' }]);
   });
 });
 
@@ -174,5 +195,27 @@ describe('parseLyricStream', () => {
       { tick: 10, parts: [{ kind: 'text', text: '主[とこ' }] },
       { tick: 20, parts: [] },
     ]);
+  });
+});
+
+describe('normalizeLyricText', () => {
+  test('plain text is unchanged', () => {
+    expect(normalizeLyricText('hello')).toBe('hello');
+  });
+
+  test('caret is replaced with space', () => {
+    expect(normalizeLyricText('こよいは^月も')).toBe('こよいは 月も');
+  });
+
+  test('escaped caret is literal', () => {
+    expect(normalizeLyricText('a\\^b')).toBe('a^b');
+  });
+
+  test('escaped backslash is literal', () => {
+    expect(normalizeLyricText('a\\\\b')).toBe('a\\b');
+  });
+
+  test('preserves ruby brackets as text', () => {
+    expect(normalizeLyricText('待(ま)月(つき)')).toBe('待(ま)月(つき)');
   });
 });
