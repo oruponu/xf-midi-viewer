@@ -66,7 +66,12 @@ export function InfoPanel({ data }: { data: XfData }) {
       {data.languageHeaders.map((h, i) => (
         <LanguageSection key={`${h.language}-${i}`} header={h} />
       ))}
-      {hasKaraoke && <KaraokeSection parsed={parsedKaraoke} />}
+      {hasKaraoke && (
+        <KaraokeSection
+          parsed={parsedKaraoke}
+          rehearsals={rehearsalsForChart}
+        />
+      )}
       {hasStyle && <StyleSection data={data.style} timing={data.timing} />}
     </section>
   );
@@ -172,18 +177,74 @@ const VOCAL_PART_LABELS: Record<VocalPart, string> = {
   nonLyric: '歌詞以外',
 };
 
-function KaraokeSection({ parsed }: { parsed: ParsedKaraoke }) {
+function KaraokeSection({
+  parsed,
+  rehearsals,
+}: {
+  parsed: ParsedKaraoke;
+  rehearsals: RehearsalMsg[];
+}) {
+  const { replaceWithDivider, dividerBefore } = computeKaraokeSectionBreaks(
+    parsed.tokens,
+    rehearsals,
+  );
+
   return (
     <div className="card">
       <h3>XF Karaoke Message</h3>
       {parsed.header && <KaraokeHeaderInfo header={parsed.header} />}
       {parsed.tokens.length > 0 && (
         <div className="karaoke-stream">
-          {parsed.tokens.map((tok, i) => renderToken(tok, i))}
+          {parsed.tokens.flatMap((tok, i) => {
+            const out: ReactNode[] = [];
+            if (dividerBefore.has(i)) {
+              out.push(<hr key={`d-${i}`} className="karaoke-section-break" />);
+            }
+            if (replaceWithDivider.has(i)) {
+              out.push(<hr key={i} className="karaoke-section-break" />);
+            } else {
+              out.push(renderToken(tok, i));
+            }
+            return out;
+          })}
         </div>
       )}
     </div>
   );
+}
+
+function computeKaraokeSectionBreaks(
+  tokens: LyricToken[],
+  rehearsals: RehearsalMsg[],
+): { replaceWithDivider: Set<number>; dividerBefore: Set<number> } {
+  const replaceWithDivider = new Set<number>();
+  const dividerBefore = new Set<number>();
+  if (rehearsals.length === 0) {
+    return { replaceWithDivider, dividerBefore };
+  }
+
+  let prevRehearsalTick = -Infinity;
+  for (const r of rehearsals) {
+    let snappedIdx = -1;
+    for (let i = 0; i < tokens.length; i += 1) {
+      const tok = tokens[i]!;
+      if (tok.tick > r.tick) break;
+      if (tok.kind !== 'lineBreak' && tok.kind !== 'pageBreak') continue;
+      if (tok.tick <= prevRehearsalTick) continue;
+      snappedIdx = i;
+    }
+
+    if (snappedIdx !== -1) {
+      replaceWithDivider.add(snappedIdx);
+    } else {
+      const fallbackIdx = tokens.findIndex((t) => t.tick >= r.tick);
+      if (fallbackIdx > 0) dividerBefore.add(fallbackIdx);
+    }
+
+    prevRehearsalTick = r.tick;
+  }
+
+  return { replaceWithDivider, dividerBefore };
 }
 
 function KaraokeHeaderInfo({ header }: { header: XfLyricsHeader }) {

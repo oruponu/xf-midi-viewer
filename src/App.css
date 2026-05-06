@@ -201,6 +201,12 @@
   color: var(--text-h);
 }
 
+.karaoke-section-break {
+  border: none;
+  height: 0;
+  margin: 18px 0 6px;
+}
+
 .lyric ruby rt {
   font-size: 0.55em;
   color: var(--text-m);
