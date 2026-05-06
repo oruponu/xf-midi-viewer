@@ -332,6 +332,13 @@ function computeKaraokeSectionBreaks(
       }
     }
 
+    if (fwdIdx !== -1 && nextRehearsalTick !== Infinity) {
+      const fwdTick = tokens[fwdIdx]!.tick;
+      if (fwdTick - r.tick > nextRehearsalTick - fwdTick) {
+        fwdIdx = -1;
+      }
+    }
+
     let chosenIdx = -1;
     if (backIdx !== -1 && fwdIdx !== -1) {
       let backChunk = 0;
@@ -339,7 +346,7 @@ function computeKaraokeSectionBreaks(
       for (let i = backIdx + 1; i < fwdIdx; i += 1) {
         const tok = tokens[i]!;
         if (tok.kind !== 'syllable') continue;
-        if (tok.tick <= r.tick) backChunk += 1;
+        if (tok.tick < r.tick) backChunk += 1;
         else fwdChunk += 1;
       }
       chosenIdx = backChunk <= fwdChunk ? backIdx : fwdIdx;
