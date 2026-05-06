@@ -125,6 +125,18 @@ describe('parseLyricText', () => {
       { kind: 'ruby', base: '待', reading: 'ま/た' },
     ]);
   });
+
+  test('less-than is treated as a page break', () => {
+    expect(parseLyricText('まえ<つぎ')).toEqual([
+      { kind: 'text', text: 'まえ' },
+      { kind: 'newline' },
+      { kind: 'text', text: 'つぎ' },
+    ]);
+  });
+
+  test('escaped less-than is literal', () => {
+    expect(parseLyricText('a\\<b')).toEqual([{ kind: 'text', text: 'a<b' }]);
+  });
 });
 
 describe('parseLyricStream', () => {
@@ -293,5 +305,13 @@ describe('splitLyricLines', () => {
       'こよいは 月も',
       '待(ま)てど',
     ]);
+  });
+
+  test('splits on less-than as a page break', () => {
+    expect(splitLyricLines('まえ<つぎ')).toEqual(['まえ', 'つぎ']);
+  });
+
+  test('escaped less-than is literal', () => {
+    expect(splitLyricLines('a\\<b')).toEqual(['a<b']);
   });
 });

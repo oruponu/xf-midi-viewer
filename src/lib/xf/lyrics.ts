@@ -98,7 +98,7 @@ export function parseLyricStream(items: LyricInput[]): ParsedLyric[] {
         continue;
       }
 
-      if (ch === '/' || ch === '\r' || ch === '\n') {
+      if (ch === '/' || ch === '<' || ch === '\r' || ch === '\n') {
         flushBuffer();
         parsed.parts.push({ kind: 'newline' });
         i += 1;
@@ -234,7 +234,7 @@ export function splitLyricLines(text: string): string[] {
       i += 2;
       continue;
     }
-    if (ch === '/' || ch === '\r' || ch === '\n') {
+    if (ch === '/' || ch === '<' || ch === '\r' || ch === '\n') {
       lines.push(current);
       current = '';
       i += 1;
