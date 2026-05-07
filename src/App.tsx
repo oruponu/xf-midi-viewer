@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import './App.css';
 import { InfoPanel } from './components/InfoPanel.tsx';
@@ -20,14 +20,13 @@ function App() {
   const [smf, setSmf] = useState<SmfFile | null>(null);
   const [xf, setXf] = useState<XfData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const playbackSequence = useMemo(
     () => (smf ? buildPlaybackSequence(smf) : null),
     [smf],
   );
 
-  const onChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
+  const loadFile = async (f: File) => {
     setFile({ name: f.name, size: f.size, lastModified: f.lastModified });
     setError(null);
     setXf(null);
@@ -42,8 +41,54 @@ function App() {
     }
   };
 
+  const onChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    void loadFile(f);
+  };
+
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) =>
+      e.dataTransfer
+        ? Array.from(e.dataTransfer.types).includes('Files')
+        : false;
+
+    const onDragEnter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+    };
+    const onDragOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+      setIsDragging(true);
+    };
+    const onDragLeave = (e: DragEvent) => {
+      if (e.relatedTarget !== null) return;
+      setIsDragging(false);
+    };
+    const onDrop = (e: DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      const f = e.dataTransfer?.files?.[0];
+      if (!f) return;
+      void loadFile(f);
+    };
+
+    document.addEventListener('dragenter', onDragEnter);
+    document.addEventListener('dragover', onDragOver);
+    document.addEventListener('dragleave', onDragLeave);
+    document.addEventListener('drop', onDrop);
+    return () => {
+      document.removeEventListener('dragenter', onDragEnter);
+      document.removeEventListener('dragover', onDragOver);
+      document.removeEventListener('dragleave', onDragLeave);
+      document.removeEventListener('drop', onDrop);
+    };
+  }, []);
+
   return (
-    <main className="app">
+    <main className={`app${isDragging ? ' app--dragging' : ''}`}>
       <header className="app-header">
         <h1>XF MIDI Viewer</h1>
         <p className="muted">

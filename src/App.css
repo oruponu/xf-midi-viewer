@@ -4,6 +4,22 @@
   padding: 32px 24px 64px;
 }
 
+.app--dragging::after {
+  content: 'ドロップして読み込み';
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 2px dashed var(--accent);
+  color: var(--accent);
+  font-size: 18px;
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 50;
+}
+
 .app-header {
   margin-bottom: 32px;
 }
