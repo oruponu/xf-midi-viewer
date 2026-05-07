@@ -24,13 +24,25 @@ import type {
 } from '../lib/xf/types.ts';
 import { LeadSheet } from './LeadSheet.tsx';
 
+export type InfoPanelTab = 'leadSheet' | 'lyrics' | 'details';
+
+type FileSummary = {
+  name: string;
+  size: number;
+  lastModified: number;
+};
+
 export function InfoPanel({
+  file,
   data,
+  activeTab,
   activeTick = null,
   sequence = null,
   getPositionSeconds = null,
 }: {
+  file: FileSummary | null;
   data: XfData;
+  activeTab: InfoPanelTab;
   activeTick?: number | null;
   sequence?: PlaybackSequence | null;
   getPositionSeconds?: (() => number) | null;
@@ -61,9 +73,16 @@ export function InfoPanel({
   if (empty) {
     return (
       <section className="info-panel">
-        <div className="card">
-          <p className="muted">XFデータは含まれていません</p>
-        </div>
+        {activeTab === 'details' ? (
+          <div className="details-view">
+            {file && <FileSection file={file} />}
+            <div className="card">
+              <p className="muted">XFデータは含まれていません</p>
+            </div>
+          </div>
+        ) : (
+          <EmptyView title="表示できるXFデータはありません" />
+        )}
       </section>
     );
   }
@@ -75,30 +94,92 @@ export function InfoPanel({
 
   return (
     <section className="info-panel">
-      {data.version && <VersionSection version={data.version} />}
-      {showChart && (
-        <LeadSheet
-          chords={chordsForChart}
-          rehearsals={rehearsalsForChart}
-          syllables={parsedKaraoke.syllables}
-          timing={data.timing}
-          sequence={sequence}
-          getPositionSeconds={getPositionSeconds}
+      {activeTab === 'leadSheet' &&
+        (showChart ? (
+          <LeadSheet
+            chords={chordsForChart}
+            rehearsals={rehearsalsForChart}
+            syllables={parsedKaraoke.syllables}
+            timing={data.timing}
+            sequence={sequence}
+            getPositionSeconds={getPositionSeconds}
+          />
+        ) : (
+          <EmptyView title="リードシート情報はありません" />
+        ))}
+
+      {activeTab === 'lyrics' &&
+        (hasKaraoke && parsedKaraoke.tokens.length > 0 ? (
+          <KaraokeSection
+            parsed={parsedKaraoke}
+            rehearsals={rehearsalsForChart}
+            activeTick={activeTick}
+          />
+        ) : (
+          <EmptyView title="歌詞情報はありません" />
+        ))}
+
+      {activeTab === 'details' && (
+        <DetailsView
+          file={file}
+          data={data}
+          parsedKaraoke={parsedKaraoke}
+          hasStyle={hasStyle}
         />
       )}
+    </section>
+  );
+}
+
+function DetailsView({
+  file,
+  data,
+  parsedKaraoke,
+  hasStyle,
+}: {
+  file: FileSummary | null;
+  data: XfData;
+  parsedKaraoke: ParsedKaraoke;
+  hasStyle: boolean;
+}) {
+  return (
+    <div className="details-view">
+      {file && <FileSection file={file} />}
+      {data.version && <VersionSection version={data.version} />}
       {data.commonHeader && <CommonSection header={data.commonHeader} />}
       {data.languageHeaders.map((h, i) => (
         <LanguageSection key={`${h.language}-${i}`} header={h} />
       ))}
-      {hasKaraoke && (
-        <KaraokeSection
-          parsed={parsedKaraoke}
-          rehearsals={rehearsalsForChart}
-          activeTick={activeTick}
-        />
+      {(data.karaoke.header || data.karaoke.events.length > 0) && (
+        <KaraokeMetaSection parsed={parsedKaraoke} />
       )}
       {hasStyle && <StyleSection data={data.style} timing={data.timing} />}
-    </section>
+    </div>
+  );
+}
+
+function EmptyView({ title }: { title: string }) {
+  return (
+    <div className="card empty-view">
+      <h3>{title}</h3>
+      <p className="muted">詳細タブで解析結果を確認できます</p>
+    </div>
+  );
+}
+
+function FileSection({ file }: { file: FileSummary }) {
+  return (
+    <div className="card">
+      <h3>ファイル情報</h3>
+      <FieldList>
+        <Field label="File name" value={file.name} />
+        <Field label="Size" value={`${file.size.toLocaleString()} bytes`} />
+        <Field
+          label="Last modified"
+          value={new Date(file.lastModified).toLocaleString()}
+        />
+      </FieldList>
+    </div>
   );
 }
 
@@ -427,6 +508,22 @@ function KaraokeHeaderInfo({ header }: { header: XfLyricsHeader }) {
   );
 }
 
+function KaraokeMetaSection({ parsed }: { parsed: ParsedKaraoke }) {
+  return (
+    <div className="card">
+      <h3>XF Karaoke Message</h3>
+      {parsed.header && <KaraokeHeaderInfo header={parsed.header} />}
+      <div className="style-subsection">
+        <h4>解析結果</h4>
+        <div className="style-summary">
+          <span>トークン: {parsed.tokens.length.toLocaleString()}</span>
+          <span>音節: {parsed.syllables.length.toLocaleString()}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function renderToken(
   tok: Exclude<LyricToken, { kind: 'vocalPart' }>,
   index: number,
@@ -571,69 +668,31 @@ function StyleSection({
   const formatTick = (tick: number): string =>
     formatTickAsBarBeat(tick, timing);
   const showSummary =
+    g.chords.length > 0 ||
+    g.rehearsals.length > 0 ||
     g.phraseCount > 0 ||
     g.fingeringCount > 0 ||
     g.guitarVoicingCount > 0 ||
+    g.guideTracks.length > 0 ||
+    g.guitarInfos.length > 0 ||
     g.maxPhrases.length > 0;
 
   return (
     <div className="card">
       <h3>XF Style Message</h3>
-
-      {g.guideTracks.length > 0 && (
-        <StyleSubSection title="ガイドトラックフラグ">
-          {g.guideTracks.map((gt, i) => (
-            <div key={i} className="style-row">
-              右手: {gt.rightHandChannel ?? '（なし）'} / 左手:{' '}
-              {gt.leftHandChannel ?? '（なし）'}
-            </div>
-          ))}
-        </StyleSubSection>
-      )}
-
-      {g.guitarInfos.length > 0 && (
-        <StyleSubSection title="ギターインフォメーションフラグ">
-          {g.guitarInfos.map((gi, i) => (
-            <div key={i} className="style-row">
-              {GUITAR_PART_LABELS[gi.part]} (CH {gi.channel ?? '全'}), カポ{' '}
-              {gi.capo}, チューニング: {gi.stringNotes.join(', ')}
-            </div>
-          ))}
-        </StyleSubSection>
-      )}
-
-      {g.chords.length > 0 && (
-        <StyleSubSection title={`コード名 (${g.chords.length})`}>
-          <div className="style-list">
-            {g.chords.map((c, i) => (
-              <div key={i} className="style-list-row">
-                <span className="tick">{formatTick(c.tick)}</span>
-                <span>{formatChord(c.root, c.type, c.bass)}</span>
-              </div>
-            ))}
-          </div>
-        </StyleSubSection>
-      )}
-
-      {g.rehearsals.length > 0 && (
-        <StyleSubSection title={`リハーサルマーク (${g.rehearsals.length})`}>
-          <div className="style-list">
-            {g.rehearsals.map((r, i) => (
-              <div key={i} className="style-list-row">
-                <span className="tick">{formatTick(r.tick)}</span>
-                <span>
-                  {r.letter}
-                  {r.variation > 0 && "'".repeat(r.variation)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </StyleSubSection>
-      )}
-
       {showSummary && (
-        <StyleSubSection title="その他">
+        <StyleSubSection title="概要">
           <div className="style-summary">
+            {g.chords.length > 0 && <span>コード: {g.chords.length}</span>}
+            {g.rehearsals.length > 0 && (
+              <span>リハーサル: {g.rehearsals.length}</span>
+            )}
+            {g.guideTracks.length > 0 && (
+              <span>ガイドトラック: {g.guideTracks.length}</span>
+            )}
+            {g.guitarInfos.length > 0 && (
+              <span>ギター情報: {g.guitarInfos.length}</span>
+            )}
             {g.phraseCount > 0 && <span>フレーズマーク: {g.phraseCount}</span>}
             {g.maxPhrases[0] && (
               <span>最大レベル8フレーズ数: {g.maxPhrases[0].count}</span>
@@ -645,8 +704,62 @@ function StyleSection({
           </div>
         </StyleSubSection>
       )}
+
+      <StyleSubSection title={`イベント一覧 (${data.events.length})`}>
+        <div className="style-list style-event-list">
+          {data.events.map((ev, i) => (
+            <div key={i} className="style-event-row">
+              <span className="tick">{formatTick(ev.tick)}</span>
+              <span className="style-kind">{STYLE_KIND_LABELS[ev.kind]}</span>
+              <span>{formatStyleDetail(ev)}</span>
+            </div>
+          ))}
+        </div>
+      </StyleSubSection>
     </div>
   );
+}
+
+const STYLE_KIND_LABELS: Record<StyleMessage['kind'], string> = {
+  chord: 'コード',
+  rehearsal: 'リハーサル',
+  phraseMark: 'フレーズ',
+  maxPhraseMark: '最大フレーズ',
+  fingering: '運指',
+  guideTrack: 'ガイド',
+  guitarInfo: 'ギター情報',
+  guitarVoicing: '押弦',
+};
+
+function formatStyleDetail(ev: StyleMessage): string {
+  switch (ev.kind) {
+    case 'chord':
+      return formatChord(ev.root, ev.type, ev.bass);
+    case 'rehearsal':
+      return `${ev.letter}${"'".repeat(ev.variation)}`;
+    case 'phraseMark':
+      return `${ev.hand === 'right' ? '右手' : '左手'}, CH ${
+        ev.channel ?? '全'
+      }, level ${ev.level}`;
+    case 'maxPhraseMark':
+      return `${ev.count} phrases`;
+    case 'fingering':
+      return `CH ${ev.channel}, note ${ev.noteNumber}, finger ${ev.fingering}, ${
+        ev.hand === 'right' ? '右手' : '左手'
+      }, ${ev.context}`;
+    case 'guideTrack':
+      return `右手: ${ev.rightHandChannel ?? 'なし'} / 左手: ${
+        ev.leftHandChannel ?? 'なし'
+      }`;
+    case 'guitarInfo':
+      return `${GUITAR_PART_LABELS[ev.part]} (CH ${
+        ev.channel ?? '全'
+      }), カポ ${ev.capo}, チューニング: ${ev.stringNotes.join(', ')}`;
+    case 'guitarVoicing':
+      return `CH ${ev.channel ?? '全'}, ${ev.strings
+        .map((s, i) => `${i + 1}弦 fret ${s.fret} finger ${s.finger}`)
+        .join(' / ')}`;
+  }
 }
 
 function StyleSubSection({

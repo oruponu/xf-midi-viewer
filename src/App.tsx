@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import './App.css';
 import { InfoPanel } from './components/InfoPanel.tsx';
+import type { InfoPanelTab } from './components/InfoPanel.tsx';
 import { PlaybackPanel } from './components/PlaybackPanel.tsx';
 import { useMidiPlayer } from './hooks/useMidiPlayer.ts';
 import { parseSmf } from './lib/smf/parser.ts';
@@ -109,19 +110,6 @@ function App() {
         </label>
       </section>
 
-      {file && (
-        <section className="file-info">
-          <dl>
-            <dt>File name</dt>
-            <dd>{file.name}</dd>
-            <dt>Size</dt>
-            <dd>{file.size.toLocaleString()} bytes</dd>
-            <dt>Last modified</dt>
-            <dd>{new Date(file.lastModified).toLocaleString()}</dd>
-          </dl>
-        </section>
-      )}
-
       {error && (
         <section className="error" role="alert">
           <strong>パースエラー:</strong> {error}
@@ -130,6 +118,7 @@ function App() {
 
       <PlayerScope
         key={file ? `${file.name}-${file.size}-${file.lastModified}` : 'empty'}
+        file={file}
         sequence={playbackSequence}
         xf={xf}
       />
@@ -138,12 +127,15 @@ function App() {
 }
 
 function PlayerScope({
+  file,
   sequence,
   xf,
 }: {
+  file: SelectedFile | null;
   sequence: PlaybackSequence | null;
   xf: XfData | null;
 }) {
+  const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
   const player = useMidiPlayer(sequence);
   const activeTick = useMemo(
     () => (sequence ? secondsToTick(player.positionSeconds, sequence) : null),
@@ -151,16 +143,56 @@ function PlayerScope({
   );
   return (
     <>
-      {sequence && <PlaybackPanel sequence={sequence} player={player} />}
+      {(sequence || xf) && (
+        <div className="viewer-chrome">
+          {sequence && <PlaybackPanel sequence={sequence} player={player} />}
+          {xf && <ViewTabs activeTab={activeTab} onChange={setActiveTab} />}
+        </div>
+      )}
       {xf && (
         <InfoPanel
+          file={file}
           data={xf}
+          activeTab={activeTab}
           activeTick={activeTick}
           sequence={sequence}
           getPositionSeconds={player.getPositionSeconds}
         />
       )}
     </>
+  );
+}
+
+const VIEW_TABS: ReadonlyArray<{
+  id: InfoPanelTab;
+  label: string;
+}> = [
+  { id: 'leadSheet', label: 'リードシート' },
+  { id: 'lyrics', label: '歌詞' },
+  { id: 'details', label: '詳細' },
+];
+
+function ViewTabs({
+  activeTab,
+  onChange,
+}: {
+  activeTab: InfoPanelTab;
+  onChange: (tab: InfoPanelTab) => void;
+}) {
+  return (
+    <nav className="viewer-tabs" aria-label="表示切り替え">
+      {VIEW_TABS.map((tab) => (
+        <button
+          key={tab.id}
+          className="viewer-tab"
+          type="button"
+          aria-selected={activeTab === tab.id}
+          onClick={() => onChange(tab.id)}
+        >
+          <span className="viewer-tab-label">{tab.label}</span>
+        </button>
+      ))}
+    </nav>
   );
 }
 
