@@ -118,6 +118,9 @@ export const LeadSheet = memo(function LeadSheet({
     if (!sequence || !getPositionSeconds) return;
     const container = scoreRef.current;
     if (!container) return;
+    const rowEls = Array.from(
+      container.querySelectorAll<HTMLElement>(':scope > .score-row'),
+    );
     const playheads = Array.from(
       container.querySelectorAll<HTMLSpanElement>(
         ':scope > .score-row > .score-playhead',
@@ -135,6 +138,7 @@ export const LeadSheet = memo(function LeadSheet({
     let cancelled = false;
     let lastPos = NaN;
     let lastTick = NaN;
+    let lastActiveRowIdx = -1;
     const tick = () => {
       if (cancelled) return;
       const seconds = getPositionSeconds();
@@ -142,16 +146,25 @@ export const LeadSheet = memo(function LeadSheet({
       const pos = barPositionAt(tickValue, timing);
       if (pos !== lastPos) {
         lastPos = pos;
+        let activeRowIdx = -1;
         for (let idx = 0; idx < rows.length; idx += 1) {
           const el = playheads[idx];
           if (!el) continue;
           const startPos = rows[idx]!.startBar - 1;
           const endPos = startPos + rows[idx]!.barCount;
           if (pos >= startPos && pos < endPos) {
+            activeRowIdx = idx;
             el.style.opacity = '';
             el.style.left = `${((pos - startPos) / rows[idx]!.barCount) * 100}%`;
           } else if (el.style.opacity !== '0') {
             el.style.opacity = '0';
+          }
+        }
+        if (activeRowIdx !== lastActiveRowIdx) {
+          lastActiveRowIdx = activeRowIdx;
+          const activeRow = rowEls[activeRowIdx];
+          if (activeRow) {
+            activeRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
           }
         }
       }
