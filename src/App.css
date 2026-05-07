@@ -398,6 +398,13 @@
   color: var(--text-h);
 }
 
+.lyric--active {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
 .karaoke-stream {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -498,6 +505,19 @@
 
 .score-row {
   position: relative;
+}
+
+.score-playhead {
+  position: absolute;
+  top: 24px;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  transform: translateX(-1px);
+  pointer-events: none;
+  opacity: 0.85;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
+  z-index: 2;
 }
 
 .score-rehearsals {

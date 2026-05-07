@@ -1,9 +1,16 @@
+import { useMemo } from 'react';
 import type { ReactNode } from 'react';
+import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatTickAsBarBeat } from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 import { formatChord } from '../lib/xf/format.ts';
 import { parseKaraoke } from '../lib/xf/lyrics.ts';
-import type { LyricRun, LyricToken, ParsedKaraoke } from '../lib/xf/lyrics.ts';
+import type {
+  LyricRun,
+  LyricSyllable,
+  LyricToken,
+  ParsedKaraoke,
+} from '../lib/xf/lyrics.ts';
 import type {
   GuitarPart,
   StyleMessage,
@@ -17,10 +24,33 @@ import type {
 } from '../lib/xf/types.ts';
 import { LeadSheet } from './LeadSheet.tsx';
 
-export function InfoPanel({ data }: { data: XfData }) {
+export function InfoPanel({
+  data,
+  activeTick = null,
+  sequence = null,
+  getPositionSeconds = null,
+}: {
+  data: XfData;
+  activeTick?: number | null;
+  sequence?: PlaybackSequence | null;
+  getPositionSeconds?: (() => number) | null;
+}) {
   const hasKaraoke =
     data.karaoke.header !== null || data.karaoke.events.length > 0;
   const hasStyle = data.style.events.length > 0;
+  const parsedKaraoke = useMemo(
+    () => parseKaraoke(data.karaoke),
+    [data.karaoke],
+  );
+  const { chordsForChart, rehearsalsForChart } = useMemo(() => {
+    const chordsForChart: ChordMsg[] = [];
+    const rehearsalsForChart: RehearsalMsg[] = [];
+    for (const ev of data.style.events) {
+      if (ev.kind === 'chord') chordsForChart.push(ev);
+      else if (ev.kind === 'rehearsal') rehearsalsForChart.push(ev);
+    }
+    return { chordsForChart, rehearsalsForChart };
+  }, [data.style.events]);
   const empty =
     data.version === null &&
     data.commonHeader === null &&
@@ -38,14 +68,6 @@ export function InfoPanel({ data }: { data: XfData }) {
     );
   }
 
-  const parsedKaraoke = parseKaraoke(data.karaoke);
-
-  const chordsForChart: ChordMsg[] = [];
-  const rehearsalsForChart: RehearsalMsg[] = [];
-  for (const ev of data.style.events) {
-    if (ev.kind === 'chord') chordsForChart.push(ev);
-    else if (ev.kind === 'rehearsal') rehearsalsForChart.push(ev);
-  }
   const showChart =
     chordsForChart.length > 0 ||
     rehearsalsForChart.length > 0 ||
@@ -60,6 +82,8 @@ export function InfoPanel({ data }: { data: XfData }) {
           rehearsals={rehearsalsForChart}
           syllables={parsedKaraoke.syllables}
           timing={data.timing}
+          sequence={sequence}
+          getPositionSeconds={getPositionSeconds}
         />
       )}
       {data.commonHeader && <CommonSection header={data.commonHeader} />}
@@ -70,6 +94,7 @@ export function InfoPanel({ data }: { data: XfData }) {
         <KaraokeSection
           parsed={parsedKaraoke}
           rehearsals={rehearsalsForChart}
+          activeTick={activeTick}
         />
       )}
       {hasStyle && <StyleSection data={data.style} timing={data.timing} />}
@@ -180,18 +205,25 @@ const VOCAL_PART_LABELS: Record<VocalPart, string> = {
 function KaraokeSection({
   parsed,
   rehearsals,
+  activeTick,
 }: {
   parsed: ParsedKaraoke;
   rehearsals: RehearsalMsg[];
+  activeTick: number | null;
 }) {
   const { replaceWithDivider, dividerBefore } = computeKaraokeSectionBreaks(
     parsed.tokens,
     rehearsals,
   );
+  const activeSyllableIndex = findActiveSyllableIndex(
+    parsed.syllables,
+    activeTick,
+  );
   const blocks = buildKaraokeBlocks(
     parsed.tokens,
     replaceWithDivider,
     dividerBefore,
+    activeSyllableIndex,
   );
 
   return (
@@ -233,6 +265,7 @@ function buildKaraokeBlocks(
   tokens: LyricToken[],
   replaceWithDivider: Set<number>,
   dividerBefore: Set<number>,
+  activeSyllableIndex: number,
 ): KaraokeBlock[] {
   const blocks: KaraokeBlock[] = [];
   let pendingPart: VocalPart | null = null;
@@ -240,6 +273,7 @@ function buildKaraokeBlocks(
   let displayedPart: VocalPart | null = null;
   let currentContent: ReactNode[] = [];
   let lastEmitted: 'br' | 'inline' | null = null;
+  let syllableCounter = 0;
 
   const flushLyrics = (): void => {
     if (lastEmitted === 'br') {
@@ -292,9 +326,12 @@ function buildKaraokeBlocks(
       activePart = pendingPart;
     }
 
-    currentContent.push(renderToken(tok, i));
+    const isActiveSyllable =
+      tok.kind === 'syllable' && syllableCounter === activeSyllableIndex;
+    currentContent.push(renderToken(tok, i, isActiveSyllable));
     if (tok.kind === 'syllable') {
       lastEmitted = 'inline';
+      syllableCounter += 1;
     }
   }
 
@@ -388,11 +425,15 @@ function KaraokeHeaderInfo({ header }: { header: XfLyricsHeader }) {
 function renderToken(
   tok: Exclude<LyricToken, { kind: 'vocalPart' }>,
   index: number,
+  isActive: boolean,
 ): ReactNode {
   switch (tok.kind) {
     case 'syllable':
       return (
-        <span key={index} className="lyric">
+        <span
+          key={index}
+          className={isActive ? 'lyric lyric--active' : 'lyric'}
+        >
           {tok.runs.map((run, j) => renderRun(run, j))}
         </span>
       );
@@ -402,6 +443,27 @@ function renderToken(
     case 'subBreak':
       return <wbr key={index} />;
   }
+}
+
+function findActiveSyllableIndex(
+  syllables: LyricSyllable[],
+  activeTick: number | null,
+): number {
+  if (
+    activeTick === null ||
+    syllables.length === 0 ||
+    activeTick < syllables[0]!.tick
+  ) {
+    return -1;
+  }
+  let lo = 0;
+  let hi = syllables.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (syllables[mid]!.tick <= activeTick) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo - 1;
 }
 
 function renderRun(run: LyricRun, index: number): ReactNode {

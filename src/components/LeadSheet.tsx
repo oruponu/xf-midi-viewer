@@ -1,3 +1,6 @@
+import { memo, useEffect, useMemo, useRef } from 'react';
+import { secondsToTick } from '../lib/smf/playback.ts';
+import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatKeySignature, tickToBarBeat } from '../lib/smf/timing.ts';
 import type {
   KeySignature,
@@ -29,65 +32,136 @@ interface PlacedSyllable {
   xPercent: number;
 }
 
-export function LeadSheet({
-  chords,
-  rehearsals,
-  syllables,
-  timing,
-}: {
+interface RowSpec {
+  startBar: number;
+  barCount: number;
+}
+
+interface LeadSheetProps {
   chords: ChordMsg[];
   rehearsals: RehearsalMsg[];
   syllables: LyricSyllable[];
   timing: SmfTiming;
-}) {
+  sequence: PlaybackSequence | null;
+  getPositionSeconds: (() => number) | null;
+}
+
+export const LeadSheet = memo(function LeadSheet({
+  chords,
+  rehearsals,
+  syllables,
+  timing,
+  sequence,
+  getPositionSeconds,
+}: LeadSheetProps) {
+  const renderable = useMemo(
+    () => syllables.filter((s) => s.runs.length > 0),
+    [syllables],
+  );
+
+  const totalBars = useMemo(() => {
+    if (
+      chords.length === 0 &&
+      rehearsals.length === 0 &&
+      syllables.length === 0
+    )
+      return 0;
+    let maxTick = 0;
+    for (const c of chords) if (c.tick > maxTick) maxTick = c.tick;
+    for (const r of rehearsals) if (r.tick > maxTick) maxTick = r.tick;
+    for (const s of syllables) if (s.tick > maxTick) maxTick = s.tick;
+    const bb = tickToBarBeat(maxTick, timing);
+    return bb ? bb.bar : 1;
+  }, [chords, rehearsals, syllables, timing]);
+
+  const rows = useMemo<RowSpec[]>(() => {
+    const out: RowSpec[] = [];
+    for (let s = 1; s <= totalBars; s += BARS_PER_ROW) {
+      const remaining = totalBars - s + 1;
+      out.push({ startBar: s, barCount: Math.min(BARS_PER_ROW, remaining) });
+    }
+    return out;
+  }, [totalBars]);
+
+  const barTimeSignatures = useMemo(() => {
+    const map = new Map<number, TimeSignature>();
+    let lastShown: TimeSignature | null = null;
+    for (const change of timing.timeSignatures) {
+      const bb = tickToBarBeat(change.tick, timing);
+      if (!bb) continue;
+      if (bb.bar > totalBars) break;
+      if (lastShown && sameSignatureDisplay(lastShown, change.signature))
+        continue;
+      map.set(bb.bar, change.signature);
+      lastShown = change.signature;
+    }
+    return map;
+  }, [timing, totalBars]);
+
+  const barKeySignatures = useMemo(() => {
+    const map = new Map<number, KeySignature>();
+    let lastKey: KeySignature | null = null;
+    for (const change of timing.keySignatures) {
+      const bb = tickToBarBeat(change.tick, timing);
+      if (!bb) continue;
+      if (bb.bar > totalBars) break;
+      if (lastKey && sameKeyDisplay(lastKey, change.signature)) continue;
+      map.set(bb.bar, change.signature);
+      lastKey = change.signature;
+    }
+    return map;
+  }, [timing, totalBars]);
+
+  const scoreRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!sequence || !getPositionSeconds) return;
+    const container = scoreRef.current;
+    if (!container) return;
+    const playheads = Array.from(
+      container.querySelectorAll<HTMLSpanElement>(
+        ':scope > .score-row > .score-playhead',
+      ),
+    );
+    let raf = 0;
+    let cancelled = false;
+    let lastPos = NaN;
+    const tick = () => {
+      if (cancelled) return;
+      const seconds = getPositionSeconds();
+      const tickValue = secondsToTick(seconds, sequence);
+      const pos = barPositionAt(tickValue, timing);
+      if (pos !== lastPos) {
+        lastPos = pos;
+        for (let idx = 0; idx < rows.length; idx += 1) {
+          const el = playheads[idx];
+          if (!el) continue;
+          const startPos = rows[idx]!.startBar - 1;
+          const endPos = startPos + rows[idx]!.barCount;
+          if (pos >= startPos && pos < endPos) {
+            el.style.opacity = '';
+            el.style.left = `${((pos - startPos) / rows[idx]!.barCount) * 100}%`;
+          } else if (el.style.opacity !== '0') {
+            el.style.opacity = '0';
+          }
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+    };
+  }, [sequence, getPositionSeconds, rows, timing]);
+
+  if (totalBars === 0) return null;
   if (timing.ppq <= 0) return null;
-  if (chords.length === 0 && rehearsals.length === 0 && syllables.length === 0)
-    return null;
-
-  const renderable = syllables.filter((s) => s.runs.length > 0);
-
-  const allTicks = [
-    ...chords.map((c) => c.tick),
-    ...rehearsals.map((r) => r.tick),
-    ...syllables.map((s) => s.tick),
-  ];
-  const maxTick = Math.max(...allTicks);
-  const maxBarBeat = tickToBarBeat(maxTick, timing);
-  const totalBars = maxBarBeat ? maxBarBeat.bar : 1;
-
-  const rows: { startBar: number; barCount: number }[] = [];
-  for (let s = 1; s <= totalBars; s += BARS_PER_ROW) {
-    const remaining = totalBars - s + 1;
-    rows.push({ startBar: s, barCount: Math.min(BARS_PER_ROW, remaining) });
-  }
-
-  const barTimeSignatures = new Map<number, TimeSignature>();
-  let lastShown: TimeSignature | null = null;
-  for (const change of timing.timeSignatures) {
-    const bb = tickToBarBeat(change.tick, timing);
-    if (!bb) continue;
-    if (bb.bar > totalBars) break;
-    if (lastShown && sameSignatureDisplay(lastShown, change.signature))
-      continue;
-    barTimeSignatures.set(bb.bar, change.signature);
-    lastShown = change.signature;
-  }
-
-  const barKeySignatures = new Map<number, KeySignature>();
-  let lastKey: KeySignature | null = null;
-  for (const change of timing.keySignatures) {
-    const bb = tickToBarBeat(change.tick, timing);
-    if (!bb) continue;
-    if (bb.bar > totalBars) break;
-    if (lastKey && sameKeyDisplay(lastKey, change.signature)) continue;
-    barKeySignatures.set(bb.bar, change.signature);
-    lastKey = change.signature;
-  }
 
   return (
     <div className="card lead-sheet">
       <h3>コード進行</h3>
-      <div className="score">
+      <div className="score" ref={scoreRef}>
         {rows.map((row) => (
           <ScoreRow
             key={row.startBar}
@@ -104,7 +178,7 @@ export function LeadSheet({
       </div>
     </div>
   );
-}
+});
 
 function sameSignatureDisplay(a: TimeSignature, b: TimeSignature): boolean {
   return a.numerator === b.numerator && a.denominator === b.denominator;
@@ -136,34 +210,45 @@ function ScoreRow({
   const startPos = startBar - 1;
   const endPos = startPos + barCount;
 
-  const placeIfInRow = (tick: number): number | null => {
-    const pos = barPositionAt(tick, timing);
-    if (pos < startPos || pos >= endPos) return null;
-    return ((pos - startPos) / barCount) * 100;
-  };
+  const placedChords = useMemo<PlacedChord[]>(() => {
+    const out: PlacedChord[] = [];
+    for (const c of chords) {
+      const x = placeIfInRow(c.tick, timing, startPos, endPos, barCount);
+      if (x !== null) out.push({ msg: c, xPercent: x });
+    }
+    return out;
+  }, [chords, timing, startPos, endPos, barCount]);
 
-  const placedChords: PlacedChord[] = [];
-  for (const c of chords) {
-    const x = placeIfInRow(c.tick);
-    if (x !== null) placedChords.push({ msg: c, xPercent: x });
-  }
+  const placedRehearsals = useMemo<PlacedRehearsal[]>(() => {
+    const out: PlacedRehearsal[] = [];
+    for (const r of rehearsals) {
+      const x = placeIfInRow(r.tick, timing, startPos, endPos, barCount);
+      if (x !== null) out.push({ msg: r, xPercent: x });
+    }
+    return out;
+  }, [rehearsals, timing, startPos, endPos, barCount]);
 
-  const placedRehearsals: PlacedRehearsal[] = [];
-  for (const r of rehearsals) {
-    const x = placeIfInRow(r.tick);
-    if (x !== null) placedRehearsals.push({ msg: r, xPercent: x });
-  }
+  const placedSyllables = useMemo<PlacedSyllable[]>(() => {
+    const out: PlacedSyllable[] = [];
+    for (const s of syllables) {
+      const x = placeIfInRow(s.tick, timing, startPos, endPos, barCount);
+      if (x !== null) out.push({ syllable: s, xPercent: x });
+    }
+    return out;
+  }, [syllables, timing, startPos, endPos, barCount]);
 
-  const placedSyllables: PlacedSyllable[] = [];
-  for (const s of syllables) {
-    const x = placeIfInRow(s.tick);
-    if (x !== null) placedSyllables.push({ syllable: s, xPercent: x });
-  }
-
-  const bars = Array.from({ length: barCount }, (_, i) => startBar + i);
+  const bars = useMemo(
+    () => Array.from({ length: barCount }, (_, i) => startBar + i),
+    [barCount, startBar],
+  );
 
   return (
     <div className="score-row">
+      <span
+        className="score-playhead"
+        aria-hidden="true"
+        style={{ opacity: 0 }}
+      />
       <div className="score-rehearsals">
         {placedRehearsals.map((p, i) => (
           <span
@@ -277,4 +362,16 @@ function barPositionAt(tick: number, timing: SmfTiming): number {
   );
   const beatPos = bb.beat - 1 + bb.tickInBeat / ticksPerBeat;
   return bb.bar - 1 + beatPos / sig.numerator;
+}
+
+function placeIfInRow(
+  tick: number,
+  timing: SmfTiming,
+  startPos: number,
+  endPos: number,
+  barCount: number,
+): number | null {
+  const pos = barPositionAt(tick, timing);
+  if (pos < startPos || pos >= endPos) return null;
+  return ((pos - startPos) / barCount) * 100;
 }

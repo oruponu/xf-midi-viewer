@@ -3,8 +3,10 @@ import type { ChangeEvent } from 'react';
 import './App.css';
 import { InfoPanel } from './components/InfoPanel.tsx';
 import { PlaybackPanel } from './components/PlaybackPanel.tsx';
+import { useMidiPlayer } from './hooks/useMidiPlayer.ts';
 import { parseSmf } from './lib/smf/parser.ts';
-import { buildPlaybackSequence } from './lib/smf/playback.ts';
+import { buildPlaybackSequence, secondsToTick } from './lib/smf/playback.ts';
+import type { PlaybackSequence } from './lib/smf/playback.ts';
 import type { SmfFile } from './lib/smf/types.ts';
 import { extractXf } from './lib/xf/parser.ts';
 import type { XfData } from './lib/xf/types.ts';
@@ -126,17 +128,39 @@ function App() {
         </section>
       )}
 
-      {playbackSequence && (
-        <PlaybackPanel
-          key={
-            file ? `${file.name}-${file.size}-${file.lastModified}` : 'playback'
-          }
-          sequence={playbackSequence}
+      <PlayerScope
+        key={file ? `${file.name}-${file.size}-${file.lastModified}` : 'empty'}
+        sequence={playbackSequence}
+        xf={xf}
+      />
+    </main>
+  );
+}
+
+function PlayerScope({
+  sequence,
+  xf,
+}: {
+  sequence: PlaybackSequence | null;
+  xf: XfData | null;
+}) {
+  const player = useMidiPlayer(sequence);
+  const activeTick = useMemo(
+    () => (sequence ? secondsToTick(player.positionSeconds, sequence) : null),
+    [player.positionSeconds, sequence],
+  );
+  return (
+    <>
+      {sequence && <PlaybackPanel sequence={sequence} player={player} />}
+      {xf && (
+        <InfoPanel
+          data={xf}
+          activeTick={activeTick}
+          sequence={sequence}
+          getPositionSeconds={player.getPositionSeconds}
         />
       )}
-
-      {xf && <InfoPanel data={xf} />}
-    </main>
+    </>
   );
 }
 

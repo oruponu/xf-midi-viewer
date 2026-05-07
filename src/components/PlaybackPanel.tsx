@@ -1,14 +1,14 @@
 import { useMemo } from 'react';
 import type { CSSProperties } from 'react';
-import { useMidiPlayer } from '../hooks/useMidiPlayer.ts';
+import type { useMidiPlayer } from '../hooks/useMidiPlayer.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 
 interface PlaybackPanelProps {
   sequence: PlaybackSequence;
+  player: ReturnType<typeof useMidiPlayer>;
 }
 
-export function PlaybackPanel({ sequence }: PlaybackPanelProps) {
-  const player = useMidiPlayer(sequence);
+export function PlaybackPanel({ sequence, player }: PlaybackPanelProps) {
   const hasMidiMessages =
     sequence.midiMessages.length > 0 && sequence.durationSeconds > 0;
   const midiReady =
