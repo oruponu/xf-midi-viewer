@@ -16,8 +16,15 @@ export interface PlaybackTempoChange {
   bpm: number;
 }
 
+export interface PlaybackMidiMessage {
+  tick: number;
+  seconds: number;
+  data: number[];
+}
+
 export interface PlaybackSequence {
   notes: PlaybackNote[];
+  midiMessages: PlaybackMidiMessage[];
   tempos: PlaybackTempoChange[];
   durationSeconds: number;
   durationTicks: number;
@@ -75,21 +82,30 @@ export function buildPlaybackSequence(smf: SmfFile): PlaybackSequence {
   const notes = absoluteTracks.flatMap((track) =>
     collectNotes(track, durationTicks, tickToSeconds),
   );
+  const midiMessages = absoluteTracks.flatMap((track) =>
+    collectMidiMessages(track, tickToSeconds),
+  );
   notes.sort(
     (a, b) =>
       a.startSeconds - b.startSeconds ||
       a.channel - b.channel ||
       a.note - b.note,
   );
+  midiMessages.sort(
+    (a, b) =>
+      a.seconds - b.seconds || a.tick - b.tick || a.data[0]! - b.data[0]!,
+  );
 
   const durationSeconds = Math.max(
     tickToSeconds(durationTicks),
     ...notes.map((note) => note.startSeconds + note.durationSeconds),
+    ...midiMessages.map((message) => message.seconds),
     0,
   );
 
   return {
     notes,
+    midiMessages,
     tempos:
       division.kind === 'tpqn'
         ? tempoSegments.map((segment) => ({
@@ -259,6 +275,48 @@ function collectNotes(
   }
 
   return notes;
+}
+
+function collectMidiMessages(
+  track: Array<TrackEvent & { tick: number }>,
+  tickToSeconds: (tick: number) => number,
+): PlaybackMidiMessage[] {
+  const messages: PlaybackMidiMessage[] = [];
+  for (const { tick, event } of track) {
+    const data = eventToMidiBytes(event);
+    if (!data) continue;
+    messages.push({ tick, seconds: tickToSeconds(tick), data });
+  }
+  return messages;
+}
+
+function eventToMidiBytes(
+  event: TrackEvent['event'],
+): PlaybackMidiMessage['data'] | null {
+  switch (event.kind) {
+    case 'noteOff':
+      return [0x80 | event.channel, event.note, event.velocity];
+    case 'noteOn':
+      return [0x90 | event.channel, event.note, event.velocity];
+    case 'polyAftertouch':
+      return [0xa0 | event.channel, event.note, event.pressure];
+    case 'controlChange':
+      return [0xb0 | event.channel, event.controller, event.value];
+    case 'programChange':
+      return [0xc0 | event.channel, event.program];
+    case 'channelAftertouch':
+      return [0xd0 | event.channel, event.pressure];
+    case 'pitchBend':
+      return [
+        0xe0 | event.channel,
+        event.value & 0x7f,
+        (event.value >> 7) & 0x7f,
+      ];
+    case 'meta':
+    case 'sysex':
+    case 'sysexEscape':
+      return null;
+  }
 }
 
 function pushNote(

@@ -50,6 +50,34 @@ const tempo = (
   },
 });
 
+const programChange = (
+  deltaTime: number,
+  program: number,
+  channel = 0,
+): TrackEvent => ({
+  deltaTime,
+  event: { kind: 'programChange', channel, program },
+});
+
+const controlChange = (
+  deltaTime: number,
+  controller: number,
+  value: number,
+  channel = 0,
+): TrackEvent => ({
+  deltaTime,
+  event: { kind: 'controlChange', channel, controller, value },
+});
+
+const pitchBend = (
+  deltaTime: number,
+  value: number,
+  channel = 0,
+): TrackEvent => ({
+  deltaTime,
+  event: { kind: 'pitchBend', channel, value },
+});
+
 describe('buildPlaybackSequence', () => {
   test('pairs note on and off events with seconds at the default tempo', () => {
     const sequence = buildPlaybackSequence(
@@ -103,5 +131,27 @@ describe('buildPlaybackSequence', () => {
     );
 
     expect(sequence.notes.map((note) => note.note)).toEqual([60, 67]);
+  });
+
+  test('builds timed channel messages for MIDI output ports', () => {
+    const sequence = buildPlaybackSequence(
+      makeSmf([
+        track([
+          programChange(0, 4, 1),
+          controlChange(120, 7, 100, 1),
+          pitchBend(120, 8192, 1),
+          noteOn(240, 72, 96, 1),
+          noteOff(240, 72, 64, 1),
+        ]),
+      ]),
+    );
+
+    expect(sequence.midiMessages).toEqual([
+      { tick: 0, seconds: 0, data: [0xc1, 4] },
+      { tick: 120, seconds: 0.125, data: [0xb1, 7, 100] },
+      { tick: 240, seconds: 0.25, data: [0xe1, 0, 64] },
+      { tick: 480, seconds: 0.5, data: [0x91, 72, 96] },
+      { tick: 720, seconds: 0.75, data: [0x81, 72, 64] },
+    ]);
   });
 });
