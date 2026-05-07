@@ -120,6 +120,28 @@ export function buildPlaybackSequence(smf: SmfFile): PlaybackSequence {
   };
 }
 
+export function secondsToTick(
+  seconds: number,
+  sequence: PlaybackSequence,
+): number {
+  if (!Number.isFinite(seconds) || seconds <= 0) return 0;
+  const { tempos, ticksPerQuarter, durationSeconds, durationTicks } = sequence;
+  if (ticksPerQuarter <= 0 || tempos.length === 0) {
+    if (durationSeconds <= 0) return 0;
+    const clamped = Math.min(seconds, durationSeconds);
+    return Math.round((clamped / durationSeconds) * durationTicks);
+  }
+  let segment = tempos[0]!;
+  for (const t of tempos) {
+    if (t.seconds <= seconds) segment = t;
+    else break;
+  }
+  const ticksPerSecond = (segment.bpm * ticksPerQuarter) / 60;
+  return Math.round(
+    segment.tick + (seconds - segment.seconds) * ticksPerSecond,
+  );
+}
+
 function toAbsoluteTrack(
   track: SmfTrack,
 ): Array<TrackEvent & { tick: number }> {
