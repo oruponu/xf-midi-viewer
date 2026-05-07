@@ -1,60 +1,88 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PlaybackNote, PlaybackSequence } from '../lib/smf/playback.ts';
+import type {
+  PlaybackMidiMessage,
+  PlaybackSequence,
+} from '../lib/smf/playback.ts';
+
+interface MidiOutputOption {
+  id: string;
+  name: string;
+  manufacturer: string;
+  state: MIDIPortDeviceState;
+  connection: MIDIPortConnectionState;
+}
+
+type MidiAccessState =
+  | 'unsupported'
+  | 'idle'
+  | 'requesting'
+  | 'ready'
+  | 'denied';
 
 interface MidiPlayerState {
   isPlaying: boolean;
   positionSeconds: number;
-  volume: number;
+  midiAccessState: MidiAccessState;
+  midiError: string | null;
+  midiOutputs: MidiOutputOption[];
+  selectedMidiOutputId: string;
+  requestMidiAccess: () => Promise<void>;
+  selectMidiOutput: (id: string) => void;
   play: () => Promise<void>;
   pause: () => void;
   stop: () => void;
   seek: (seconds: number) => void;
-  setVolume: (volume: number) => void;
 }
 
-interface ScheduledNode {
-  oscillator: OscillatorNode;
-  gain: GainNode;
-}
-
-type AudioWindow = Window &
-  typeof globalThis & {
-    webkitAudioContext?: typeof AudioContext;
-  };
-
-const LOOKAHEAD_SECONDS = 0.3;
-const SCHEDULER_MS = 40;
-const MIN_GAIN = 0.0001;
+const LOOKAHEAD_SECONDS = 0.05;
+const SCHEDULER_MS = 10;
 
 export function useMidiPlayer(
   sequence: PlaybackSequence | null,
 ): MidiPlayerState {
   const [isPlaying, setIsPlaying] = useState(false);
   const [positionSeconds, setPositionSeconds] = useState(0);
-  const [volume, setVolumeState] = useState(0.65);
-  const contextRef = useRef<AudioContext | null>(null);
-  const masterGainRef = useRef<GainNode | null>(null);
-  const scheduledNodesRef = useRef<ScheduledNode[]>([]);
-  const scheduledIdsRef = useRef<Set<number>>(new Set());
+  const [midiAccessState, setMidiAccessState] = useState<MidiAccessState>(() =>
+    typeof navigator.requestMIDIAccess === 'function' ? 'idle' : 'unsupported',
+  );
+  const [midiError, setMidiError] = useState<string | null>(null);
+  const [midiOutputs, setMidiOutputs] = useState<MidiOutputOption[]>([]);
+  const [selectedMidiOutputId, setSelectedMidiOutputId] = useState('');
+  const midiAccessRef = useRef<MIDIAccess | null>(null);
+  const selectedMidiOutputIdRef = useRef('');
+  const nextMidiMessageIndexRef = useRef(0);
   const intervalRef = useRef<number | null>(null);
-  const startedAtRef = useRef(0);
+  const panicTimerRef = useRef<number | null>(null);
+  const startedAtMsRef = useRef(0);
   const startOffsetRef = useRef(0);
   const positionRef = useRef(0);
-  const volumeRef = useRef(volume);
 
-  const cleanupScheduled = useCallback(() => {
-    for (const node of scheduledNodesRef.current) {
-      try {
-        node.oscillator.stop();
-      } catch {
-        // The node may already have ended.
-      }
-      node.oscillator.disconnect();
-      node.gain.disconnect();
+  const clearPanicTimer = useCallback(() => {
+    if (panicTimerRef.current !== null) {
+      window.clearTimeout(panicTimerRef.current);
+      panicTimerRef.current = null;
     }
-    scheduledNodesRef.current = [];
-    scheduledIdsRef.current.clear();
   }, []);
+
+  const cleanupScheduled = useCallback(
+    (followUpPanic = true) => {
+      const output = getSelectedMidiOutput(
+        midiAccessRef.current,
+        selectedMidiOutputIdRef.current,
+      );
+      if (output) {
+        clearPanicTimer();
+        sendMidiPanic(output);
+        if (followUpPanic) {
+          panicTimerRef.current = window.setTimeout(
+            () => sendMidiPanic(output),
+            LOOKAHEAD_SECONDS * 1000 + 80,
+          );
+        }
+      }
+    },
+    [clearPanicTimer],
+  );
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current !== null) {
@@ -63,26 +91,12 @@ export function useMidiPlayer(
     }
   }, []);
 
-  const ensureAudio = useCallback((): AudioContext => {
-    if (contextRef.current && masterGainRef.current) return contextRef.current;
-
-    const AudioContextClass =
-      window.AudioContext ?? (window as AudioWindow).webkitAudioContext;
-    const context = new AudioContextClass();
-    const masterGain = context.createGain();
-    masterGain.gain.value = volumeRef.current;
-    masterGain.connect(context.destination);
-    contextRef.current = context;
-    masterGainRef.current = masterGain;
-    return context;
-  }, []);
-
   const currentPosition = useCallback(() => {
-    const context = contextRef.current;
-    if (!context || !intervalRef.current) return positionRef.current;
+    if (!intervalRef.current) return positionRef.current;
     return Math.min(
       sequence?.durationSeconds ?? 0,
-      startOffsetRef.current + context.currentTime - startedAtRef.current,
+      startOffsetRef.current +
+        (performance.now() - startedAtMsRef.current) / 1000,
     );
   }, [sequence]);
 
@@ -103,104 +117,72 @@ export function useMidiPlayer(
     [cleanupScheduled, clearTimer, currentPosition],
   );
 
-  const scheduleNote = useCallback(
-    (
-      context: AudioContext,
-      note: PlaybackNote,
-      id: number,
-      position: number,
-    ) => {
-      const masterGain = masterGainRef.current;
-      if (!masterGain) return;
-
-      const noteEnd = note.startSeconds + note.durationSeconds;
-      const audibleStart = Math.max(note.startSeconds, position);
-      const startAt =
-        context.currentTime + Math.max(0, note.startSeconds - position);
-      const duration = Math.max(0.03, noteEnd - audibleStart);
-      const gain = context.createGain();
-      const oscillator = context.createOscillator();
-      const isDrum = note.channel === 9;
-      const velocityGain = (note.velocity / 127) * (isDrum ? 0.18 : 0.12);
-
-      oscillator.type = isDrum ? 'square' : waveformForChannel(note.channel);
-      oscillator.frequency.setValueAtTime(
-        isDrum ? drumFrequency(note.note) : midiNoteToFrequency(note.note),
-        startAt,
-      );
-
-      gain.gain.setValueAtTime(MIN_GAIN, startAt);
-      gain.gain.exponentialRampToValueAtTime(
-        Math.max(MIN_GAIN, velocityGain),
-        startAt + 0.01,
-      );
-      gain.gain.exponentialRampToValueAtTime(
-        MIN_GAIN,
-        startAt + (isDrum ? Math.min(duration, 0.16) : duration),
-      );
-
-      oscillator.connect(gain);
-      gain.connect(masterGain);
-      oscillator.start(startAt);
-      oscillator.stop(startAt + duration + 0.04);
-      oscillator.addEventListener(
-        'ended',
-        () => {
-          oscillator.disconnect();
-          gain.disconnect();
-          scheduledNodesRef.current = scheduledNodesRef.current.filter(
-            (node) => node.oscillator !== oscillator,
-          );
-        },
-        { once: true },
-      );
-
-      scheduledIdsRef.current.add(id);
-      scheduledNodesRef.current.push({ oscillator, gain });
+  const scheduleMidiMessage = useCallback(
+    (output: MIDIOutput, message: PlaybackMidiMessage, position: number) => {
+      const sendAt =
+        performance.now() + Math.max(0, message.seconds - position) * 1000;
+      output.send(message.data, sendAt);
     },
     [],
   );
 
   const scheduleWindow = useCallback(() => {
     if (!sequence) return;
-    const context = contextRef.current;
-    if (!context) return;
-
     const position = currentPosition();
     const until = position + LOOKAHEAD_SECONDS;
-    for (let i = 0; i < sequence.notes.length; i += 1) {
-      if (scheduledIdsRef.current.has(i)) continue;
-      const note = sequence.notes[i]!;
-      const noteEnd = note.startSeconds + note.durationSeconds;
-      if (noteEnd < position) continue;
-      if (note.startSeconds > until) break;
-      scheduleNote(context, note, i, position);
+
+    const output = getSelectedMidiOutput(
+      midiAccessRef.current,
+      selectedMidiOutputIdRef.current,
+    );
+    if (!output) {
+      stopInternal(false);
+      return;
     }
+
+    let i = nextMidiMessageIndexRef.current;
+    while (i < sequence.midiMessages.length) {
+      const message = sequence.midiMessages[i]!;
+      if (message.seconds < position) {
+        i += 1;
+        continue;
+      }
+      if (message.seconds > until) break;
+      scheduleMidiMessage(output, message, position);
+      i += 1;
+    }
+    nextMidiMessageIndexRef.current = i;
 
     positionRef.current = position;
     setPositionSeconds(position);
     if (position >= sequence.durationSeconds) {
       stopInternal(true);
     }
-  }, [currentPosition, scheduleNote, sequence, stopInternal]);
+  }, [currentPosition, scheduleMidiMessage, sequence, stopInternal]);
 
   const play = useCallback(async () => {
     if (!sequence || sequence.durationSeconds <= 0) return;
-    const context = ensureAudio();
-    if (context.state === 'suspended') await context.resume();
+    const output = getSelectedMidiOutput(
+      midiAccessRef.current,
+      selectedMidiOutputIdRef.current,
+    );
+    if (!output || sequence.midiMessages.length === 0) return;
 
-    cleanupScheduled();
-    scheduledIdsRef.current.clear();
+    cleanupScheduled(false);
     startOffsetRef.current = Math.min(
       positionRef.current,
       Math.max(0, sequence.durationSeconds - 0.01),
     );
-    startedAtRef.current = context.currentTime;
+    nextMidiMessageIndexRef.current = firstMidiMessageIndexAtOrAfter(
+      sequence.midiMessages,
+      startOffsetRef.current,
+    );
+    startedAtMsRef.current = performance.now();
     setIsPlaying(true);
     clearTimer();
     scheduleWindow();
     intervalRef.current = window.setInterval(scheduleWindow, SCHEDULER_MS);
-  }, [cleanupScheduled, clearTimer, ensureAudio, scheduleWindow, sequence]);
+  }, [cleanupScheduled, clearTimer, scheduleWindow, sequence]);
 
   const pause = useCallback(() => {
     stopInternal(false);
@@ -227,51 +209,155 @@ export function useMidiPlayer(
     [play, sequence, stopInternal],
   );
 
-  const setVolume = useCallback((nextVolume: number) => {
-    const clamped = Math.max(0, Math.min(1, nextVolume));
-    volumeRef.current = clamped;
-    setVolumeState(clamped);
-    const context = contextRef.current;
-    const masterGain = masterGainRef.current;
-    if (context && masterGain) {
-      masterGain.gain.setTargetAtTime(clamped, context.currentTime, 0.02);
+  const refreshMidiOutputs = useCallback(() => {
+    const access = midiAccessRef.current;
+    if (!access) {
+      setMidiOutputs([]);
+      setSelectedMidiOutputId('');
+      selectedMidiOutputIdRef.current = '';
+      return;
     }
+
+    const outputs = Array.from(access.outputs.values())
+      .filter((output) => output.state === 'connected')
+      .map((output) => ({
+        id: output.id,
+        name: output.name ?? 'MIDI Output',
+        manufacturer: output.manufacturer ?? '',
+        state: output.state,
+        connection: output.connection,
+      }));
+    setMidiOutputs(outputs);
+
+    const selectedStillExists = outputs.some(
+      (output) => output.id === selectedMidiOutputIdRef.current,
+    );
+    if (!selectedStillExists) {
+      const nextId = outputs[0]?.id ?? '';
+      selectedMidiOutputIdRef.current = nextId;
+      setSelectedMidiOutputId(nextId);
+    }
+  }, []);
+
+  const requestMidiAccess = useCallback(async () => {
+    if (typeof navigator.requestMIDIAccess !== 'function') {
+      setMidiAccessState('unsupported');
+      setMidiError('このブラウザはWeb MIDI APIに対応していません。');
+      return;
+    }
+
+    setMidiAccessState('requesting');
+    setMidiError(null);
+    try {
+      const access = await navigator.requestMIDIAccess({ sysex: false });
+      midiAccessRef.current = access;
+      setMidiAccessState('ready');
+      refreshMidiOutputs();
+      access.onstatechange = refreshMidiOutputs;
+    } catch (err) {
+      setMidiAccessState('denied');
+      setMidiError(err instanceof Error ? err.message : String(err));
+    }
+  }, [refreshMidiOutputs]);
+
+  const selectMidiOutput = useCallback((id: string) => {
+    const current = getSelectedMidiOutput(
+      midiAccessRef.current,
+      selectedMidiOutputIdRef.current,
+    );
+    if (current) sendMidiPanic(current);
+    selectedMidiOutputIdRef.current = id;
+    setSelectedMidiOutputId(id);
   }, []);
 
   useEffect(() => {
     return () => {
       clearTimer();
-      cleanupScheduled();
-      void contextRef.current?.close();
+      clearPanicTimer();
+      cleanupScheduled(false);
+      if (midiAccessRef.current) midiAccessRef.current.onstatechange = null;
     };
-  }, [cleanupScheduled, clearTimer]);
+  }, [cleanupScheduled, clearPanicTimer, clearTimer]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (midiAccessState !== 'idle') return;
+
+    void queryMidiPermission().then((state) => {
+      if (cancelled) return;
+      if (state === 'granted') {
+        void requestMidiAccess();
+      } else if (state === 'denied') {
+        setMidiAccessState('denied');
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [midiAccessState, requestMidiAccess]);
 
   return {
     isPlaying,
     positionSeconds,
-    volume,
+    midiAccessState,
+    midiError,
+    midiOutputs,
+    selectedMidiOutputId,
+    requestMidiAccess,
+    selectMidiOutput,
     play,
     pause,
     stop,
     seek,
-    setVolume,
   };
 }
 
-function midiNoteToFrequency(note: number): number {
-  return 440 * 2 ** ((note - 69) / 12);
+function getSelectedMidiOutput(
+  access: MIDIAccess | null,
+  outputId: string,
+): MIDIOutput | null {
+  if (!access || outputId.length === 0) return null;
+  return access.outputs.get(outputId) ?? null;
 }
 
-function waveformForChannel(channel: number): OscillatorType {
-  return channel % 3 === 0
-    ? 'triangle'
-    : channel % 3 === 1
-      ? 'sine'
-      : 'sawtooth';
+function sendMidiPanic(output: MIDIOutput): void {
+  (output as MIDIOutput & { clear?: () => void }).clear?.();
+  const now = performance.now();
+  for (let channel = 0; channel < 16; channel += 1) {
+    output.send([0xb0 | channel, 120, 0], now);
+    output.send([0xb0 | channel, 123, 0], now);
+  }
 }
 
-function drumFrequency(note: number): number {
-  if (note < 42) return 74;
-  if (note < 50) return 118;
-  return 190;
+function firstMidiMessageIndexAtOrAfter(
+  messages: PlaybackMidiMessage[],
+  seconds: number,
+): number {
+  let lo = 0;
+  let hi = messages.length;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (messages[mid]!.seconds < seconds) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+type MidiPermissionDescriptor = PermissionDescriptor & {
+  name: 'midi';
+  sysex?: boolean;
+};
+
+async function queryMidiPermission(): Promise<PermissionState | null> {
+  if (!navigator.permissions) return null;
+  try {
+    const status = await navigator.permissions.query({
+      name: 'midi',
+      sysex: false,
+    } as MidiPermissionDescriptor);
+    return status.state;
+  } catch {
+    return null;
+  }
 }
