@@ -326,10 +326,15 @@ function buildKaraokeBlocks(
       activePart = pendingPart;
     }
 
+    const isSyllable = tok.kind === 'syllable';
     const isActiveSyllable =
-      tok.kind === 'syllable' && syllableCounter === activeSyllableIndex;
-    currentContent.push(renderToken(tok, i, isActiveSyllable));
-    if (tok.kind === 'syllable') {
+      isSyllable && syllableCounter === activeSyllableIndex;
+    const isPassedSyllable =
+      isSyllable && syllableCounter <= activeSyllableIndex;
+    currentContent.push(
+      renderToken(tok, i, isPassedSyllable, isActiveSyllable),
+    );
+    if (isSyllable) {
       lastEmitted = 'inline';
       syllableCounter += 1;
     }
@@ -425,18 +430,20 @@ function KaraokeHeaderInfo({ header }: { header: XfLyricsHeader }) {
 function renderToken(
   tok: Exclude<LyricToken, { kind: 'vocalPart' }>,
   index: number,
+  isPassed: boolean,
   isActive: boolean,
 ): ReactNode {
   switch (tok.kind) {
-    case 'syllable':
+    case 'syllable': {
+      let className = 'lyric';
+      if (isPassed) className += ' lyric--passed';
+      if (isActive) className += ' lyric--active';
       return (
-        <span
-          key={index}
-          className={isActive ? 'lyric lyric--active' : 'lyric'}
-        >
+        <span key={index} className={className}>
           {tok.runs.map((run, j) => renderRun(run, j))}
         </span>
       );
+    }
     case 'lineBreak':
     case 'pageBreak':
       return <br key={index} />;

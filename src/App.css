@@ -396,6 +396,11 @@
 
 .lyric {
   color: var(--text-h);
+  transition: color 0.12s linear;
+}
+
+.lyric--passed {
+  color: var(--accent);
 }
 
 .lyric--active {
@@ -653,6 +658,11 @@
   font-weight: 600;
   color: var(--text-h);
   white-space: nowrap;
+  transition: color 0.12s linear;
+}
+
+.score-chord--passed {
+  color: var(--accent);
 }
 
 .score-lyrics {
@@ -670,11 +680,16 @@
   color: var(--text);
   white-space: nowrap;
   line-height: 1;
+  transition: color 0.12s linear;
+}
+
+.score-lyric--passed {
+  color: var(--accent);
 }
 
 .score-lyric rt {
   font-size: 9px;
-  color: var(--text);
+  color: inherit;
   line-height: 1;
 }
 

@@ -123,9 +123,18 @@ export const LeadSheet = memo(function LeadSheet({
         ':scope > .score-row > .score-playhead',
       ),
     );
+    const chordEls = Array.from(
+      container.querySelectorAll<HTMLElement>('.score-chord'),
+    );
+    const lyricEls = Array.from(
+      container.querySelectorAll<HTMLElement>('.score-lyric'),
+    );
+    const chordTicks = chordEls.map((el) => Number(el.dataset.tick ?? '0'));
+    const lyricTicks = lyricEls.map((el) => Number(el.dataset.tick ?? '0'));
     let raf = 0;
     let cancelled = false;
     let lastPos = NaN;
+    let lastTick = NaN;
     const tick = () => {
       if (cancelled) return;
       const seconds = getPositionSeconds();
@@ -146,12 +155,29 @@ export const LeadSheet = memo(function LeadSheet({
           }
         }
       }
+      if (tickValue !== lastTick) {
+        lastTick = tickValue;
+        for (let i = 0; i < chordEls.length; i += 1) {
+          chordEls[i]!.classList.toggle(
+            'score-chord--passed',
+            chordTicks[i]! <= tickValue,
+          );
+        }
+        for (let i = 0; i < lyricEls.length; i += 1) {
+          lyricEls[i]!.classList.toggle(
+            'score-lyric--passed',
+            lyricTicks[i]! <= tickValue,
+          );
+        }
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
+      for (const el of chordEls) el.classList.remove('score-chord--passed');
+      for (const el of lyricEls) el.classList.remove('score-lyric--passed');
     };
   }, [sequence, getPositionSeconds, rows, timing]);
 
@@ -306,6 +332,7 @@ function ScoreRow({
           <span
             key={i}
             className="score-chord"
+            data-tick={p.msg.tick}
             style={{ left: `${p.xPercent}%` }}
           >
             {formatChord(p.msg.root, p.msg.type, p.msg.bass)}
@@ -319,6 +346,7 @@ function ScoreRow({
             <span
               key={i}
               className="score-lyric"
+              data-tick={p.syllable.tick}
               style={{ left: `${p.xPercent}%` }}
             >
               {p.syllable.runs.map((run, j) => {
