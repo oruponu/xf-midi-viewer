@@ -687,10 +687,21 @@
   color: var(--accent);
 }
 
+.score-lyric ruby {
+  display: inline-block;
+  position: relative;
+  line-height: 1;
+}
+
 .score-lyric rt {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
   font-size: 9px;
   color: inherit;
   line-height: 1;
+  white-space: nowrap;
 }
 
 @media (max-width: 720px) {
