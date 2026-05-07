@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatTickAsBarBeat } from '../lib/smf/timing.ts';
@@ -306,13 +306,19 @@ function KaraokeSection({
     dividerBefore,
     activeSyllableIndex,
   );
+  const streamRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (activeSyllableIndex < 0) return;
+    const el = streamRef.current?.querySelector('.lyric--active');
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [activeSyllableIndex]);
 
   return (
     <div className="card">
       <h3>XF Karaoke Message</h3>
       {parsed.header && <KaraokeHeaderInfo header={parsed.header} />}
       {blocks.length > 0 && (
-        <div className="karaoke-stream">
+        <div className="karaoke-stream" ref={streamRef}>
           {blocks.flatMap((block, idx) => {
             if (block.kind === 'divider') {
               return [
