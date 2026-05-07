@@ -22,6 +22,7 @@ type MidiAccessState =
 interface MidiPlayerState {
   isPlaying: boolean;
   positionSeconds: number;
+  getPositionSeconds: () => number;
   midiAccessState: MidiAccessState;
   midiError: string | null;
   midiOutputs: MidiOutputOption[];
@@ -36,6 +37,7 @@ interface MidiPlayerState {
 
 const LOOKAHEAD_SECONDS = 0.05;
 const SCHEDULER_MS = 10;
+const UI_UPDATE_INTERVAL_MS = 33;
 
 export function useMidiPlayer(
   sequence: PlaybackSequence | null,
@@ -56,6 +58,7 @@ export function useMidiPlayer(
   const startedAtMsRef = useRef(0);
   const startOffsetRef = useRef(0);
   const positionRef = useRef(0);
+  const lastUiUpdateAtMsRef = useRef(0);
 
   const clearPanicTimer = useCallback(() => {
     if (panicTimerRef.current !== null) {
@@ -154,7 +157,11 @@ export function useMidiPlayer(
     nextMidiMessageIndexRef.current = i;
 
     positionRef.current = position;
-    setPositionSeconds(position);
+    const nowMs = performance.now();
+    if (nowMs - lastUiUpdateAtMsRef.current >= UI_UPDATE_INTERVAL_MS) {
+      lastUiUpdateAtMsRef.current = nowMs;
+      setPositionSeconds(position);
+    }
     if (position >= sequence.durationSeconds) {
       stopInternal(true);
     }
@@ -300,6 +307,7 @@ export function useMidiPlayer(
   return {
     isPlaying,
     positionSeconds,
+    getPositionSeconds: currentPosition,
     midiAccessState,
     midiError,
     midiOutputs,
