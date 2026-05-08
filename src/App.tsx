@@ -165,6 +165,7 @@ function App() {
         open={isSettingsOpen}
         settings={settings}
         onChange={updateSettings}
+        player={player}
         onClose={() => setIsSettingsOpen(false)}
       />
     </>
