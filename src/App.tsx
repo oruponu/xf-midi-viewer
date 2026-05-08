@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import './App.css';
 import { InfoPanel } from './components/InfoPanel.tsx';
@@ -141,12 +141,32 @@ function PlayerScope({
     () => (sequence ? secondsToTick(player.positionSeconds, sequence) : null),
     [player.positionSeconds, sequence],
   );
+  const dockRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = dockRef.current;
+    const root = document.documentElement;
+    if (!el) {
+      root.style.removeProperty('--dock-height');
+      return;
+    }
+    const update = () => {
+      root.style.setProperty('--dock-height', `${el.offsetHeight}px`);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty('--dock-height');
+    };
+  }, [sequence]);
+
   return (
     <>
-      {(sequence || xf) && (
+      {xf && (
         <div className="viewer-chrome">
-          {sequence && <PlaybackPanel sequence={sequence} player={player} />}
-          {xf && <ViewTabs activeTab={activeTab} onChange={setActiveTab} />}
+          <ViewTabs activeTab={activeTab} onChange={setActiveTab} />
         </div>
       )}
       {xf && (
@@ -158,6 +178,13 @@ function PlayerScope({
           sequence={sequence}
           getPositionSeconds={player.getPositionSeconds}
         />
+      )}
+      {sequence && (
+        <div className="player-dock" ref={dockRef}>
+          <div className="player-dock-inner">
+            <PlaybackPanel sequence={sequence} player={player} />
+          </div>
+        </div>
       )}
     </>
   );
