@@ -44,6 +44,7 @@ interface LeadSheetProps {
   timing: SmfTiming;
   sequence: PlaybackSequence | null;
   getPositionSeconds: (() => number) | null;
+  autoScroll: boolean;
 }
 
 export const LeadSheet = memo(function LeadSheet({
@@ -53,6 +54,7 @@ export const LeadSheet = memo(function LeadSheet({
   timing,
   sequence,
   getPositionSeconds,
+  autoScroll,
 }: LeadSheetProps) {
   const renderable = useMemo(
     () => syllables.filter((s) => s.runs.length > 0),
@@ -162,9 +164,11 @@ export const LeadSheet = memo(function LeadSheet({
         }
         if (activeRowIdx !== lastActiveRowIdx) {
           lastActiveRowIdx = activeRowIdx;
-          const activeRow = rowEls[activeRowIdx];
-          if (activeRow) {
-            activeRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          if (autoScroll) {
+            const activeRow = rowEls[activeRowIdx];
+            if (activeRow) {
+              activeRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
           }
         }
       }
@@ -192,7 +196,7 @@ export const LeadSheet = memo(function LeadSheet({
       for (const el of chordEls) el.classList.remove('score-chord--passed');
       for (const el of lyricEls) el.classList.remove('score-lyric--passed');
     };
-  }, [sequence, getPositionSeconds, rows, timing]);
+  }, [sequence, getPositionSeconds, rows, timing, autoScroll]);
 
   if (totalBars === 0) return null;
   if (timing.ppq <= 0) return null;

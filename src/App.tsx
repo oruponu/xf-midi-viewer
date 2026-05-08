@@ -7,6 +7,7 @@ import { PlaybackPanel } from './components/PlaybackPanel.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
 import { useMidiPlayer } from './hooks/useMidiPlayer.ts';
 import { useSettings } from './hooks/useSettings.ts';
+import type { Settings } from './hooks/useSettings.ts';
 import { parseSmf } from './lib/smf/parser.ts';
 import { buildPlaybackSequence, secondsToTick } from './lib/smf/playback.ts';
 import type { PlaybackSequence } from './lib/smf/playback.ts';
@@ -150,6 +151,7 @@ function App() {
           file={file}
           sequence={playbackSequence}
           xf={xf}
+          settings={settings}
         />
       </main>
 
@@ -205,10 +207,12 @@ function PlayerScope({
   file,
   sequence,
   xf,
+  settings,
 }: {
   file: SelectedFile | null;
   sequence: PlaybackSequence | null;
   xf: XfData | null;
+  settings: Settings;
 }) {
   const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
   const player = useMidiPlayer(sequence);
@@ -252,6 +256,8 @@ function PlayerScope({
           activeTick={activeTick}
           sequence={sequence}
           getPositionSeconds={player.getPositionSeconds}
+          autoScrollLeadSheet={settings.autoScrollLeadSheet}
+          autoScrollLyrics={settings.autoScrollLyrics}
         />
       )}
       {sequence && (

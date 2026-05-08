@@ -39,6 +39,8 @@ export function InfoPanel({
   activeTick = null,
   sequence = null,
   getPositionSeconds = null,
+  autoScrollLeadSheet = true,
+  autoScrollLyrics = true,
 }: {
   file: FileSummary | null;
   data: XfData;
@@ -46,6 +48,8 @@ export function InfoPanel({
   activeTick?: number | null;
   sequence?: PlaybackSequence | null;
   getPositionSeconds?: (() => number) | null;
+  autoScrollLeadSheet?: boolean;
+  autoScrollLyrics?: boolean;
 }) {
   const hasKaraoke =
     data.karaoke.header !== null || data.karaoke.events.length > 0;
@@ -103,6 +107,7 @@ export function InfoPanel({
             timing={data.timing}
             sequence={sequence}
             getPositionSeconds={getPositionSeconds}
+            autoScroll={autoScrollLeadSheet}
           />
         ) : (
           <EmptyView title="リードシート情報はありません" />
@@ -114,6 +119,7 @@ export function InfoPanel({
             parsed={parsedKaraoke}
             rehearsals={rehearsalsForChart}
             activeTick={activeTick}
+            autoScroll={autoScrollLyrics}
           />
         ) : (
           <EmptyView title="歌詞情報はありません" />
@@ -287,10 +293,12 @@ function KaraokeSection({
   parsed,
   rehearsals,
   activeTick,
+  autoScroll,
 }: {
   parsed: ParsedKaraoke;
   rehearsals: RehearsalMsg[];
   activeTick: number | null;
+  autoScroll: boolean;
 }) {
   const { replaceWithDivider, dividerBefore } = computeKaraokeSectionBreaks(
     parsed.tokens,
@@ -308,10 +316,11 @@ function KaraokeSection({
   );
   const streamRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    if (!autoScroll) return;
     if (activeSyllableIndex < 0) return;
     const el = streamRef.current?.querySelector('.lyric--active');
     el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }, [activeSyllableIndex]);
+  }, [activeSyllableIndex, autoScroll]);
 
   return (
     <div className="card">
