@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import './App.css';
 import { InfoPanel } from './components/InfoPanel.tsx';
@@ -33,21 +33,26 @@ function App() {
     () => (smf ? buildPlaybackSequence(smf) : null),
     [smf],
   );
+  const player = useMidiPlayer(playbackSequence);
 
-  const loadFile = async (f: File) => {
-    setFile({ name: f.name, size: f.size, lastModified: f.lastModified });
-    setError(null);
-    setXf(null);
-    setSmf(null);
-    try {
-      const buffer = await f.arrayBuffer();
-      const parsedSmf = parseSmf(buffer);
-      setSmf(parsedSmf);
-      setXf(extractXf(parsedSmf));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
+  const loadFile = useCallback(
+    async (f: File) => {
+      player.stop();
+      setFile({ name: f.name, size: f.size, lastModified: f.lastModified });
+      setError(null);
+      setXf(null);
+      setSmf(null);
+      try {
+        const buffer = await f.arrayBuffer();
+        const parsedSmf = parseSmf(buffer);
+        setSmf(parsedSmf);
+        setXf(extractXf(parsedSmf));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [player],
+  );
 
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -93,7 +98,7 @@ function App() {
       document.removeEventListener('dragleave', onDragLeave);
       document.removeEventListener('drop', onDrop);
     };
-  }, []);
+  }, [loadFile]);
 
   return (
     <>
@@ -152,6 +157,7 @@ function App() {
           sequence={playbackSequence}
           xf={xf}
           settings={settings}
+          player={player}
         />
       </main>
 
@@ -208,14 +214,15 @@ function PlayerScope({
   sequence,
   xf,
   settings,
+  player,
 }: {
   file: SelectedFile | null;
   sequence: PlaybackSequence | null;
   xf: XfData | null;
   settings: Settings;
+  player: ReturnType<typeof useMidiPlayer>;
 }) {
   const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
-  const player = useMidiPlayer(sequence);
   const activeTick = useMemo(
     () => (sequence ? secondsToTick(player.positionSeconds, sequence) : null),
     [player.positionSeconds, sequence],
