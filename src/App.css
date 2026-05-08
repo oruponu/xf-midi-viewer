@@ -238,7 +238,7 @@
 }
 
 .transport-button {
-  min-width: 82px;
+  width: 36px;
   height: 36px;
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -247,9 +247,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  font-weight: 600;
   cursor: pointer;
+  padding: 0;
 }
 
 .transport-button.primary {

@@ -31,20 +31,24 @@ export function PlaybackPanel({ sequence, player }: PlaybackPanelProps) {
           className="transport-button primary"
           type="button"
           disabled={!canPlay}
+          aria-label={player.isPlaying ? 'Pause' : 'Play'}
+          title={player.isPlaying ? 'Pause' : 'Play'}
           onClick={() => {
             if (player.isPlaying) player.pause();
             else void player.play();
           }}
         >
-          {player.isPlaying ? 'Pause' : 'Play'}
+          {player.isPlaying ? <PauseIcon /> : <PlayIcon />}
         </button>
         <button
           className="transport-button"
           type="button"
           disabled={!canPlay}
+          aria-label="Stop"
+          title="Stop"
           onClick={player.stop}
         >
-          Stop
+          <StopIcon />
         </button>
       </div>
 
@@ -70,6 +74,49 @@ export function PlaybackPanel({ sequence, player }: PlaybackPanelProps) {
         <span>{tempoLabel}</span>
       </div>
     </section>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M4 3.2c0-.7.8-1.1 1.4-.7l7.2 4.8c.5.4.5 1.1 0 1.4L5.4 13.5c-.6.4-1.4 0-1.4-.7V3.2Z" />
+    </svg>
+  );
+}
+
+function PauseIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <rect x="4" y="3" width="3" height="10" rx="0.6" />
+      <rect x="9" y="3" width="3" height="10" rx="0.6" />
+    </svg>
+  );
+}
+
+function StopIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <rect x="3.5" y="3.5" width="9" height="9" rx="0.8" />
+    </svg>
   );
 }
 
