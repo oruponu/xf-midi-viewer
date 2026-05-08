@@ -294,6 +294,7 @@
   border-radius: 5px;
   background: var(--bg);
   color: var(--text-h);
+  font-family: var(--mono);
   font-size: 14px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -743,7 +744,7 @@
 }
 
 .score-key-value {
-  font-family: var(--sans);
+  font-family: var(--mono);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -759,6 +760,7 @@
   color: var(--timesig-color);
   border: 1px solid color-mix(in srgb, var(--timesig-color) 40%, transparent);
   border-radius: 4px;
+  font-family: var(--mono);
   font-weight: 700;
   line-height: 1;
 }

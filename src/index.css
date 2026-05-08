@@ -8,8 +8,8 @@
   --key-color: #0f766e;
   --timesig-color: #b45309;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --sans: 'Noto Sans JP', sans-serif;
+  --mono: 'Roboto Mono', monospace;
 
   font: 16px/1.5 var(--sans);
   color-scheme: light dark;
