@@ -4,7 +4,9 @@ import './App.css';
 import { InfoPanel } from './components/InfoPanel.tsx';
 import type { InfoPanelTab } from './components/InfoPanel.tsx';
 import { PlaybackPanel } from './components/PlaybackPanel.tsx';
+import { SettingsDialog } from './components/SettingsDialog.tsx';
 import { useMidiPlayer } from './hooks/useMidiPlayer.ts';
+import { useSettings } from './hooks/useSettings.ts';
 import { parseSmf } from './lib/smf/parser.ts';
 import { buildPlaybackSequence, secondsToTick } from './lib/smf/playback.ts';
 import type { PlaybackSequence } from './lib/smf/playback.ts';
@@ -24,6 +26,8 @@ function App() {
   const [xf, setXf] = useState<XfData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const { settings, updateSettings } = useSettings();
   const playbackSequence = useMemo(
     () => (smf ? buildPlaybackSequence(smf) : null),
     [smf],
@@ -113,6 +117,7 @@ function App() {
               className="icon-button"
               title="設定"
               aria-label="設定"
+              onClick={() => setIsSettingsOpen(true)}
             >
               <SettingsIcon />
             </button>
@@ -147,6 +152,13 @@ function App() {
           xf={xf}
         />
       </main>
+
+      <SettingsDialog
+        open={isSettingsOpen}
+        settings={settings}
+        onChange={updateSettings}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </>
   );
 }
