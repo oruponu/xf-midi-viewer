@@ -91,38 +91,101 @@ function App() {
   }, []);
 
   return (
-    <main className={`app${isDragging ? ' app--dragging' : ''}`}>
-      <header className="app-header">
-        <h1>XF MIDI Viewer</h1>
-        <p className="muted">
-          YAMAHA XF フォーマットの MIDI ファイルを解析・表示します
-        </p>
+    <>
+      <header className="app-bar">
+        <div className="app-bar-inner">
+          <h1 className="app-bar-title">XF MIDI Viewer</h1>
+          <div className="app-bar-actions">
+            <label
+              className="icon-button"
+              title="ファイルを開く"
+              aria-label="ファイルを開く"
+            >
+              <input
+                type="file"
+                accept=".mid,.midi,.kar,.xih,.xkm,audio/midi"
+                onChange={onChange}
+              />
+              <FolderOpenIcon />
+            </label>
+            <button
+              type="button"
+              className="icon-button"
+              title="設定"
+              aria-label="設定"
+            >
+              <SettingsIcon />
+            </button>
+          </div>
+        </div>
       </header>
 
-      <section className="file-picker">
-        <label className="file-input">
-          <input
-            type="file"
-            accept=".mid,.midi,.kar,.xih,.xkm,audio/midi"
-            onChange={onChange}
-          />
-          <span>MIDI ファイルを選択</span>
-        </label>
-      </section>
+      <main className={`app${isDragging ? ' app--dragging' : ''}`}>
+        {!xf && !error && (
+          <section className="empty-state">
+            <p className="empty-state-headline">
+              YAMAHA XF フォーマットの MIDI ファイルを解析・表示します
+            </p>
+            <p className="muted">
+              上部のアイコンから開くか、ウィンドウへドラッグ&ドロップ
+            </p>
+          </section>
+        )}
 
-      {error && (
-        <section className="error" role="alert">
-          <strong>パースエラー:</strong> {error}
-        </section>
-      )}
+        {error && (
+          <section className="error" role="alert">
+            <strong>パースエラー:</strong> {error}
+          </section>
+        )}
 
-      <PlayerScope
-        key={file ? `${file.name}-${file.size}-${file.lastModified}` : 'empty'}
-        file={file}
-        sequence={playbackSequence}
-        xf={xf}
-      />
-    </main>
+        <PlayerScope
+          key={
+            file ? `${file.name}-${file.size}-${file.lastModified}` : 'empty'
+          }
+          file={file}
+          sequence={playbackSequence}
+          xf={xf}
+        />
+      </main>
+    </>
+  );
+}
+
+function FolderOpenIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 7a2 2 0 0 1 2-2h3.5l2 2H19a2 2 0 0 1 2 2v1H3V7Z" />
+      <path d="M3 10h18.2l-1.95 8.1A2 2 0 0 1 17.3 19.6H5.55a2 2 0 0 1-1.95-1.5L3 10Z" />
+    </svg>
+  );
+}
+
+function SettingsIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33 1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82 1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+    </svg>
   );
 }
 

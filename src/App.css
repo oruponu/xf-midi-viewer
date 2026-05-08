@@ -1,7 +1,11 @@
+:root {
+  --app-bar-height: 56px;
+}
+
 .app {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 28px 24px calc(var(--dock-height, 0px) + 32px);
+  padding: 24px 24px calc(var(--dock-height, 0px) + 32px);
 }
 
 .app--dragging::after {
@@ -20,14 +24,71 @@
   z-index: 50;
 }
 
-.app-header {
-  margin-bottom: 32px;
+.app-bar {
+  position: sticky;
+  top: 0;
+  z-index: 35;
+  height: var(--app-bar-height);
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border-bottom: 1px solid var(--border);
 }
 
-.app-header h1 {
-  margin: 0 0 4px;
-  font-size: 28px;
-  letter-spacing: -0.5px;
+.app-bar-inner {
+  height: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.app-bar-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--text-h);
+}
+
+.app-bar-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.icon-button {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-h);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
+  padding: 0;
+}
+
+.icon-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.icon-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.icon-button input[type='file'] {
+  display: none;
 }
 
 .muted {
@@ -36,30 +97,21 @@
   font-size: 14px;
 }
 
-.file-picker {
-  margin-bottom: 24px;
-}
-
-.file-input {
-  display: inline-flex;
+.empty-state {
+  margin-top: 64px;
+  padding: 32px 20px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  cursor: pointer;
-  background: var(--code-bg);
+  text-align: center;
+}
+
+.empty-state-headline {
+  margin: 0;
   color: var(--text-h);
-  font-size: 14px;
-  transition: border-color 0.2s;
-}
-
-.file-input:hover {
-  border-color: var(--accent);
-}
-
-.file-input input {
-  display: none;
+  font-size: 17px;
+  font-weight: 600;
 }
 
 .file-info {
@@ -100,7 +152,7 @@
 
 .viewer-chrome {
   position: sticky;
-  top: 0;
+  top: var(--app-bar-height);
   z-index: 30;
   margin-top: 24px;
   padding: 10px 0 12px;
@@ -802,7 +854,11 @@
 
 @media (max-width: 720px) {
   .app {
-    padding: 20px 14px calc(var(--dock-height, 0px) + 24px);
+    padding: 18px 14px calc(var(--dock-height, 0px) + 24px);
+  }
+
+  .app-bar-inner {
+    padding: 0 14px;
   }
 
   .viewer-chrome {
