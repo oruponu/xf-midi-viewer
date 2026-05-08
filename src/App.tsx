@@ -271,7 +271,11 @@ function PlayerScope({
       {sequence && (
         <div className="player-dock" ref={dockRef}>
           <div className="player-dock-inner">
-            <PlaybackPanel sequence={sequence} player={player} />
+            <PlaybackPanel
+              sequence={sequence}
+              timing={xf?.timing ?? null}
+              player={player}
+            />
           </div>
         </div>
       )}
