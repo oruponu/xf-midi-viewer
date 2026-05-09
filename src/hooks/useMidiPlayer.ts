@@ -146,12 +146,10 @@ export function useMidiPlayer(
     let i = nextMidiMessageIndexRef.current;
     while (i < sequence.midiMessages.length) {
       const message = sequence.midiMessages[i]!;
-      if (message.seconds < position) {
-        i += 1;
-        continue;
-      }
       if (message.seconds > until) break;
-      scheduleMidiMessage(output, message, position);
+      if (message.seconds >= position || !isLiveNoteOn(message.data)) {
+        scheduleMidiMessage(output, message, position);
+      }
       i += 1;
     }
     nextMidiMessageIndexRef.current = i;
@@ -327,6 +325,10 @@ function getSelectedMidiOutput(
 ): MIDIOutput | null {
   if (!access || outputId.length === 0) return null;
   return access.outputs.get(outputId) ?? null;
+}
+
+function isLiveNoteOn(data: number[]): boolean {
+  return (data[0]! & 0xf0) === 0x90 && (data[2] ?? 0) > 0;
 }
 
 function sendMidiPanic(output: MIDIOutput): void {
