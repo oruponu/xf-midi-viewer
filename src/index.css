@@ -5,6 +5,7 @@
   --border: #e5e4e7;
   --code-bg: #f4f3ec;
   --accent: #aa3bff;
+  --rehearsal-color: #be123c;
   --key-color: #0f766e;
   --timesig-color: #b45309;
   --warning: #ca8a04;
@@ -28,6 +29,7 @@
     --border: #2e303a;
     --code-bg: #1f2028;
     --accent: #c084fc;
+    --rehearsal-color: #fb7185;
     --key-color: #2dd4bf;
     --timesig-color: #fbbf24;
     --warning: #facc15;
