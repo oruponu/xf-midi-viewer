@@ -56,6 +56,16 @@ export function PlaybackPanel({
     }
     return formatKeySignature(current.signature);
   }, [player.positionSeconds, sequence, timing]);
+  const timeSigLabel = useMemo(() => {
+    if (!timing || timing.timeSignatures.length === 0) return null;
+    const tick = secondsToTick(player.positionSeconds, sequence);
+    let current = timing.timeSignatures[0]!;
+    for (const change of timing.timeSignatures) {
+      if (change.tick <= tick) current = change;
+      else break;
+    }
+    return `${current.signature.numerator}/${current.signature.denominator}`;
+  }, [player.positionSeconds, sequence, timing]);
 
   return (
     <section className="playback-panel" aria-label="MIDI playback">
@@ -112,6 +122,16 @@ export function PlaybackPanel({
             >
               <span className="playback-key-label">キー</span>
               <span className="playback-key-value">{keyLabel}</span>
+            </span>
+          )}
+          {timeSigLabel && (
+            <span
+              className="playback-time-sig"
+              aria-label={`Time signature ${timeSigLabel}`}
+              title="現在の拍子"
+            >
+              <span className="playback-time-sig-label">拍子</span>
+              <span className="playback-time-sig-value">{timeSigLabel}</span>
             </span>
           )}
         </div>
