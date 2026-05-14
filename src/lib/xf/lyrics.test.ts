@@ -285,6 +285,24 @@ describe('parseKaraoke', () => {
     expect(r.pages[1]!.lines[0]!.tick).toBe(30);
   });
 
+  test('lineBreak followed by pageBreak promotes the line to close the page', () => {
+    const r = parseKaraoke(
+      karaoke([
+        { kind: 'lyric', tick: 10, text: 'a' },
+        { kind: 'carriageReturn', tick: 15 },
+        { kind: 'lineFeed', tick: 16 },
+        { kind: 'lyric', tick: 20, text: 'b' },
+      ]),
+    );
+    expect(r.lines).toHaveLength(2);
+    expect(r.lines[0]!.closedBy).toBe('page');
+    expect(r.lines[0]!.endTick).toBe(16);
+    expect(r.lines[1]!.closedBy).toBe(null);
+    expect(r.pages).toHaveLength(2);
+    expect(r.pages[0]!.lines.map((l) => l.syllables[0]!.tick)).toEqual([10]);
+    expect(r.pages[1]!.lines.map((l) => l.syllables[0]!.tick)).toEqual([20]);
+  });
+
   test('consecutive breaks do not produce empty lines or pages', () => {
     const r = parseKaraoke(
       karaoke([

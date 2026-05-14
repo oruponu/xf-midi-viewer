@@ -332,7 +332,15 @@ function buildLines(
     } else if (tok.kind === 'lineBreak') {
       closeLine('line', tok.tick);
     } else if (tok.kind === 'pageBreak') {
-      closeLine('page', tok.tick);
+      if (current.length === 0 && lines.length > 0) {
+        const lastLine = lines[lines.length - 1]!;
+        if (lastLine.closedBy === 'line') {
+          lastLine.closedBy = 'page';
+          lastLine.endTick = tok.tick;
+        }
+      } else {
+        closeLine('page', tok.tick);
+      }
     }
   }
   closeLine(null, null);
