@@ -1,6 +1,9 @@
 import { useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import {
+  KEY_SHIFT_MAX,
+  KEY_SHIFT_MIN,
+  KEY_SHIFT_STEP,
   PLAYBACK_RATE_MAX,
   PLAYBACK_RATE_MIN,
   PLAYBACK_RATE_STEP,
@@ -8,7 +11,11 @@ import {
 import type { useMidiPlayer } from '../hooks/useMidiPlayer.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
-import { formatKeySignature, tickToBarBeat } from '../lib/smf/timing.ts';
+import {
+  formatKeySignature,
+  shiftKeySignature,
+  tickToBarBeat,
+} from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 
 interface PlaybackPanelProps {
@@ -63,8 +70,17 @@ export function PlaybackPanel({
       if (change.tick <= tick) current = change;
       else break;
     }
-    return formatKeySignature(current.signature);
-  }, [player.positionSeconds, sequence, timing]);
+    const shifted =
+      player.keyShift === 0
+        ? current.signature
+        : shiftKeySignature(current.signature, player.keyShift);
+    return formatKeySignature(shifted);
+  }, [player.keyShift, player.positionSeconds, sequence, timing]);
+  const canDecreaseShift = player.keyShift > KEY_SHIFT_MIN;
+  const canIncreaseShift = player.keyShift < KEY_SHIFT_MAX;
+  const isShiftModified = player.keyShift !== 0;
+  const keyShiftLabel =
+    player.keyShift > 0 ? `+${player.keyShift}` : String(player.keyShift);
   const timeSigLabel = useMemo(() => {
     if (!timing || timing.timeSignatures.length === 0) return null;
     const tick = secondsToTick(player.positionSeconds, sequence);
@@ -164,16 +180,51 @@ export function PlaybackPanel({
               </span>
             </span>
           )}
-          {keyLabel && (
-            <span
-              className="playback-key"
-              aria-label={`Key ${keyLabel}`}
-              title="現在のキー"
-            >
+          <span
+            className="playback-key"
+            aria-label={`Key ${keyLabel ?? 'unknown'}, shift ${keyShiftLabel}`}
+            title="現在のキー（移調適用後）"
+          >
+            <span className="playback-key-header">
               <span className="playback-key-label">キー</span>
-              <span className="playback-key-value">{keyLabel}</span>
+              <span
+                className={
+                  isShiftModified
+                    ? 'playback-key-value playback-key-value--modified'
+                    : 'playback-key-value'
+                }
+              >
+                {keyLabel ?? '—'}
+              </span>
             </span>
-          )}
+            <span className="playback-key-shift">
+              <button
+                type="button"
+                className="playback-rate-button"
+                aria-label="移調を下げる"
+                title="移調を下げる"
+                disabled={!canDecreaseShift}
+                onClick={() =>
+                  player.setKeyShift(player.keyShift - KEY_SHIFT_STEP)
+                }
+              >
+                <ChevronDownIcon />
+              </button>
+              <span className="playback-rate-value">{keyShiftLabel}</span>
+              <button
+                type="button"
+                className="playback-rate-button"
+                aria-label="移調を上げる"
+                title="移調を上げる"
+                disabled={!canIncreaseShift}
+                onClick={() =>
+                  player.setKeyShift(player.keyShift + KEY_SHIFT_STEP)
+                }
+              >
+                <ChevronUpIcon />
+              </button>
+            </span>
+          </span>
           {timeSigLabel && (
             <span
               className="playback-time-sig"

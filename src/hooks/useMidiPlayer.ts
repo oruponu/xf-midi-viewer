@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { transposeMidiData } from '../lib/smf/playback.ts';
 import type {
   PlaybackMidiMessage,
   PlaybackSequence,
@@ -28,6 +29,7 @@ interface MidiPlayerState {
   midiOutputs: MidiOutputOption[];
   selectedMidiOutputId: string;
   playbackRate: number;
+  keyShift: number;
   requestMidiAccess: () => Promise<void>;
   selectMidiOutput: (id: string) => void;
   play: () => Promise<void>;
@@ -35,6 +37,7 @@ interface MidiPlayerState {
   stop: () => void;
   seek: (seconds: number) => void;
   setPlaybackRate: (rate: number) => void;
+  setKeyShift: (semitones: number) => void;
   reset: () => void;
 }
 
@@ -44,6 +47,9 @@ const UI_UPDATE_INTERVAL_MS = 33;
 export const PLAYBACK_RATE_MIN = 0.5;
 export const PLAYBACK_RATE_MAX = 2.0;
 export const PLAYBACK_RATE_STEP = 0.1;
+export const KEY_SHIFT_MIN = -6;
+export const KEY_SHIFT_MAX = 6;
+export const KEY_SHIFT_STEP = 1;
 
 function clampPlaybackRate(rate: number): number {
   if (!Number.isFinite(rate)) return 1;
@@ -52,6 +58,14 @@ function clampPlaybackRate(rate: number): number {
     Math.min(PLAYBACK_RATE_MAX, rate),
   );
   return Math.round(clamped * 10) / 10;
+}
+
+function clampKeyShift(semitones: number): number {
+  if (!Number.isFinite(semitones)) return 0;
+  return Math.max(
+    KEY_SHIFT_MIN,
+    Math.min(KEY_SHIFT_MAX, Math.round(semitones)),
+  );
 }
 
 export function useMidiPlayer(
@@ -66,6 +80,7 @@ export function useMidiPlayer(
   const [midiOutputs, setMidiOutputs] = useState<MidiOutputOption[]>([]);
   const [selectedMidiOutputId, setSelectedMidiOutputId] = useState('');
   const [playbackRate, setPlaybackRateState] = useState(1);
+  const [keyShift, setKeyShiftState] = useState(0);
   const midiAccessRef = useRef<MIDIAccess | null>(null);
   const selectedMidiOutputIdRef = useRef('');
   const nextMidiMessageIndexRef = useRef(0);
@@ -76,6 +91,8 @@ export function useMidiPlayer(
   const positionRef = useRef(0);
   const lastUiUpdateAtMsRef = useRef(0);
   const playbackRateRef = useRef(1);
+  const keyShiftRef = useRef(0);
+  const drumChannelsRef = useRef<ReadonlySet<number>>(new Set());
 
   const clearPanicTimer = useCallback(() => {
     if (panicTimerRef.current !== null) {
@@ -140,10 +157,16 @@ export function useMidiPlayer(
 
   const scheduleMidiMessage = useCallback(
     (output: MIDIOutput, message: PlaybackMidiMessage, position: number) => {
+      const data = transposeMidiData(
+        message.data,
+        keyShiftRef.current,
+        drumChannelsRef.current,
+      );
+      if (!data) return;
       const offsetSeconds = Math.max(0, message.seconds - position);
       const sendAt =
         performance.now() + (offsetSeconds / playbackRateRef.current) * 1000;
-      output.send(message.data, sendAt);
+      output.send(data, sendAt);
     },
     [],
   );
@@ -305,6 +328,24 @@ export function useMidiPlayer(
     [sequence],
   );
 
+  const setKeyShift = useCallback(
+    (shift: number) => {
+      const clamped = clampKeyShift(shift);
+      if (clamped === keyShiftRef.current) return;
+      keyShiftRef.current = clamped;
+      setKeyShiftState(clamped);
+      if (intervalRef.current !== null && sequence) {
+        const pos = currentPosition();
+        cleanupScheduled(false);
+        nextMidiMessageIndexRef.current = firstMidiMessageIndexAtOrAfter(
+          sequence.midiMessages,
+          pos,
+        );
+      }
+    },
+    [cleanupScheduled, currentPosition, sequence],
+  );
+
   const reset = useCallback(() => {
     const output = getSelectedMidiOutput(
       midiAccessRef.current,
@@ -322,6 +363,10 @@ export function useMidiPlayer(
     selectedMidiOutputIdRef.current = id;
     setSelectedMidiOutputId(id);
   }, []);
+
+  useEffect(() => {
+    drumChannelsRef.current = sequence?.drumChannels ?? new Set();
+  }, [sequence]);
 
   useEffect(() => {
     return () => {
@@ -359,6 +404,7 @@ export function useMidiPlayer(
     midiOutputs,
     selectedMidiOutputId,
     playbackRate,
+    keyShift,
     requestMidiAccess,
     selectMidiOutput,
     play,
@@ -366,6 +412,7 @@ export function useMidiPlayer(
     stop,
     seek,
     setPlaybackRate,
+    setKeyShift,
     reset,
   };
 }
