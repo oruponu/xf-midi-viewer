@@ -1,5 +1,10 @@
 import { useMemo } from 'react';
 import type { CSSProperties } from 'react';
+import {
+  PLAYBACK_RATE_MAX,
+  PLAYBACK_RATE_MIN,
+  PLAYBACK_RATE_STEP,
+} from '../hooks/useMidiPlayer.ts';
 import type { useMidiPlayer } from '../hooks/useMidiPlayer.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
@@ -34,8 +39,12 @@ export function PlaybackPanel({
       if (t.seconds <= player.positionSeconds) segment = t;
       else break;
     }
-    return Math.round(segment.bpm);
-  }, [player.positionSeconds, sequence.tempos]);
+    return Math.round(segment.bpm * player.playbackRate);
+  }, [player.playbackRate, player.positionSeconds, sequence.tempos]);
+  const canDecreaseRate = player.playbackRate > PLAYBACK_RATE_MIN + 1e-6;
+  const canIncreaseRate = player.playbackRate < PLAYBACK_RATE_MAX - 1e-6;
+  const isRateModified = Math.abs(player.playbackRate - 1) > 1e-6;
+  const playbackRateLabel = `×${player.playbackRate.toFixed(1)}`;
   const positionLabel = useMemo(() => {
     if (!timing || timing.ppq <= 0) return null;
     const tick = secondsToTick(player.positionSeconds, sequence);
@@ -107,11 +116,52 @@ export function PlaybackPanel({
           {tempoBpm !== null && (
             <span
               className="playback-tempo"
-              aria-label={`Tempo ${tempoBpm} BPM`}
-              title="現在のテンポ"
+              aria-label={`Tempo ${tempoBpm} BPM, rate ${playbackRateLabel}`}
+              title="現在のテンポ（倍率適用後）"
             >
-              <span className="playback-tempo-label">テンポ</span>
-              <span className="playback-tempo-value">{tempoBpm}</span>
+              <span className="playback-tempo-header">
+                <span className="playback-tempo-label">テンポ</span>
+                <span
+                  className={
+                    isRateModified
+                      ? 'playback-tempo-value playback-tempo-value--modified'
+                      : 'playback-tempo-value'
+                  }
+                >
+                  {tempoBpm}
+                </span>
+              </span>
+              <span className="playback-tempo-rate">
+                <button
+                  type="button"
+                  className="playback-rate-button"
+                  aria-label="倍率を下げる"
+                  title="倍率を下げる"
+                  disabled={!canDecreaseRate}
+                  onClick={() =>
+                    player.setPlaybackRate(
+                      player.playbackRate - PLAYBACK_RATE_STEP,
+                    )
+                  }
+                >
+                  <ChevronDownIcon />
+                </button>
+                <span className="playback-rate-value">{playbackRateLabel}</span>
+                <button
+                  type="button"
+                  className="playback-rate-button"
+                  aria-label="倍率を上げる"
+                  title="倍率を上げる"
+                  disabled={!canIncreaseRate}
+                  onClick={() =>
+                    player.setPlaybackRate(
+                      player.playbackRate + PLAYBACK_RATE_STEP,
+                    )
+                  }
+                >
+                  <ChevronUpIcon />
+                </button>
+              </span>
             </span>
           )}
           {keyLabel && (
@@ -200,6 +250,42 @@ function StopIcon() {
       aria-hidden="true"
     >
       <rect x="3.5" y="3.5" width="9" height="9" rx="0.8" />
+    </svg>
+  );
+}
+
+function ChevronUpIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2.5 7.5 6 4l3.5 3.5" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2.5 4.5 6 8l3.5-3.5" />
     </svg>
   );
 }

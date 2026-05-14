@@ -7,6 +7,7 @@
   --accent: #aa3bff;
   --key-color: #0f766e;
   --timesig-color: #b45309;
+  --warning: #ca8a04;
 
   --sans: 'Noto Sans JP', sans-serif;
   --mono: 'Roboto Mono', monospace;
@@ -29,6 +30,7 @@
     --accent: #c084fc;
     --key-color: #2dd4bf;
     --timesig-color: #fbbf24;
+    --warning: #facc15;
   }
 }
 

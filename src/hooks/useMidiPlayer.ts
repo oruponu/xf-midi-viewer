@@ -27,18 +27,32 @@ interface MidiPlayerState {
   midiError: string | null;
   midiOutputs: MidiOutputOption[];
   selectedMidiOutputId: string;
+  playbackRate: number;
   requestMidiAccess: () => Promise<void>;
   selectMidiOutput: (id: string) => void;
   play: () => Promise<void>;
   pause: () => void;
   stop: () => void;
   seek: (seconds: number) => void;
+  setPlaybackRate: (rate: number) => void;
   reset: () => void;
 }
 
 const LOOKAHEAD_SECONDS = 0.05;
 const SCHEDULER_MS = 10;
 const UI_UPDATE_INTERVAL_MS = 33;
+export const PLAYBACK_RATE_MIN = 0.5;
+export const PLAYBACK_RATE_MAX = 2.0;
+export const PLAYBACK_RATE_STEP = 0.1;
+
+function clampPlaybackRate(rate: number): number {
+  if (!Number.isFinite(rate)) return 1;
+  const clamped = Math.max(
+    PLAYBACK_RATE_MIN,
+    Math.min(PLAYBACK_RATE_MAX, rate),
+  );
+  return Math.round(clamped * 10) / 10;
+}
 
 export function useMidiPlayer(
   sequence: PlaybackSequence | null,
@@ -51,6 +65,7 @@ export function useMidiPlayer(
   const [midiError, setMidiError] = useState<string | null>(null);
   const [midiOutputs, setMidiOutputs] = useState<MidiOutputOption[]>([]);
   const [selectedMidiOutputId, setSelectedMidiOutputId] = useState('');
+  const [playbackRate, setPlaybackRateState] = useState(1);
   const midiAccessRef = useRef<MIDIAccess | null>(null);
   const selectedMidiOutputIdRef = useRef('');
   const nextMidiMessageIndexRef = useRef(0);
@@ -60,6 +75,7 @@ export function useMidiPlayer(
   const startOffsetRef = useRef(0);
   const positionRef = useRef(0);
   const lastUiUpdateAtMsRef = useRef(0);
+  const playbackRateRef = useRef(1);
 
   const clearPanicTimer = useCallback(() => {
     if (panicTimerRef.current !== null) {
@@ -100,7 +116,8 @@ export function useMidiPlayer(
     return Math.min(
       sequence?.durationSeconds ?? 0,
       startOffsetRef.current +
-        (performance.now() - startedAtMsRef.current) / 1000,
+        ((performance.now() - startedAtMsRef.current) / 1000) *
+          playbackRateRef.current,
     );
   }, [sequence]);
 
@@ -123,8 +140,9 @@ export function useMidiPlayer(
 
   const scheduleMidiMessage = useCallback(
     (output: MIDIOutput, message: PlaybackMidiMessage, position: number) => {
+      const offsetSeconds = Math.max(0, message.seconds - position);
       const sendAt =
-        performance.now() + Math.max(0, message.seconds - position) * 1000;
+        performance.now() + (offsetSeconds / playbackRateRef.current) * 1000;
       output.send(message.data, sendAt);
     },
     [],
@@ -266,6 +284,27 @@ export function useMidiPlayer(
     }
   }, [refreshMidiOutputs]);
 
+  const setPlaybackRate = useCallback(
+    (rate: number) => {
+      const clamped = clampPlaybackRate(rate);
+      if (clamped === playbackRateRef.current) return;
+      if (intervalRef.current !== null) {
+        const now = performance.now();
+        const pos = Math.min(
+          sequence?.durationSeconds ?? 0,
+          startOffsetRef.current +
+            ((now - startedAtMsRef.current) / 1000) * playbackRateRef.current,
+        );
+        startOffsetRef.current = pos;
+        startedAtMsRef.current = now;
+        positionRef.current = pos;
+      }
+      playbackRateRef.current = clamped;
+      setPlaybackRateState(clamped);
+    },
+    [sequence],
+  );
+
   const reset = useCallback(() => {
     const output = getSelectedMidiOutput(
       midiAccessRef.current,
@@ -319,12 +358,14 @@ export function useMidiPlayer(
     midiError,
     midiOutputs,
     selectedMidiOutputId,
+    playbackRate,
     requestMidiAccess,
     selectMidiOutput,
     play,
     pause,
     stop,
     seek,
+    setPlaybackRate,
     reset,
   };
 }
