@@ -33,6 +33,7 @@ interface MidiPlayerState {
   pause: () => void;
   stop: () => void;
   seek: (seconds: number) => void;
+  reset: () => void;
 }
 
 const LOOKAHEAD_SECONDS = 0.05;
@@ -265,6 +266,14 @@ export function useMidiPlayer(
     }
   }, [refreshMidiOutputs]);
 
+  const reset = useCallback(() => {
+    const output = getSelectedMidiOutput(
+      midiAccessRef.current,
+      selectedMidiOutputIdRef.current,
+    );
+    if (output) sendMidiReset(output);
+  }, []);
+
   const selectMidiOutput = useCallback((id: string) => {
     const current = getSelectedMidiOutput(
       midiAccessRef.current,
@@ -316,6 +325,7 @@ export function useMidiPlayer(
     pause,
     stop,
     seek,
+    reset,
   };
 }
 
@@ -338,6 +348,12 @@ function sendMidiPanic(output: MIDIOutput): void {
     output.send([0xb0 | channel, 120, 0], now);
     output.send([0xb0 | channel, 123, 0], now);
   }
+}
+
+function sendMidiReset(output: MIDIOutput): void {
+  const now = performance.now();
+  output.send([0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7], now);
+  output.send([0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7], now);
 }
 
 function firstMidiMessageIndexAtOrAfter(

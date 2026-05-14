@@ -38,6 +38,7 @@ function App() {
   const loadFile = useCallback(
     async (f: File) => {
       player.stop();
+      player.reset();
       setFile({ name: f.name, size: f.size, lastModified: f.lastModified });
       setError(null);
       setXf(null);
