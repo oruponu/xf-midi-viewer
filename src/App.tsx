@@ -101,6 +101,23 @@ function App() {
     };
   }, [loadFile]);
 
+  const { isPlaying, play, pause } = player;
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+      if (e.repeat) return;
+      if (isSettingsOpen) return;
+      if (!playbackSequence) return;
+      if (isEditableTarget(e.target)) return;
+      e.preventDefault();
+      if (isPlaying) pause();
+      else void play();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isPlaying, isSettingsOpen, pause, play, playbackSequence]);
+
   return (
     <>
       <header className="app-bar">
@@ -315,6 +332,27 @@ function ViewTabs({
       ))}
     </nav>
   );
+}
+
+const TEXT_INPUT_TYPES = new Set([
+  'text',
+  'search',
+  'email',
+  'password',
+  'tel',
+  'url',
+  'number',
+]);
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  if (target instanceof HTMLTextAreaElement) return true;
+  if (target instanceof HTMLSelectElement) return true;
+  if (target instanceof HTMLInputElement) {
+    return TEXT_INPUT_TYPES.has(target.type);
+  }
+  return false;
 }
 
 export default App;
