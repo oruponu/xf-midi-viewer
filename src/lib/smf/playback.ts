@@ -29,6 +29,7 @@ export interface PlaybackSequence {
   durationSeconds: number;
   durationTicks: number;
   ticksPerQuarter: number;
+  drumChannels: Set<number>;
 }
 
 interface RawTempoChange {
@@ -117,7 +118,54 @@ export function buildPlaybackSequence(smf: SmfFile): PlaybackSequence {
     durationSeconds,
     durationTicks,
     ticksPerQuarter,
+    drumChannels: detectDrumChannels(smf),
   };
+}
+
+const XG_DRUM_BANK_MSB = 127;
+
+export function transposeMidiData(
+  data: number[],
+  semitones: number,
+  drumChannels: ReadonlySet<number>,
+): number[] | null {
+  if (semitones === 0 || data.length < 2) return data;
+  const status = data[0]! & 0xf0;
+  if (status !== 0x80 && status !== 0x90 && status !== 0xa0) return data;
+  const channel = data[0]! & 0x0f;
+  if (drumChannels.has(channel)) return data;
+  const newNote = data[1]! + semitones;
+  if (newNote < 0 || newNote > 127) return null;
+  return [data[0]!, newNote, data[2]!];
+}
+
+export function detectDrumChannels(smf: SmfFile): Set<number> {
+  const drums = new Set<number>();
+  for (const track of smf.tracks) {
+    for (const tev of track.events) {
+      const ev = tev.event;
+      if (ev.kind === 'controlChange' && ev.controller === 0) {
+        if (ev.value === XG_DRUM_BANK_MSB) drums.add(ev.channel);
+      } else if (ev.kind === 'sysex') {
+        const channel = xgPartModeDrumChannel(ev.data);
+        if (channel !== null) drums.add(channel);
+      }
+    }
+  }
+  return drums;
+}
+
+function xgPartModeDrumChannel(data: Uint8Array): number | null {
+  if (data.length < 8) return null;
+  if (data[0] !== 0x43) return null;
+  if ((data[1]! & 0xf0) !== 0x10) return null;
+  if (data[2] !== 0x4c) return null;
+  if (data[3] !== 0x08) return null;
+  if (data[5] !== 0x07) return null;
+  const mode = data[6]!;
+  if (mode < 1 || mode > 3) return null;
+  const part = data[4]!;
+  return part <= 15 ? part : null;
 }
 
 export function secondsToTick(

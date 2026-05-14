@@ -5,6 +5,7 @@ import {
   formatBarBeat,
   formatKeySignature,
   formatTickAsBarBeat,
+  shiftKeySignature,
   tickToBarBeat,
 } from './timing.ts';
 
@@ -162,6 +163,41 @@ describe('formatKeySignature', () => {
     [-5, 'minor', 'Bbm'],
   ] as const)('sharps=%i mode=%s -> %s', (sharps, mode, expected) => {
     expect(formatKeySignature({ sharps, mode })).toBe(expected);
+  });
+});
+
+describe('shiftKeySignature', () => {
+  test('returns the same key when semitones is 0', () => {
+    const key = { sharps: 2, mode: 'major' as const };
+    expect(shiftKeySignature(key, 0)).toEqual(key);
+  });
+
+  test.each([
+    [0, 'major', 2, 2, 'major'], // C -> D
+    [0, 'major', 1, -5, 'major'], // C -> Db
+    [0, 'major', -1, 5, 'major'], // C -> B
+    [0, 'major', 6, 6, 'major'], // C -> F#
+    [0, 'major', -6, 6, 'major'], // C -> F# (enharmonic of Gb)
+    [1, 'major', 1, -4, 'major'], // G -> Ab
+    [-1, 'major', 1, 6, 'major'], // F -> F#
+    [7, 'major', -1, 0, 'major'], // C# -> C
+    [0, 'minor', 3, -3, 'minor'], // Am -> Cm
+    [0, 'minor', -3, 3, 'minor'], // Am -> F#m
+    [-1, 'minor', 1, 6, 'minor'], // Dm -> D#m (enharmonic of Ebm)
+  ] as const)(
+    'sharps=%i mode=%s shift=%i -> sharps=%i mode=%s',
+    (sharps, mode, shift, expSharps, expMode) => {
+      expect(shiftKeySignature({ sharps, mode }, shift)).toEqual({
+        sharps: expSharps,
+        mode: expMode,
+      });
+    },
+  );
+
+  test('shifting by ±12 yields the same key', () => {
+    const key = { sharps: 3, mode: 'major' as const };
+    expect(shiftKeySignature(key, 12)).toEqual(key);
+    expect(shiftKeySignature(key, -12)).toEqual(key);
   });
 });
 

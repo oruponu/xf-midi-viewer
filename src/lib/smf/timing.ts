@@ -94,6 +94,24 @@ const MAJOR_KEYS_FLAT = ['C', 'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'] as const;
 const MINOR_KEYS_SHARP = ['A', 'E', 'B', 'F#', 'C#', 'G#', 'D#', 'A#'] as const;
 const MINOR_KEYS_FLAT = ['A', 'D', 'G', 'C', 'F', 'Bb', 'Eb', 'Ab'] as const;
 
+const MAJOR_TONIC_TO_SHARPS = [0, -5, 2, -3, 4, -1, 6, 1, -4, 3, -2, 5];
+
+function mod12(n: number): number {
+  return ((n % 12) + 12) % 12;
+}
+
+export function shiftKeySignature(
+  key: KeySignature,
+  semitones: number,
+): KeySignature {
+  if (semitones === 0) return key;
+  const base = mod12(key.sharps * 7);
+  const tonic = key.mode === 'major' ? base : mod12(base + 9);
+  const newTonic = mod12(tonic + semitones);
+  const lookup = key.mode === 'major' ? newTonic : mod12(newTonic - 9);
+  return { sharps: MAJOR_TONIC_TO_SHARPS[lookup]!, mode: key.mode };
+}
+
 export function formatKeySignature(key: KeySignature): string {
   const idx = Math.abs(key.sharps);
   if (idx > 7) return '?';

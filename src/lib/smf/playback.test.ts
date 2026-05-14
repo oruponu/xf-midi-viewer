@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { buildPlaybackSequence } from './playback.ts';
+import {
+  buildPlaybackSequence,
+  detectDrumChannels,
+  transposeMidiData,
+} from './playback.ts';
 import type { SmfFile, SmfTrack, TrackEvent } from './types.ts';
 
 const makeSmf = (tracks: SmfTrack[], ppq = 480): SmfFile => ({
@@ -187,5 +191,117 @@ describe('buildPlaybackSequence', () => {
         data: [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7],
       },
     ]);
+  });
+});
+
+describe('transposeMidiData', () => {
+  const noDrums: ReadonlySet<number> = new Set();
+
+  test('returns the same array when semitones is 0', () => {
+    const data = [0x90, 60, 100];
+    expect(transposeMidiData(data, 0, noDrums)).toBe(data);
+  });
+
+  test('shifts Note On pitch upward', () => {
+    expect(transposeMidiData([0x90, 60, 100], 2, noDrums)).toEqual([
+      0x90, 62, 100,
+    ]);
+  });
+
+  test('shifts Note Off pitch downward', () => {
+    expect(transposeMidiData([0x80, 64, 0], -3, noDrums)).toEqual([
+      0x80, 61, 0,
+    ]);
+  });
+
+  test('shifts Poly Aftertouch pitch', () => {
+    expect(transposeMidiData([0xa3, 70, 64], 5, noDrums)).toEqual([
+      0xa3, 75, 64,
+    ]);
+  });
+
+  test('does not shift any channel in the drum set', () => {
+    const drums = new Set<number>([9, 10]);
+    expect(transposeMidiData([0x99, 36, 110], 5, drums)).toEqual([
+      0x99, 36, 110,
+    ]);
+    expect(transposeMidiData([0x9a, 38, 100], 5, drums)).toEqual([
+      0x9a, 38, 100,
+    ]);
+  });
+
+  test('shifts non-drum channels even when other channels are drums', () => {
+    const drums = new Set<number>([9, 10]);
+    expect(transposeMidiData([0x90, 60, 100], 5, drums)).toEqual([
+      0x90, 65, 100,
+    ]);
+  });
+
+  test('returns null when the resulting note is out of range', () => {
+    expect(transposeMidiData([0x90, 125, 100], 6, noDrums)).toBeNull();
+    expect(transposeMidiData([0x90, 2, 100], -6, noDrums)).toBeNull();
+  });
+
+  test('leaves non-note messages unchanged', () => {
+    const cc = [0xb0, 7, 100];
+    expect(transposeMidiData(cc, 4, noDrums)).toBe(cc);
+    const pitchBend = [0xe0, 0x00, 0x40];
+    expect(transposeMidiData(pitchBend, -4, noDrums)).toBe(pitchBend);
+  });
+});
+
+describe('detectDrumChannels', () => {
+  const cc = (
+    deltaTime: number,
+    controller: number,
+    value: number,
+    channel = 0,
+  ): TrackEvent => ({
+    deltaTime,
+    event: { kind: 'controlChange', channel, controller, value },
+  });
+
+  const sysex = (deltaTime: number, body: number[]): TrackEvent => ({
+    deltaTime,
+    event: { kind: 'sysex', data: new Uint8Array(body) },
+  });
+
+  test('returns an empty set when there are no drum markers', () => {
+    expect(detectDrumChannels(makeSmf([]))).toEqual(new Set());
+  });
+
+  test('adds a channel when Bank Select MSB is 127 (XG drum)', () => {
+    const smf = makeSmf([track([cc(0, 0, 127, 10)])]);
+    expect(detectDrumChannels(smf)).toEqual(new Set([10]));
+  });
+
+  test('ignores Bank Select MSB values other than 127', () => {
+    const smf = makeSmf([
+      track([cc(0, 0, 0, 3), cc(0, 0, 64, 4), cc(0, 0, 120, 5)]),
+    ]);
+    expect(detectDrumChannels(smf)).toEqual(new Set());
+  });
+
+  test('adds a channel from XG Part Mode SysEx (drum mode)', () => {
+    // F0 43 10 4C 08 04 07 02 F7 -> part 4, mode 2 (Drum S1)
+    const smf = makeSmf([
+      track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x04, 0x07, 0x02, 0xf7])]),
+    ]);
+    expect(detectDrumChannels(smf)).toEqual(new Set([4]));
+  });
+
+  test('ignores XG Part Mode SysEx with Normal mode', () => {
+    const smf = makeSmf([
+      track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x04, 0x07, 0x00, 0xf7])]),
+    ]);
+    expect(detectDrumChannels(smf)).toEqual(new Set());
+  });
+
+  test('detects drum channels across multiple tracks', () => {
+    const smf = makeSmf([
+      track([cc(0, 0, 127, 11)]),
+      track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x0c, 0x07, 0x01, 0xf7])]),
+    ]);
+    expect(detectDrumChannels(smf)).toEqual(new Set([11, 12]));
   });
 });
