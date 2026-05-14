@@ -22,9 +22,10 @@ import type {
   XfStyleData,
   XfVersion,
 } from '../lib/xf/types.ts';
+import { KaraokeView } from './KaraokeView.tsx';
 import { LeadSheet } from './LeadSheet.tsx';
 
-export type InfoPanelTab = 'leadSheet' | 'lyrics' | 'details';
+export type InfoPanelTab = 'leadSheet' | 'lyrics' | 'karaoke' | 'details';
 
 type FileSummary = {
   name: string;
@@ -123,6 +124,17 @@ export function InfoPanel({
             rehearsals={rehearsalsForChart}
             activeTick={activeTick}
             autoScroll={autoScrollLyrics}
+          />
+        ) : (
+          <EmptyView title="歌詞情報はありません" />
+        ))}
+
+      {activeTab === 'karaoke' &&
+        (hasKaraoke && parsedKaraoke.syllables.length > 0 ? (
+          <KaraokeView
+            parsed={parsedKaraoke}
+            sequence={sequence}
+            getPositionSeconds={getPositionSeconds}
           />
         ) : (
           <EmptyView title="歌詞情報はありません" />

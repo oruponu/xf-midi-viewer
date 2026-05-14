@@ -308,6 +308,7 @@ const VIEW_TABS: ReadonlyArray<{
 }> = [
   { id: 'leadSheet', label: 'リードシート' },
   { id: 'lyrics', label: '歌詞' },
+  { id: 'karaoke', label: 'カラオケ' },
   { id: 'details', label: '詳細' },
 ];
 
