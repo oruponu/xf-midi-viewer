@@ -982,7 +982,7 @@
   display: inline-flex;
   align-items: flex-end;
   font-size: 13px;
-  color: var(--text);
+  color: var(--text-h);
   white-space: nowrap;
   line-height: 1;
   transition: color 0.12s linear;
