@@ -1150,26 +1150,26 @@
 }
 
 .karaoke-stage {
-  min-height: 280px;
+  aspect-ratio: 16 / 9;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 24px;
   overflow: hidden;
   padding: 16px 0 4px;
 }
 
 .karaoke-line {
   position: relative;
-  font-size: 24px;
+  font-size: 48px;
   line-height: 1.45;
   letter-spacing: 0.04em;
-  color: var(--text);
+  color: var(--text-h);
   white-space: nowrap;
 }
 
 .karaoke-line--past {
-  visibility: hidden;
+  display: none;
 }
 
 .karaoke-line-base {
@@ -1179,7 +1179,9 @@
 .karaoke-line-fill {
   position: absolute;
   left: 0;
-  top: 0;
+  top: -0.7em;
+  bottom: 0;
+  padding-top: 0.7em;
   color: var(--accent);
   overflow: hidden;
   white-space: nowrap;
@@ -1189,11 +1191,23 @@
 
 .karaoke-syl {
   display: inline-block;
+  white-space: pre;
+}
+
+.karaoke-line ruby {
+  position: relative;
 }
 
 .karaoke-line ruby rt {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
   font-size: 0.55em;
+  line-height: 1;
   color: var(--text);
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .karaoke-line--active .karaoke-line-fill ruby rt {
@@ -1255,10 +1269,7 @@
   }
 
   .karaoke-line {
-    font-size: 20px;
-  }
-  .karaoke-stage {
-    min-height: 220px;
+    font-size: 32px;
   }
 
   .style-event-row {
