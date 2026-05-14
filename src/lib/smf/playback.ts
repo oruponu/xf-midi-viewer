@@ -334,9 +334,11 @@ function eventToMidiBytes(
         event.value & 0x7f,
         (event.value >> 7) & 0x7f,
       ];
-    case 'meta':
     case 'sysex':
+      return [0xf0, ...event.data];
     case 'sysexEscape':
+      return [...event.data];
+    case 'meta':
       return null;
   }
 }

@@ -78,6 +78,16 @@ const pitchBend = (
   event: { kind: 'pitchBend', channel, value },
 });
 
+const sysex = (deltaTime: number, data: number[]): TrackEvent => ({
+  deltaTime,
+  event: { kind: 'sysex', data: new Uint8Array(data) },
+});
+
+const sysexEscape = (deltaTime: number, data: number[]): TrackEvent => ({
+  deltaTime,
+  event: { kind: 'sysexEscape', data: new Uint8Array(data) },
+});
+
 describe('buildPlaybackSequence', () => {
   test('pairs note on and off events with seconds at the default tempo', () => {
     const sequence = buildPlaybackSequence(
@@ -152,6 +162,30 @@ describe('buildPlaybackSequence', () => {
       { tick: 240, seconds: 0.25, data: [0xe1, 0, 64] },
       { tick: 480, seconds: 0.5, data: [0x91, 72, 96] },
       { tick: 720, seconds: 0.75, data: [0x81, 72, 64] },
+    ]);
+  });
+
+  test('emits sysex events with the F0 status byte restored', () => {
+    const sequence = buildPlaybackSequence(
+      makeSmf([
+        track([
+          sysex(0, [0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7]),
+          sysexEscape(120, [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7]),
+        ]),
+      ]),
+    );
+
+    expect(sequence.midiMessages).toEqual([
+      {
+        tick: 0,
+        seconds: 0,
+        data: [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7],
+      },
+      {
+        tick: 120,
+        seconds: 0.125,
+        data: [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7],
+      },
     ]);
   });
 });

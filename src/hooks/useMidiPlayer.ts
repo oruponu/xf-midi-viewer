@@ -254,7 +254,7 @@ export function useMidiPlayer(
     setMidiAccessState('requesting');
     setMidiError(null);
     try {
-      const access = await navigator.requestMIDIAccess({ sysex: false });
+      const access = await navigator.requestMIDIAccess({ sysex: true });
       midiAccessRef.current = access;
       setMidiAccessState('ready');
       refreshMidiOutputs();
@@ -364,7 +364,7 @@ async function queryMidiPermission(): Promise<PermissionState | null> {
   try {
     const status = await navigator.permissions.query({
       name: 'midi',
-      sysex: false,
+      sysex: true,
     } as MidiPermissionDescriptor);
     return status.state;
   } catch {
