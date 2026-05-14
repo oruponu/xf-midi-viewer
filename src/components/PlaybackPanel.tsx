@@ -27,10 +27,15 @@ export function PlaybackPanel({
     sequence.durationSeconds > 0
       ? player.positionSeconds / sequence.durationSeconds
       : 0;
-  const tempoLabel = useMemo(() => {
-    const firstTempo = sequence.tempos[0];
-    return firstTempo ? `${Math.round(firstTempo.bpm)} BPM` : 'SMPTE';
-  }, [sequence.tempos]);
+  const tempoBpm = useMemo(() => {
+    if (sequence.tempos.length === 0) return null;
+    let segment = sequence.tempos[0]!;
+    for (const t of sequence.tempos) {
+      if (t.seconds <= player.positionSeconds) segment = t;
+      else break;
+    }
+    return Math.round(segment.bpm);
+  }, [player.positionSeconds, sequence.tempos]);
   const positionLabel = useMemo(() => {
     if (!timing || timing.ppq <= 0) return null;
     const tick = secondsToTick(player.positionSeconds, sequence);
@@ -71,13 +76,25 @@ export function PlaybackPanel({
       </div>
 
       {positionLabel && (
-        <span
-          className="playback-position"
-          aria-label="Bar.Beat.Tick"
-          title="小節.拍.Tick"
-        >
-          {positionLabel}
-        </span>
+        <div className="playback-position-group">
+          <span
+            className="playback-position"
+            aria-label="Bar.Beat.Tick"
+            title="小節.拍.Tick"
+          >
+            {positionLabel}
+          </span>
+          {tempoBpm !== null && (
+            <span
+              className="playback-tempo"
+              aria-label={`Tempo ${tempoBpm} BPM`}
+              title="現在のテンポ"
+            >
+              <span className="playback-tempo-label">テンポ</span>
+              <span className="playback-tempo-value">{tempoBpm}</span>
+            </span>
+          )}
+        </div>
       )}
 
       <div className="playback-timeline">
@@ -99,7 +116,6 @@ export function PlaybackPanel({
       <div className="playback-meta">
         <span>{sequence.notes.length.toLocaleString()} notes</span>
         <span>{sequence.midiMessages.length.toLocaleString()} MIDI events</span>
-        <span>{tempoLabel}</span>
       </div>
     </section>
   );
