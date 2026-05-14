@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import type { useMidiPlayer } from '../hooks/useMidiPlayer.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
-import { tickToBarBeat } from '../lib/smf/timing.ts';
+import { formatKeySignature, tickToBarBeat } from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 
 interface PlaybackPanelProps {
@@ -45,6 +45,16 @@ export function PlaybackPanel({
       2,
       '0',
     )}.${String(bb.tickInBeat).padStart(4, '0')}`;
+  }, [player.positionSeconds, sequence, timing]);
+  const keyLabel = useMemo(() => {
+    if (!timing || timing.keySignatures.length === 0) return null;
+    const tick = secondsToTick(player.positionSeconds, sequence);
+    let current = timing.keySignatures[0]!;
+    for (const change of timing.keySignatures) {
+      if (change.tick <= tick) current = change;
+      else break;
+    }
+    return formatKeySignature(current.signature);
   }, [player.positionSeconds, sequence, timing]);
 
   return (
@@ -92,6 +102,16 @@ export function PlaybackPanel({
             >
               <span className="playback-tempo-label">テンポ</span>
               <span className="playback-tempo-value">{tempoBpm}</span>
+            </span>
+          )}
+          {keyLabel && (
+            <span
+              className="playback-key"
+              aria-label={`Key ${keyLabel}`}
+              title="現在のキー"
+            >
+              <span className="playback-key-label">キー</span>
+              <span className="playback-key-value">{keyLabel}</span>
             </span>
           )}
         </div>
