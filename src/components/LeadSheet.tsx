@@ -1,15 +1,21 @@
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
-import { formatKeySignature, tickToBarBeat } from '../lib/smf/timing.ts';
+import {
+  formatKeySignature,
+  shiftKeySignature,
+  tickToBarBeat,
+} from '../lib/smf/timing.ts';
 import type {
   KeySignature,
+  KeySignatureChange,
   SmfTiming,
   TimeSignature,
   TimeSignatureChange,
 } from '../lib/smf/timing.ts';
 import { formatChord } from '../lib/xf/format.ts';
 import type { LyricSyllable } from '../lib/xf/lyrics.ts';
+import { shiftChordBass, shiftChordRoot } from '../lib/xf/transpose.ts';
 import type { StyleMessage } from '../lib/xf/types.ts';
 
 const BARS_PER_ROW = 4;
@@ -45,6 +51,7 @@ interface LeadSheetProps {
   sequence: PlaybackSequence | null;
   getPositionSeconds: (() => number) | null;
   autoScroll: boolean;
+  keyShift: number;
 }
 
 export const LeadSheet = memo(function LeadSheet({
@@ -55,6 +62,7 @@ export const LeadSheet = memo(function LeadSheet({
   sequence,
   getPositionSeconds,
   autoScroll,
+  keyShift,
 }: LeadSheetProps) {
   const renderable = useMemo(
     () => syllables.filter((s) => s.runs.length > 0),
@@ -216,6 +224,7 @@ export const LeadSheet = memo(function LeadSheet({
             timing={timing}
             barTimeSignatures={barTimeSignatures}
             barKeySignatures={barKeySignatures}
+            keyShift={keyShift}
           />
         ))}
       </div>
@@ -240,6 +249,7 @@ function ScoreRow({
   timing,
   barTimeSignatures,
   barKeySignatures,
+  keyShift,
 }: {
   startBar: number;
   barCount: number;
@@ -249,6 +259,7 @@ function ScoreRow({
   timing: SmfTiming;
   barTimeSignatures: Map<number, TimeSignature>;
   barKeySignatures: Map<number, KeySignature>;
+  keyShift: number;
 }) {
   const startPos = startBar - 1;
   const endPos = startPos + barCount;
@@ -315,17 +326,18 @@ function ScoreRow({
               <span className="score-bar-num">{bar}</span>
               {hasMeta && (
                 <div className="score-bar-meta">
-                  {key && (
-                    <span
-                      className="score-key"
-                      aria-label={`Key ${formatKeySignature(key)}`}
-                    >
-                      <span className="score-key-label">KEY</span>
-                      <span className="score-key-value">
-                        {formatKeySignature(key)}
-                      </span>
-                    </span>
-                  )}
+                  {key &&
+                    (() => {
+                      const shifted =
+                        keyShift === 0 ? key : shiftKeySignature(key, keyShift);
+                      const label = formatKeySignature(shifted);
+                      return (
+                        <span className="score-key" aria-label={`Key ${label}`}>
+                          <span className="score-key-label">KEY</span>
+                          <span className="score-key-value">{label}</span>
+                        </span>
+                      );
+                    })()}
                   {sig && (
                     <span
                       className="score-timesig"
@@ -352,7 +364,7 @@ function ScoreRow({
             data-tick={p.msg.tick}
             style={{ left: `${p.xPercent}%` }}
           >
-            {formatChord(p.msg.root, p.msg.type, p.msg.bass)}
+            {formatTransposedChord(p.msg, timing, keyShift)}
           </span>
         ))}
       </div>
@@ -395,6 +407,47 @@ function findSignatureAt(
     else break;
   }
   return result;
+}
+
+const C_MAJOR: KeySignature = { sharps: 0, mode: 'major' };
+
+function findKeySignatureAt(
+  tick: number,
+  changes: KeySignatureChange[],
+): KeySignature {
+  if (changes.length === 0) return C_MAJOR;
+  let result = changes[0]!.signature;
+  for (const c of changes) {
+    if (c.tick <= tick) result = c.signature;
+    else break;
+  }
+  return result;
+}
+
+function preferFlatsForChord(
+  tick: number,
+  timing: SmfTiming,
+  keyShift: number,
+): boolean {
+  const sig = findKeySignatureAt(tick, timing.keySignatures);
+  const shifted = keyShift === 0 ? sig : shiftKeySignature(sig, keyShift);
+  return shifted.sharps < 0;
+}
+
+function formatTransposedChord(
+  chord: ChordMsg,
+  timing: SmfTiming,
+  keyShift: number,
+): string {
+  if (keyShift === 0) return formatChord(chord.root, chord.type, chord.bass);
+  const preferFlats = preferFlatsForChord(chord.tick, timing, keyShift);
+  return formatChord(
+    shiftChordRoot(chord.root, keyShift, preferFlats),
+    chord.type,
+    chord.bass === null
+      ? null
+      : shiftChordBass(chord.bass, keyShift, preferFlats),
+  );
 }
 
 function barPositionAt(tick: number, timing: SmfTiming): number {

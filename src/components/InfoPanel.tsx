@@ -41,6 +41,7 @@ export function InfoPanel({
   getPositionSeconds = null,
   autoScrollLeadSheet = true,
   autoScrollLyrics = true,
+  keyShift = 0,
 }: {
   file: FileSummary | null;
   data: XfData;
@@ -50,6 +51,7 @@ export function InfoPanel({
   getPositionSeconds?: (() => number) | null;
   autoScrollLeadSheet?: boolean;
   autoScrollLyrics?: boolean;
+  keyShift?: number;
 }) {
   const hasKaraoke =
     data.karaoke.header !== null || data.karaoke.events.length > 0;
@@ -108,6 +110,7 @@ export function InfoPanel({
             sequence={sequence}
             getPositionSeconds={getPositionSeconds}
             autoScroll={autoScrollLeadSheet}
+            keyShift={keyShift}
           />
         ) : (
           <EmptyView title="リードシート情報はありません" />

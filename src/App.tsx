@@ -284,6 +284,7 @@ function PlayerScope({
           getPositionSeconds={player.getPositionSeconds}
           autoScrollLeadSheet={settings.autoScrollLeadSheet}
           autoScrollLyrics={settings.autoScrollLyrics}
+          keyShift={player.keyShift}
         />
       )}
       {sequence && (
