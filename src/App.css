@@ -1144,6 +1144,63 @@
   font-size: 12px;
 }
 
+.karaoke-view h3 {
+  font-size: 17px;
+  margin-bottom: 16px;
+}
+
+.karaoke-stage {
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 12px;
+  overflow: hidden;
+  padding: 16px 0 4px;
+}
+
+.karaoke-line {
+  position: relative;
+  font-size: 24px;
+  line-height: 1.45;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.karaoke-line--past {
+  visibility: hidden;
+}
+
+.karaoke-line-base {
+  display: inline;
+}
+
+.karaoke-line-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--accent);
+  overflow: hidden;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: none;
+}
+
+.karaoke-syl {
+  display: inline-block;
+}
+
+.karaoke-line ruby rt {
+  font-size: 0.55em;
+  color: var(--text);
+}
+
+.karaoke-line--active .karaoke-line-fill ruby rt {
+  color: var(--accent);
+  opacity: 0.7;
+}
+
 @media (max-width: 720px) {
   .app {
     padding: 18px 14px calc(var(--dock-height, 0px) + 24px);
@@ -1195,6 +1252,13 @@
 
   .viewer-tab-label {
     font-size: 13px;
+  }
+
+  .karaoke-line {
+    font-size: 20px;
+  }
+  .karaoke-stage {
+    min-height: 220px;
   }
 
   .style-event-row {
