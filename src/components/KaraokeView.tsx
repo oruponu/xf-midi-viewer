@@ -240,6 +240,10 @@ function computeFillWidth(
   if (activeIdx < 0) return 0;
 
   const activeSyl = syls[activeIdx]!;
+  if (activeSyl.vocalPart === 'speech' || activeSyl.vocalPart === 'nonLyric') {
+    return metrics.syllableLefts[activeIdx] ?? 0;
+  }
+
   const endTick =
     activeSyl.endTick ??
     line.endTick ??
