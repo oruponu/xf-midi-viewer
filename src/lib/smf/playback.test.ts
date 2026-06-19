@@ -169,6 +169,16 @@ describe('buildPlaybackSequence', () => {
     ]);
   });
 
+  test('computes durationSeconds for huge sequences without overflowing the stack', () => {
+    const events = Array.from({ length: 700_000 }, () =>
+      controlChange(1, 7, 100),
+    );
+    const sequence = buildPlaybackSequence(makeSmf([track(events)]));
+
+    expect(sequence.midiMessages).toHaveLength(700_000);
+    expect(sequence.durationSeconds).toBeCloseTo(700_000 / 960, 3);
+  });
+
   test('emits sysex events with the F0 status byte restored', () => {
     const sequence = buildPlaybackSequence(
       makeSmf([

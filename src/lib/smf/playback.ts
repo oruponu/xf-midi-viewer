@@ -97,12 +97,14 @@ export function buildPlaybackSequence(smf: SmfFile): PlaybackSequence {
       a.seconds - b.seconds || a.tick - b.tick || a.data[0]! - b.data[0]!,
   );
 
-  const durationSeconds = Math.max(
-    tickToSeconds(durationTicks),
-    ...notes.map((note) => note.startSeconds + note.durationSeconds),
-    ...midiMessages.map((message) => message.seconds),
-    0,
-  );
+  let durationSeconds = Math.max(tickToSeconds(durationTicks), 0);
+  for (const note of notes) {
+    const end = note.startSeconds + note.durationSeconds;
+    if (end > durationSeconds) durationSeconds = end;
+  }
+  for (const message of midiMessages) {
+    if (message.seconds > durationSeconds) durationSeconds = message.seconds;
+  }
 
   return {
     notes,
