@@ -97,6 +97,18 @@ export function scheduleDueMidiMessages(
   return { nextIndex: i, failed: false };
 }
 
+export function collectChaseMessages(
+  messages: readonly PlaybackMidiMessage[],
+  startIndex: number,
+): PlaybackMidiMessage[] {
+  const chase: PlaybackMidiMessage[] = [];
+  for (let i = 0; i < startIndex; i += 1) {
+    const message = messages[i]!;
+    if (!isNoteMessage(message.data)) chase.push(message);
+  }
+  return chase;
+}
+
 function clampPlaybackRate(rate: number): number {
   if (!Number.isFinite(rate)) return 1;
   const clamped = Math.max(
@@ -287,12 +299,24 @@ export function useMidiPlayer(
       sequence.midiMessages,
       startOffsetRef.current,
     );
+    for (const message of collectChaseMessages(
+      sequence.midiMessages,
+      nextMidiMessageIndexRef.current,
+    )) {
+      scheduleMidiMessage(output, message, startOffsetRef.current);
+    }
     startedAtMsRef.current = performance.now();
     setIsPlaying(true);
     clearTimer();
     scheduleWindow();
     intervalRef.current = window.setInterval(scheduleWindow, SCHEDULER_MS);
-  }, [cleanupScheduled, clearTimer, scheduleWindow, sequence]);
+  }, [
+    cleanupScheduled,
+    clearTimer,
+    scheduleMidiMessage,
+    scheduleWindow,
+    sequence,
+  ]);
 
   const pause = useCallback(() => {
     stopInternal(false);
@@ -493,6 +517,11 @@ function getSelectedMidiOutput(
 
 function isLiveNoteOn(data: number[]): boolean {
   return (data[0]! & 0xf0) === 0x90 && (data[2] ?? 0) > 0;
+}
+
+function isNoteMessage(data: number[]): boolean {
+  const status = data[0]! & 0xf0;
+  return status === 0x80 || status === 0x90 || status === 0xa0;
 }
 
 function sendMidiPanic(
