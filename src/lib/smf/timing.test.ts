@@ -244,6 +244,26 @@ describe('tickToBarBeat', () => {
     });
   });
 
+  test('counts a partial bar as a full bar when the meter changes mid-bar', () => {
+    const timing = extractTiming(
+      makeSmf([
+        {
+          events: [timeSigMeta(4, 2, 0), timeSigMeta(3, 2, 960)],
+        },
+      ]),
+    );
+    expect(tickToBarBeat(959, timing)).toEqual({
+      bar: 1,
+      beat: 2,
+      tickInBeat: 479,
+    });
+    expect(tickToBarBeat(960, timing)).toEqual({
+      bar: 2,
+      beat: 1,
+      tickInBeat: 0,
+    });
+  });
+
   test('returns null for SMPTE division', () => {
     const timing = extractTiming(makeSmf([], 480, true));
     expect(tickToBarBeat(0, timing)).toBeNull();

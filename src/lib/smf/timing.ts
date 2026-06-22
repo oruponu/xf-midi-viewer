@@ -151,7 +151,7 @@ export function tickToBarBeat(tick: number, timing: SmfTiming): BarBeat | null {
     const next = sigs[i + 1]!;
     const tpb =
       ticksPerBeat(timing.ppq, cur.signature) * cur.signature.numerator;
-    cumBar += Math.floor((next.tick - cur.tick) / tpb);
+    cumBar += Math.ceil((next.tick - cur.tick) / tpb);
   }
 
   const seg = sigs[idx]!;
