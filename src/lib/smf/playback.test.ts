@@ -276,20 +276,20 @@ describe('detectDrumChannels', () => {
     event: { kind: 'sysex', data: new Uint8Array(body) },
   });
 
-  test('returns an empty set when there are no drum markers', () => {
-    expect(detectDrumChannels(makeSmf([]))).toEqual(new Set());
+  test('includes General MIDI channel 10 when there are no drum markers', () => {
+    expect(detectDrumChannels(makeSmf([]))).toEqual(new Set([9]));
   });
 
   test('adds a channel when Bank Select MSB is 127 (XG drum)', () => {
     const smf = makeSmf([track([cc(0, 0, 127, 10)])]);
-    expect(detectDrumChannels(smf)).toEqual(new Set([10]));
+    expect(detectDrumChannels(smf)).toEqual(new Set([9, 10]));
   });
 
   test('ignores Bank Select MSB values other than 127', () => {
     const smf = makeSmf([
       track([cc(0, 0, 0, 3), cc(0, 0, 64, 4), cc(0, 0, 120, 5)]),
     ]);
-    expect(detectDrumChannels(smf)).toEqual(new Set());
+    expect(detectDrumChannels(smf)).toEqual(new Set([9]));
   });
 
   test('adds a channel from XG Part Mode SysEx (drum mode)', () => {
@@ -297,14 +297,31 @@ describe('detectDrumChannels', () => {
     const smf = makeSmf([
       track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x04, 0x07, 0x02, 0xf7])]),
     ]);
-    expect(detectDrumChannels(smf)).toEqual(new Set([4]));
+    expect(detectDrumChannels(smf)).toEqual(new Set([4, 9]));
   });
 
   test('ignores XG Part Mode SysEx with Normal mode', () => {
     const smf = makeSmf([
       track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x04, 0x07, 0x00, 0xf7])]),
     ]);
+    expect(detectDrumChannels(smf)).toEqual(new Set([9]));
+  });
+
+  test('removes General MIDI channel 10 when XG Part Mode sets it to Normal', () => {
+    const smf = makeSmf([
+      track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x09, 0x07, 0x00, 0xf7])]),
+    ]);
     expect(detectDrumChannels(smf)).toEqual(new Set());
+  });
+
+  test('removes a detected XG drum channel when XG Part Mode sets it to Normal', () => {
+    const smf = makeSmf([
+      track([
+        cc(0, 0, 127, 11),
+        sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x0b, 0x07, 0x00, 0xf7]),
+      ]),
+    ]);
+    expect(detectDrumChannels(smf)).toEqual(new Set([9]));
   });
 
   test('detects drum channels across multiple tracks', () => {
@@ -312,6 +329,6 @@ describe('detectDrumChannels', () => {
       track([cc(0, 0, 127, 11)]),
       track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x0c, 0x07, 0x01, 0xf7])]),
     ]);
-    expect(detectDrumChannels(smf)).toEqual(new Set([11, 12]));
+    expect(detectDrumChannels(smf)).toEqual(new Set([9, 11, 12]));
   });
 });

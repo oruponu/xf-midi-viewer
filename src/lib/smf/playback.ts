@@ -51,6 +51,11 @@ interface ActiveNote {
   startTick: number;
 }
 
+interface XgPartModeChange {
+  channel: number;
+  isDrum: boolean;
+}
+
 const DEFAULT_MICROSECONDS_PER_QUARTER = 500_000;
 const DEFAULT_NOTE_SECONDS = 0.12;
 
@@ -124,6 +129,7 @@ export function buildPlaybackSequence(smf: SmfFile): PlaybackSequence {
   };
 }
 
+const GM_PERCUSSION_CHANNEL = 9;
 const XG_DRUM_BANK_MSB = 127;
 
 export function transposeMidiData(
@@ -142,22 +148,25 @@ export function transposeMidiData(
 }
 
 export function detectDrumChannels(smf: SmfFile): Set<number> {
-  const drums = new Set<number>();
+  const drums = new Set<number>([GM_PERCUSSION_CHANNEL]);
   for (const track of smf.tracks) {
     for (const tev of track.events) {
       const ev = tev.event;
       if (ev.kind === 'controlChange' && ev.controller === 0) {
         if (ev.value === XG_DRUM_BANK_MSB) drums.add(ev.channel);
       } else if (ev.kind === 'sysex') {
-        const channel = xgPartModeDrumChannel(ev.data);
-        if (channel !== null) drums.add(channel);
+        const change = xgPartModeChange(ev.data);
+        if (change) {
+          if (change.isDrum) drums.add(change.channel);
+          else drums.delete(change.channel);
+        }
       }
     }
   }
   return drums;
 }
 
-function xgPartModeDrumChannel(data: Uint8Array): number | null {
+function xgPartModeChange(data: Uint8Array): XgPartModeChange | null {
   if (data.length < 8) return null;
   if (data[0] !== 0x43) return null;
   if ((data[1]! & 0xf0) !== 0x10) return null;
@@ -165,9 +174,9 @@ function xgPartModeDrumChannel(data: Uint8Array): number | null {
   if (data[3] !== 0x08) return null;
   if (data[5] !== 0x07) return null;
   const mode = data[6]!;
-  if (mode < 1 || mode > 3) return null;
+  if (mode > 3) return null;
   const part = data[4]!;
-  return part <= 15 ? part : null;
+  return part <= 15 ? { channel: part, isDrum: mode !== 0 } : null;
 }
 
 export function secondsToTick(
