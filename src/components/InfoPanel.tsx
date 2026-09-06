@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
+import type { MidiScheduler } from '../lib/player/scheduler.ts';
+import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatTickAsBarBeat } from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
@@ -32,9 +35,8 @@ export function InfoPanel({
   file,
   data,
   activeTab,
-  activeTick = null,
+  scheduler,
   sequence = null,
-  getPositionSeconds = null,
   autoScrollLeadSheet = true,
   autoScrollLyrics = true,
   keyShift = 0,
@@ -42,9 +44,8 @@ export function InfoPanel({
   file: FileSummary | null;
   data: XfData;
   activeTab: InfoPanelTab;
-  activeTick?: number | null;
+  scheduler: MidiScheduler;
   sequence?: PlaybackSequence | null;
-  getPositionSeconds?: (() => number) | null;
   autoScrollLeadSheet?: boolean;
   autoScrollLyrics?: boolean;
   keyShift?: number;
@@ -100,7 +101,7 @@ export function InfoPanel({
             syllables={parsedKaraoke.syllables}
             timing={data.timing}
             sequence={sequence}
-            getPositionSeconds={getPositionSeconds}
+            scheduler={scheduler}
             autoScroll={autoScrollLeadSheet}
             keyShift={keyShift}
           />
@@ -113,7 +114,8 @@ export function InfoPanel({
           <KaraokeSection
             parsed={parsedKaraoke}
             rehearsals={rehearsalsForChart}
-            activeTick={activeTick}
+            scheduler={scheduler}
+            sequence={sequence}
             autoScroll={autoScrollLyrics}
           />
         ) : (
@@ -122,11 +124,7 @@ export function InfoPanel({
 
       {activeTab === 'karaoke' &&
         (hasKaraoke && parsedKaraoke.syllables.length > 0 ? (
-          <KaraokeView
-            parsed={parsedKaraoke}
-            sequence={sequence}
-            getPositionSeconds={getPositionSeconds}
-          />
+          <KaraokeView parsed={parsedKaraoke} sequence={sequence} scheduler={scheduler} />
         ) : (
           <EmptyView title="歌詞情報はありません" />
         ))}
@@ -280,19 +278,23 @@ const VOCAL_PART_LABELS: Record<VocalPart, string> = {
 function KaraokeSection({
   parsed,
   rehearsals,
-  activeTick,
+  scheduler,
+  sequence,
   autoScroll,
 }: {
   parsed: ParsedKaraoke;
   rehearsals: RehearsalMsg[];
-  activeTick: number | null;
+  scheduler: MidiScheduler;
+  sequence: PlaybackSequence | null;
   autoScroll: boolean;
 }) {
   const { replaceWithDivider, dividerBefore } = computeKaraokeSectionBreaks(
     parsed.tokens,
     rehearsals,
   );
-  const activeSyllableIndex = findActiveSyllableIndex(parsed.syllables, activeTick);
+  const activeSyllableIndex = usePlaybackPosition(scheduler, (seconds) =>
+    sequence ? findActiveSyllableIndex(parsed.syllables, secondsToTick(seconds, sequence)) : -1,
+  );
   const blocks = buildKaraokeBlocks(
     parsed.tokens,
     replaceWithDivider,

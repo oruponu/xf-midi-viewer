@@ -276,6 +276,7 @@ function PlayerScope({
           file={file}
           data={xf}
           activeTab={activeTab}
+          scheduler={scheduler}
           sequence={sequence}
           autoScrollLeadSheet={settings.autoScrollLeadSheet}
           autoScrollLyrics={settings.autoScrollLyrics}

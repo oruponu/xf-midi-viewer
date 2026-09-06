@@ -1,5 +1,6 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
+import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import { buildKaraokePages } from '../lib/xf/karaokePages.ts';
@@ -9,13 +10,13 @@ import type { LyricLine, LyricRun, ParsedKaraoke } from '../lib/xf/lyrics.ts';
 interface KaraokeViewProps {
   parsed: ParsedKaraoke;
   sequence: PlaybackSequence | null;
-  getPositionSeconds: (() => number) | null;
+  scheduler: MidiScheduler;
 }
 
 export const KaraokeView = memo(function KaraokeView({
   parsed,
   sequence,
-  getPositionSeconds,
+  scheduler,
 }: KaraokeViewProps) {
   const pages = useMemo(() => buildKaraokePages(parsed), [parsed]);
 
@@ -49,7 +50,7 @@ export const KaraokeView = memo(function KaraokeView({
   }, [activeState]);
 
   useEffect(() => {
-    if (!sequence || !getPositionSeconds) {
+    if (!sequence) {
       setActiveState({ pageIdx: 0, lineIdx: 0 });
       return;
     }
@@ -62,7 +63,7 @@ export const KaraokeView = memo(function KaraokeView({
 
     const loop = () => {
       if (cancelled) return;
-      const tick = secondsToTick(getPositionSeconds(), sequence);
+      const tick = secondsToTick(scheduler.getPosition(), sequence);
       const pageIdx = findActivePageIndex(pages, tick);
       const page = pages[pageIdx]!;
       const lineIdx = findActiveLineIndex(page.lines, tick);
@@ -96,7 +97,7 @@ export const KaraokeView = memo(function KaraokeView({
       cancelled = true;
       cancelAnimationFrame(raf);
     };
-  }, [sequence, getPositionSeconds, pages]);
+  }, [sequence, scheduler, pages]);
 
   if (pages.length === 0) return null;
   const activePage = pages[Math.min(activeState.pageIdx, pages.length - 1)]!;

@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef } from 'react';
+import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatKeySignature, shiftKeySignature, tickToBarBeat } from '../lib/smf/timing.ts';
@@ -45,7 +46,7 @@ interface LeadSheetProps {
   syllables: LyricSyllable[];
   timing: SmfTiming;
   sequence: PlaybackSequence | null;
-  getPositionSeconds: (() => number) | null;
+  scheduler: MidiScheduler;
   autoScroll: boolean;
   keyShift: number;
 }
@@ -56,7 +57,7 @@ export const LeadSheet = memo(function LeadSheet({
   syllables,
   timing,
   sequence,
-  getPositionSeconds,
+  scheduler,
   autoScroll,
   keyShift,
 }: LeadSheetProps) {
@@ -112,7 +113,7 @@ export const LeadSheet = memo(function LeadSheet({
   const scoreRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!sequence || !getPositionSeconds) return;
+    if (!sequence) return;
     const container = scoreRef.current;
     if (!container) return;
     const rowEls = Array.from(container.querySelectorAll<HTMLElement>(':scope > .score-row'));
@@ -130,7 +131,7 @@ export const LeadSheet = memo(function LeadSheet({
     let lastActiveRowIdx = -1;
     const tick = () => {
       if (cancelled) return;
-      const seconds = getPositionSeconds();
+      const seconds = scheduler.getPosition();
       const tickValue = secondsToTick(seconds, sequence);
       const pos = barPositionAt(tickValue, timing);
       if (pos !== lastPos) {
@@ -177,7 +178,7 @@ export const LeadSheet = memo(function LeadSheet({
       for (const el of chordEls) el.classList.remove('score-chord--passed');
       for (const el of lyricEls) el.classList.remove('score-lyric--passed');
     };
-  }, [sequence, getPositionSeconds, rows, timing, autoScroll]);
+  }, [sequence, scheduler, rows, timing, autoScroll]);
 
   if (totalBars === 0) return null;
   if (timing.ppq <= 0) return null;
