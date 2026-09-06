@@ -1,5 +1,8 @@
-import type { PlaybackMidiMessage } from '../smf/playback.ts';
-import { isLiveNoteOn } from './messages.ts';
+import { transposeMidiData } from '../smf/playback.ts';
+import type { PlaybackMidiMessage, PlaybackSequence } from '../smf/playback.ts';
+import { collectChaseMessages } from './chase.ts';
+import { isLiveNoteOn, sendMidiPanic, sendMidiReset, trySendMidiMessage } from './messages.ts';
+import type { MidiOutputLike, MidiSendFailure } from './messages.ts';
 
 export const LOOKAHEAD_SECONDS = 0.05;
 export const SCHEDULER_MS = 10;
@@ -61,4 +64,251 @@ export function firstMidiMessageIndexAtOrAfter(
     else hi = mid;
   }
   return lo;
+}
+
+export type TimerHandle = number;
+
+export interface Timers {
+  setInterval(fn: () => void, ms: number): TimerHandle;
+  clearInterval(handle: TimerHandle): void;
+  setTimeout(fn: () => void, ms: number): TimerHandle;
+  clearTimeout(handle: TimerHandle): void;
+}
+
+export interface SchedulerState {
+  isPlaying: boolean;
+  playbackRate: number;
+  keyShift: number;
+  sendError: MidiSendFailure | null;
+}
+
+export interface SchedulerOptions {
+  now?: () => number;
+  timers?: Timers;
+}
+
+const windowTimers: Timers = {
+  setInterval: (fn, ms) => window.setInterval(fn, ms),
+  clearInterval: (handle) => window.clearInterval(handle),
+  setTimeout: (fn, ms) => window.setTimeout(fn, ms),
+  clearTimeout: (handle) => window.clearTimeout(handle),
+};
+
+const INITIAL_STATE: SchedulerState = {
+  isPlaying: false,
+  playbackRate: 1,
+  keyShift: 0,
+  sendError: null,
+};
+
+export class MidiScheduler {
+  private readonly now: () => number;
+  private readonly timers: Timers;
+  private readonly listeners = new Set<() => void>();
+  private sequence: PlaybackSequence | null = null;
+  private output: MidiOutputLike | null = null;
+  private drumChannels: ReadonlySet<number> = new Set();
+  private nextMessageIndex = 0;
+  private intervalHandle: TimerHandle | null = null;
+  private panicTimerHandle: TimerHandle | null = null;
+  private startedAtMs = 0;
+  private startOffset = 0;
+  private position = 0;
+  private positionSnapshot = 0;
+  private lastNotifyAtMs = 0;
+  private state: SchedulerState = INITIAL_STATE;
+
+  constructor(options: SchedulerOptions = {}) {
+    this.now = options.now ?? (() => performance.now());
+    this.timers = options.timers ?? windowTimers;
+  }
+
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  };
+
+  getState = (): SchedulerState => this.state;
+
+  getPositionSnapshot = (): number => this.positionSnapshot;
+
+  getPosition = (): number =>
+    this.intervalHandle === null ? this.position : this.playingPosition(this.now());
+
+  setSequence(sequence: PlaybackSequence | null): void {
+    if (this.intervalHandle !== null) {
+      this.stopInternal(true, true);
+    } else {
+      this.position = 0;
+      this.positionSnapshot = 0;
+    }
+    this.sequence = sequence;
+    this.drumChannels = sequence?.drumChannels ?? new Set();
+    this.notify();
+  }
+
+  setOutput(output: MidiOutputLike | null): void {
+    if (output === this.output) return;
+    const previous = this.output;
+    this.output = output;
+    if (previous) {
+      this.clearPanicTimer();
+      sendMidiPanic(previous, this.now());
+    }
+    if (output === null && this.intervalHandle !== null) this.pause();
+  }
+
+  play(): void {
+    const { sequence, output } = this;
+    if (this.intervalHandle !== null) return;
+    if (!sequence || sequence.durationSeconds <= 0) return;
+    if (!output || sequence.midiMessages.length === 0) return;
+
+    this.setState({ sendError: null });
+    this.cleanupScheduled(false);
+    this.startOffset = Math.min(this.position, Math.max(0, sequence.durationSeconds - 0.01));
+    this.nextMessageIndex = firstMidiMessageIndexAtOrAfter(sequence.midiMessages, this.startOffset);
+    for (const message of collectChaseMessages(sequence.midiMessages, this.nextMessageIndex)) {
+      this.scheduleMessage(output, message, this.startOffset);
+    }
+    this.startedAtMs = this.now();
+    this.lastNotifyAtMs = this.startedAtMs;
+    this.positionSnapshot = this.startOffset;
+    this.intervalHandle = this.timers.setInterval(
+      () => this.scheduleWindow(this.playingPosition(this.now())),
+      SCHEDULER_MS,
+    );
+    this.setState({ isPlaying: true });
+    this.notify();
+    this.scheduleWindow(this.startOffset);
+  }
+
+  pause(): void {
+    this.stopInternal(false, true);
+  }
+
+  stop(): void {
+    this.stopInternal(true, true);
+  }
+
+  sendReset(): void {
+    if (this.output) {
+      sendMidiReset(this.output, this.now(), this.reportSendFailure);
+    }
+  }
+
+  dispose(): void {
+    this.stopInternal(false, false);
+  }
+
+  private stopInternal(resetPosition: boolean, followUpPanic: boolean): void {
+    const position = resetPosition ? 0 : this.getPosition();
+    this.clearTimer();
+    this.cleanupScheduled(followUpPanic);
+    this.position = position;
+    this.positionSnapshot = position;
+    this.setState({ isPlaying: false });
+    this.notify();
+  }
+
+  private scheduleWindow(position: number): void {
+    const { sequence, output } = this;
+    if (!sequence) return;
+    if (!output) {
+      this.stopInternal(false, true);
+      return;
+    }
+    const result = scheduleDueMidiMessages(
+      sequence.midiMessages,
+      this.nextMessageIndex,
+      position,
+      position + LOOKAHEAD_SECONDS,
+      (message) => this.scheduleMessage(output, message, position),
+    );
+    this.nextMessageIndex = result.nextIndex;
+    if (result.failed) {
+      this.stopInternal(false, true);
+      return;
+    }
+    this.position = position;
+    const nowMs = this.now();
+    if (nowMs - this.lastNotifyAtMs >= UI_UPDATE_INTERVAL_MS) {
+      this.lastNotifyAtMs = nowMs;
+      this.positionSnapshot = position;
+      this.notify();
+    }
+    if (position >= sequence.durationSeconds) this.stopInternal(true, true);
+  }
+
+  private scheduleMessage(
+    output: MidiOutputLike,
+    message: PlaybackMidiMessage,
+    position: number,
+  ): boolean {
+    const data = transposeMidiData(message.data, this.state.keyShift, this.drumChannels);
+    if (!data) return true;
+    const offsetSeconds = Math.max(0, message.seconds - position);
+    const sendAt = this.now() + (offsetSeconds / this.state.playbackRate) * 1000;
+    return trySendMidiMessage(output, data, sendAt, this.reportSendFailure);
+  }
+
+  private reportSendFailure = (failure: MidiSendFailure): void => {
+    if (this.state.sendError !== null) return;
+    this.setState({ sendError: failure });
+    this.notify();
+  };
+
+  private cleanupScheduled(followUpPanic: boolean): void {
+    const output = this.output;
+    if (!output) return;
+    this.clearPanicTimer();
+    sendMidiPanic(output, this.now(), this.reportSendFailure);
+    if (followUpPanic) {
+      this.panicTimerHandle = this.timers.setTimeout(
+        () => {
+          this.panicTimerHandle = null;
+          sendMidiPanic(output, this.now(), this.reportSendFailure);
+        },
+        LOOKAHEAD_SECONDS * 1000 + 80,
+      );
+    }
+  }
+
+  private clearTimer(): void {
+    if (this.intervalHandle === null) return;
+    this.timers.clearInterval(this.intervalHandle);
+    this.intervalHandle = null;
+  }
+
+  private clearPanicTimer(): void {
+    if (this.panicTimerHandle === null) return;
+    this.timers.clearTimeout(this.panicTimerHandle);
+    this.panicTimerHandle = null;
+  }
+
+  private playingPosition(nowMs: number): number {
+    return Math.min(
+      this.sequence?.durationSeconds ?? 0,
+      this.startOffset + ((nowMs - this.startedAtMs) / 1000) * this.state.playbackRate,
+    );
+  }
+
+  private setState(patch: Partial<SchedulerState>): void {
+    const next = { ...this.state, ...patch };
+    if (
+      next.isPlaying === this.state.isPlaying &&
+      next.playbackRate === this.state.playbackRate &&
+      next.keyShift === this.state.keyShift &&
+      next.sendError === this.state.sendError
+    ) {
+      return;
+    }
+    this.state = next;
+  }
+
+  private notify(): void {
+    for (const listener of this.listeners) listener();
+  }
 }
