@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   isLiveNoteOn,
-  isNoteMessage,
   sendMidiPanic,
   sendMidiReset,
   trySendMidiMessage,
 } from '../lib/player/messages.ts';
 import type { MidiSendFailure } from '../lib/player/messages.ts';
+import { collectChaseMessages } from '../lib/player/chase.ts';
 import { transposeMidiData } from '../lib/smf/playback.ts';
 import type { PlaybackMidiMessage, PlaybackSequence } from '../lib/smf/playback.ts';
 
@@ -76,18 +76,6 @@ export function scheduleDueMidiMessages(
     i += 1;
   }
   return { nextIndex: i, failed: false };
-}
-
-export function collectChaseMessages(
-  messages: readonly PlaybackMidiMessage[],
-  startIndex: number,
-): PlaybackMidiMessage[] {
-  const chase: PlaybackMidiMessage[] = [];
-  for (let i = 0; i < startIndex; i += 1) {
-    const message = messages[i]!;
-    if (!isNoteMessage(message.data)) chase.push(message);
-  }
-  return chase;
 }
 
 function clampPlaybackRate(rate: number): number {
