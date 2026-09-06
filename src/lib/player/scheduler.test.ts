@@ -440,3 +440,154 @@ describe('MidiScheduler send failures', () => {
     expect(scheduler.getState().isPlaying).toBe(true);
   });
 });
+
+describe('MidiScheduler seek', () => {
+  test('seek() while stopped moves the position and sends chase messages on the next play()', () => {
+    const { scheduler, out } = setup(
+      [
+        msg(0, [0xc0, 7]),
+        msg(0, [0xb0, 7, 100]),
+        msg(0.1, [0x90, 60, 100]),
+        msg(0.4, [0x80, 60, 0]),
+        msg(0.6, [0x90, 62, 100]),
+      ],
+      2,
+    );
+
+    scheduler.seek(0.5);
+
+    expect(scheduler.getPosition()).toBe(0.5);
+    expect(scheduler.getPositionSnapshot()).toBe(0.5);
+
+    scheduler.play();
+
+    expect(nonPanic(out.sent).map((m) => m.data)).toEqual([
+      [0xc0, 7],
+      [0xb0, 7, 100],
+    ]);
+  });
+
+  test('seek() while playing keeps playing from the new position', () => {
+    const { clock, scheduler, out } = setup([msg(0, [0xc0, 7]), msg(1.0, [0x90, 60, 100])], 2);
+    scheduler.play();
+    clock.advance(100);
+
+    scheduler.seek(0.98);
+
+    expect(scheduler.getState().isPlaying).toBe(true);
+    expect(scheduler.getPosition()).toBeCloseTo(0.98, 6);
+    expect(nonPanic(out.sent).map((m) => m.data)).toEqual([
+      [0xc0, 7],
+      [0xc0, 7],
+      [0x90, 60, 100],
+    ]);
+  });
+
+  test('seek() clamps to [0, duration]', () => {
+    const { scheduler } = setup([msg(0, [0xc0, 7])], 2);
+
+    scheduler.seek(-1);
+    expect(scheduler.getPosition()).toBe(0);
+
+    scheduler.seek(5);
+    expect(scheduler.getPosition()).toBe(2);
+  });
+
+  test('a note-on exactly at the seek position is sent on play() even if the clock advances during play()', () => {
+    const { scheduler, out } = setup([msg(0, [0xc0, 7]), msg(0.5, [0x90, 60, 100])], 2, 0.01);
+
+    scheduler.seek(0.5);
+    scheduler.play();
+
+    expect(nonPanic(out.sent).map((m) => m.data)).toEqual([
+      [0xc0, 7],
+      [0x90, 60, 100],
+    ]);
+  });
+});
+
+describe('MidiScheduler playback rate', () => {
+  test('setPlaybackRate() while playing keeps the position continuous and rescales timestamps', () => {
+    const { clock, scheduler, out } = setup([msg(0, [0xc0, 7]), msg(0.3, [0x90, 60, 100])], 10);
+    scheduler.play();
+    clock.advance(200);
+
+    scheduler.setPlaybackRate(2);
+
+    expect(scheduler.getState().playbackRate).toBe(2);
+    expect(scheduler.getPosition()).toBeCloseTo(0.2, 6);
+
+    clock.advance(50);
+
+    expect(scheduler.getPosition()).toBeCloseTo(0.3, 6);
+    const noteOn = nonPanic(out.sent).find((m) => m.data[0] === 0x90)!;
+    expect(noteOn.timestamp).toBeCloseTo(1250, 6);
+  });
+
+  test('setPlaybackRate() applies the clamp and skips notification when unchanged', () => {
+    const { scheduler } = setup([], 1);
+    let calls = 0;
+    scheduler.subscribe(() => {
+      calls += 1;
+    });
+
+    scheduler.setPlaybackRate(3);
+    expect(scheduler.getState().playbackRate).toBe(2);
+    expect(calls).toBe(1);
+
+    scheduler.setPlaybackRate(2);
+    expect(calls).toBe(1);
+  });
+});
+
+describe('MidiScheduler key shift', () => {
+  test('setKeyShift() transposes scheduled notes and skips drum channels', () => {
+    const clock = new FakeClock();
+    const scheduler = new MidiScheduler({
+      now: () => clock.now,
+      timers: clock.timers,
+    });
+    const out = createOutput();
+    scheduler.setSequence(makeSequence([msg(0, [0x90, 60, 100]), msg(0, [0x99, 36, 100])], 1, [9]));
+    scheduler.setOutput(out.output);
+
+    scheduler.setKeyShift(2);
+    scheduler.play();
+
+    expect(nonPanic(out.sent).map((m) => m.data)).toEqual([
+      [0x90, 62, 100],
+      [0x99, 36, 100],
+    ]);
+  });
+
+  test('setKeyShift() while playing panics and reschedules from the current position', () => {
+    const { clock, scheduler, out } = setup([msg(0, [0xc0, 7]), msg(0.5, [0x90, 60, 100])], 10);
+    scheduler.play();
+    clock.advance(100);
+    const before = out.sent.length;
+
+    scheduler.setKeyShift(-1);
+
+    expect(out.sent.slice(before).filter(isPanic)).toHaveLength(32);
+    expect(scheduler.getState().isPlaying).toBe(true);
+
+    clock.advance(400);
+
+    expect(nonPanic(out.sent).at(-1)!.data).toEqual([0x90, 59, 100]);
+  });
+
+  test('setKeyShift() applies the clamp and skips notification when unchanged', () => {
+    const { scheduler } = setup([], 1);
+    let calls = 0;
+    scheduler.subscribe(() => {
+      calls += 1;
+    });
+
+    scheduler.setKeyShift(9);
+    expect(scheduler.getState().keyShift).toBe(6);
+    expect(calls).toBe(1);
+
+    scheduler.setKeyShift(6);
+    expect(calls).toBe(1);
+  });
+});

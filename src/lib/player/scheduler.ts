@@ -193,6 +193,41 @@ export class MidiScheduler {
     this.stopInternal(true, true);
   }
 
+  seek(seconds: number): void {
+    const clamped = Math.max(0, Math.min(seconds, this.sequence?.durationSeconds ?? 0));
+    const wasPlaying = this.intervalHandle !== null;
+    this.stopInternal(false, true);
+    this.position = clamped;
+    this.positionSnapshot = clamped;
+    this.notify();
+    if (wasPlaying) this.play();
+  }
+
+  setPlaybackRate(rate: number): void {
+    const clamped = clampPlaybackRate(rate);
+    if (clamped === this.state.playbackRate) return;
+    if (this.intervalHandle !== null) {
+      const nowMs = this.now();
+      this.startOffset = this.playingPosition(nowMs);
+      this.startedAtMs = nowMs;
+      this.position = this.startOffset;
+    }
+    this.setState({ playbackRate: clamped });
+    this.notify();
+  }
+
+  setKeyShift(semitones: number): void {
+    const clamped = clampKeyShift(semitones);
+    if (clamped === this.state.keyShift) return;
+    this.setState({ keyShift: clamped });
+    if (this.intervalHandle !== null && this.sequence) {
+      const position = this.getPosition();
+      this.cleanupScheduled(false);
+      this.nextMessageIndex = firstMidiMessageIndexAtOrAfter(this.sequence.midiMessages, position);
+    }
+    this.notify();
+  }
+
   sendReset(): void {
     if (this.output) {
       sendMidiReset(this.output, this.now(), this.reportSendFailure);
