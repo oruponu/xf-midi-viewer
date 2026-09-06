@@ -23,8 +23,7 @@ export type ChannelEvent =
   | { kind: 'pitchBend'; channel: number; value: number };
 
 export type SysExEvent =
-  | { kind: 'sysex'; data: Uint8Array }
-  | { kind: 'sysexEscape'; data: Uint8Array };
+  { kind: 'sysex'; data: Uint8Array } | { kind: 'sysexEscape'; data: Uint8Array };
 
 export interface MetaEvent {
   kind: 'meta';

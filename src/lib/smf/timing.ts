@@ -42,10 +42,7 @@ const DEFAULT_SIGNATURE: TimeSignature = {
 };
 
 export function extractTiming(smf: SmfFile): SmfTiming {
-  const ppq =
-    smf.header.division.kind === 'tpqn'
-      ? smf.header.division.ticksPerQuarter
-      : 0;
+  const ppq = smf.header.division.kind === 'tpqn' ? smf.header.division.ticksPerQuarter : 0;
 
   const changes: TimeSignatureChange[] = [];
   const keyChanges: KeySignatureChange[] = [];
@@ -100,10 +97,7 @@ function mod12(n: number): number {
   return ((n % 12) + 12) % 12;
 }
 
-export function shiftKeySignature(
-  key: KeySignature,
-  semitones: number,
-): KeySignature {
+export function shiftKeySignature(key: KeySignature, semitones: number): KeySignature {
   if (semitones === 0) return key;
   const base = mod12(key.sharps * 7);
   const tonic = key.mode === 'major' ? base : mod12(base + 9);
@@ -149,8 +143,7 @@ export function tickToBarBeat(tick: number, timing: SmfTiming): BarBeat | null {
   for (let i = 0; i < idx; i++) {
     const cur = sigs[i]!;
     const next = sigs[i + 1]!;
-    const tpb =
-      ticksPerBeat(timing.ppq, cur.signature) * cur.signature.numerator;
+    const tpb = ticksPerBeat(timing.ppq, cur.signature) * cur.signature.numerator;
     cumBar += Math.ceil((next.tick - cur.tick) / tpb);
   }
 

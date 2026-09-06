@@ -28,11 +28,7 @@ const concat = (...arrays: Uint8Array[]): Uint8Array => {
   return out;
 };
 
-const makeVersionData = (
-  versionStr: string,
-  s0: number,
-  s1 = 0,
-): Uint8Array => {
+const makeVersionData = (versionStr: string, s0: number, s1 = 0): Uint8Array => {
   if (versionStr.length !== 4) throw new Error('versionStr must be 4 chars');
   return u8(
     0x43,
@@ -58,10 +54,7 @@ const emptyHeader = {
   division: { kind: 'tpqn' as const, ticksPerQuarter: 480 },
 };
 
-const makeSmf = (
-  tracks: SmfTrack[] = [],
-  extraChunks: SmfChunk[] = [],
-): SmfFile => ({
+const makeSmf = (tracks: SmfTrack[] = [], extraChunks: SmfChunk[] = []): SmfFile => ({
   header: { ...emptyHeader, trackCount: tracks.length },
   tracks,
   extraChunks,
@@ -97,9 +90,7 @@ describe('parseXfVersion', () => {
     [0x10, 'hasKaraoke'],
   ])('flag bit 0x%s sets %s', (bits, flagName) => {
     const v = parseXfVersion(makeVersionData('XF02', bits));
-    expect(v?.flags[flagName as keyof NonNullable<typeof v>['flags']]).toBe(
-      true,
-    );
+    expect(v?.flags[flagName as keyof NonNullable<typeof v>['flags']]).toBe(true);
   });
 
   test('returns null for too-short data', () => {
@@ -107,21 +98,15 @@ describe('parseXfVersion', () => {
   });
 
   test('returns null for non-Yamaha manufacturer', () => {
-    expect(
-      parseXfVersion(u8(0x41, 0x00, 0x00, 0x58, 0x46, 0x30, 0x32, 0x00, 0x00)),
-    ).toBeNull();
+    expect(parseXfVersion(u8(0x41, 0x00, 0x00, 0x58, 0x46, 0x30, 0x32, 0x00, 0x00))).toBeNull();
   });
 
   test('returns null for non-XF subID', () => {
-    expect(
-      parseXfVersion(u8(0x43, 0x7b, 0x01, 0x58, 0x46, 0x30, 0x32, 0x00, 0x00)),
-    ).toBeNull();
+    expect(parseXfVersion(u8(0x43, 0x7b, 0x01, 0x58, 0x46, 0x30, 0x32, 0x00, 0x00))).toBeNull();
   });
 
   test('returns null for non-XF version string', () => {
-    expect(
-      parseXfVersion(u8(0x43, 0x7b, 0x00, 0x59, 0x59, 0x30, 0x32, 0x00, 0x00)),
-    ).toBeNull();
+    expect(parseXfVersion(u8(0x43, 0x7b, 0x00, 0x59, 0x59, 0x30, 0x32, 0x00, 0x00))).toBeNull();
   });
 });
 
@@ -226,16 +211,12 @@ describe('parseXfInfoHeader - other', () => {
 
 describe('extractXf', () => {
   test('extracts version from inline meta', () => {
-    const smf = makeSmf([
-      { events: [makeMeta(0x7f, makeVersionData('XF02', 0x1b))] },
-    ]);
+    const smf = makeSmf([{ events: [makeMeta(0x7f, makeVersionData('XF02', 0x1b))] }]);
     expect(extractXf(smf).version?.versionString).toBe('XF02');
   });
 
   test('extracts inline common header', () => {
-    const smf = makeSmf([
-      { events: [makeMeta(0x01, ascii('XFhd:2026/01/01:::::::::::'))] },
-    ]);
+    const smf = makeSmf([{ events: [makeMeta(0x01, ascii('XFhd:2026/01/01:::::::::::'))] }]);
     expect(extractXf(smf).commonHeader?.date).toBe('2026/01/01');
   });
 
@@ -279,10 +260,7 @@ describe('extractXf', () => {
   });
 
   test('throws on non-meta status inside XFIH chunk', () => {
-    const smf = makeSmf(
-      [],
-      [{ type: 'XFIH', data: u8(0x00, 0x90, 0x3c, 0x40) }],
-    );
+    const smf = makeSmf([], [{ type: 'XFIH', data: u8(0x00, 0x90, 0x3c, 0x40) }]);
     expect(() => extractXf(smf)).toThrow(/unexpected status.*XFIH/);
   });
 });
@@ -309,9 +287,7 @@ describe('parseXfLyricsHeader', () => {
   });
 
   test('filters out-of-range and non-numeric channels', () => {
-    expect(
-      parseXfLyricsHeader('$Lyrc:0,1,17,abc,16:0:JP')?.melodyChannels,
-    ).toEqual([1, 16]);
+    expect(parseXfLyricsHeader('$Lyrc:0,1,17,abc,16:0:JP')?.melodyChannels).toEqual([1, 16]);
   });
 
   test('treats negative offset as 0', () => {
@@ -342,12 +318,9 @@ describe('parseVocalPartCue', () => {
     expect(parseVocalPartCue(input)).toBe(expected);
   });
 
-  test.each(['&z', '&', '&mm', 'm', '', '$Lyrc:1:0:JP'])(
-    'rejects %p',
-    (input) => {
-      expect(parseVocalPartCue(input)).toBeNull();
-    },
-  );
+  test.each(['&z', '&', '&mm', 'm', '', '$Lyrc:1:0:JP'])('rejects %p', (input) => {
+    expect(parseVocalPartCue(input)).toBeNull();
+  });
 });
 
 describe('extractXf - karaoke', () => {
@@ -472,10 +445,7 @@ describe('extractXf - karaoke', () => {
   });
 
   test('throws on non-meta status inside XFKM chunk', () => {
-    const smf = makeSmf(
-      [],
-      [{ type: 'XFKM', data: u8(0x00, 0x90, 0x3c, 0x40) }],
-    );
+    const smf = makeSmf([], [{ type: 'XFKM', data: u8(0x00, 0x90, 0x3c, 0x40) }]);
     expect(() => extractXf(smf)).toThrow(/unexpected status.*XFKM/);
   });
 });

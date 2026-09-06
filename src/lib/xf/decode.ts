@@ -15,10 +15,7 @@ export function decodeLatin1(bytes: Uint8Array): string {
   return makeDecoder(LATIN1).decode(bytes);
 }
 
-export function decodeXfText(
-  bytes: Uint8Array,
-  language: string | undefined,
-): string {
+export function decodeXfText(bytes: Uint8Array, language: string | undefined): string {
   const encoding = (language && ENCODING_MAP[language]) ?? LATIN1;
   try {
     return makeDecoder(encoding).decode(bytes);

@@ -4,11 +4,7 @@ export class ByteReader {
 
   constructor(buffer: ArrayBuffer | Uint8Array) {
     if (buffer instanceof Uint8Array) {
-      this.view = new DataView(
-        buffer.buffer,
-        buffer.byteOffset,
-        buffer.byteLength,
-      );
+      this.view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
     } else {
       this.view = new DataView(buffer);
     }
@@ -32,9 +28,7 @@ export class ByteReader {
 
   seek(pos: number): void {
     if (pos < 0 || pos > this.length) {
-      throw new RangeError(
-        `seek out of bounds: ${pos} (length=${this.length})`,
-      );
+      throw new RangeError(`seek out of bounds: ${pos} (length=${this.length})`);
     }
     this.cursor = pos;
   }

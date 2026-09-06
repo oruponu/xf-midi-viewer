@@ -5,12 +5,7 @@ import { formatTickAsBarBeat } from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 import { formatChord } from '../lib/xf/format.ts';
 import { parseKaraoke } from '../lib/xf/lyrics.ts';
-import type {
-  LyricRun,
-  LyricSyllable,
-  LyricToken,
-  ParsedKaraoke,
-} from '../lib/xf/lyrics.ts';
+import type { LyricRun, LyricSyllable, LyricToken, ParsedKaraoke } from '../lib/xf/lyrics.ts';
 import type {
   GuitarPart,
   StyleMessage,
@@ -54,13 +49,9 @@ export function InfoPanel({
   autoScrollLyrics?: boolean;
   keyShift?: number;
 }) {
-  const hasKaraoke =
-    data.karaoke.header !== null || data.karaoke.events.length > 0;
+  const hasKaraoke = data.karaoke.header !== null || data.karaoke.events.length > 0;
   const hasStyle = data.style.events.length > 0;
-  const parsedKaraoke = useMemo(
-    () => parseKaraoke(data.karaoke),
-    [data.karaoke],
-  );
+  const parsedKaraoke = useMemo(() => parseKaraoke(data.karaoke), [data.karaoke]);
   const { chordsForChart, rehearsalsForChart } = useMemo(() => {
     const chordsForChart: ChordMsg[] = [];
     const rehearsalsForChart: RehearsalMsg[] = [];
@@ -141,12 +132,7 @@ export function InfoPanel({
         ))}
 
       {activeTab === 'details' && (
-        <DetailsView
-          file={file}
-          data={data}
-          parsedKaraoke={parsedKaraoke}
-          hasStyle={hasStyle}
-        />
+        <DetailsView file={file} data={data} parsedKaraoke={parsedKaraoke} hasStyle={hasStyle} />
       )}
     </section>
   );
@@ -195,10 +181,7 @@ function FileSection({ file }: { file: FileSummary }) {
       <FieldList>
         <Field label="File name" value={file.name} />
         <Field label="Size" value={`${file.size.toLocaleString()} bytes`} />
-        <Field
-          label="Last modified"
-          value={new Date(file.lastModified).toLocaleString()}
-        />
+        <Field label="Last modified" value={new Date(file.lastModified).toLocaleString()} />
       </FieldList>
     </div>
   );
@@ -228,9 +211,7 @@ function VersionSection({ version }: { version: XfVersion }) {
   );
 }
 
-const COMMON_FIELDS: ReadonlyArray<
-  readonly [Exclude<keyof XfInfoHeaderCommon, 'kind'>, string]
-> = [
+const COMMON_FIELDS: ReadonlyArray<readonly [Exclude<keyof XfInfoHeaderCommon, 'kind'>, string]> = [
   ['date', '発表日'],
   ['country', '制作地'],
   ['category', 'ジャンル'],
@@ -252,9 +233,7 @@ function CommonSection({ header }: { header: XfInfoHeaderCommon }) {
       <FieldList>
         {COMMON_FIELDS.map(([key, label]) => {
           const value = header[key];
-          return value === undefined ? null : (
-            <Field key={key} label={label} value={value} />
-          );
+          return value === undefined ? null : <Field key={key} label={label} value={value} />;
         })}
       </FieldList>
     </div>
@@ -262,10 +241,7 @@ function CommonSection({ header }: { header: XfInfoHeaderCommon }) {
 }
 
 const LANG_FIELDS: ReadonlyArray<
-  readonly [
-    Exclude<keyof XfInfoHeaderLanguageSpecific, 'kind' | 'language'>,
-    string,
-  ]
+  readonly [Exclude<keyof XfInfoHeaderLanguageSpecific, 'kind' | 'language'>, string]
 > = [
   ['songName', '曲名'],
   ['composer', '作曲者'],
@@ -279,15 +255,12 @@ function LanguageSection({ header }: { header: XfInfoHeaderLanguageSpecific }) {
   return (
     <div className="card">
       <h3>
-        言語別ヘッダー (XFln){' '}
-        <span className="badge-small">{header.language}</span>
+        言語別ヘッダー (XFln) <span className="badge-small">{header.language}</span>
       </h3>
       <FieldList>
         {LANG_FIELDS.map(([key, label]) => {
           const value = header[key];
-          return value === undefined ? null : (
-            <Field key={key} label={label} value={value} />
-          );
+          return value === undefined ? null : <Field key={key} label={label} value={value} />;
         })}
       </FieldList>
     </div>
@@ -319,10 +292,7 @@ function KaraokeSection({
     parsed.tokens,
     rehearsals,
   );
-  const activeSyllableIndex = findActiveSyllableIndex(
-    parsed.syllables,
-    activeTick,
-  );
+  const activeSyllableIndex = findActiveSyllableIndex(parsed.syllables, activeTick);
   const blocks = buildKaraokeBlocks(
     parsed.tokens,
     replaceWithDivider,
@@ -345,16 +315,12 @@ function KaraokeSection({
         <div className="karaoke-stream" ref={streamRef}>
           {blocks.flatMap((block, idx) => {
             if (block.kind === 'divider') {
-              return [
-                <hr key={`div-${idx}`} className="karaoke-section-break" />,
-              ];
+              return [<hr key={`div-${idx}`} className="karaoke-section-break" />];
             }
             return [
               <div key={`bc-${idx}`} className="karaoke-badge-cell">
                 {block.part !== null && (
-                  <span className="part-badge">
-                    {VOCAL_PART_LABELS[block.part]}
-                  </span>
+                  <span className="part-badge">{VOCAL_PART_LABELS[block.part]}</span>
                 )}
               </div>,
               <div key={`lc-${idx}`} className="karaoke-lyric-cell">
@@ -369,8 +335,7 @@ function KaraokeSection({
 }
 
 type KaraokeBlock =
-  | { kind: 'divider' }
-  | { kind: 'lyrics'; part: VocalPart | null; tokens: ReactNode[] };
+  { kind: 'divider' } | { kind: 'lyrics'; part: VocalPart | null; tokens: ReactNode[] };
 
 function buildKaraokeBlocks(
   tokens: LyricToken[],
@@ -391,8 +356,7 @@ function buildKaraokeBlocks(
       currentContent.pop();
     }
     if (currentContent.length > 0) {
-      const partForBlock =
-        activePart !== null && activePart !== displayedPart ? activePart : null;
+      const partForBlock = activePart !== null && activePart !== displayedPart ? activePart : null;
       blocks.push({
         kind: 'lyrics',
         part: partForBlock,
@@ -438,13 +402,9 @@ function buildKaraokeBlocks(
     }
 
     const isSyllable = tok.kind === 'syllable';
-    const isActiveSyllable =
-      isSyllable && syllableCounter === activeSyllableIndex;
-    const isPassedSyllable =
-      isSyllable && syllableCounter <= activeSyllableIndex;
-    currentContent.push(
-      renderToken(tok, i, isPassedSyllable, isActiveSyllable),
-    );
+    const isActiveSyllable = isSyllable && syllableCounter === activeSyllableIndex;
+    const isPassedSyllable = isSyllable && syllableCounter <= activeSyllableIndex;
+    currentContent.push(renderToken(tok, i, isPassedSyllable, isActiveSyllable));
     if (isSyllable) {
       lastEmitted = 'inline';
       syllableCounter += 1;
@@ -527,11 +487,7 @@ function KaraokeHeaderInfo({ header }: { header: XfLyricsHeader }) {
       <Field label="言語" value={header.language ?? '（未指定 / Latin-1）'} />
       <Field
         label="メロディCH"
-        value={
-          header.melodyChannels.length > 0
-            ? header.melodyChannels.join(', ')
-            : '（なし）'
-        }
+        value={header.melodyChannels.length > 0 ? header.melodyChannels.join(', ') : '（なし）'}
       />
       <Field label="表示オフセット" value={`${header.displayOffset} ticks`} />
     </FieldList>
@@ -579,15 +535,8 @@ function renderToken(
   }
 }
 
-function findActiveSyllableIndex(
-  syllables: LyricSyllable[],
-  activeTick: number | null,
-): number {
-  if (
-    activeTick === null ||
-    syllables.length === 0 ||
-    activeTick < syllables[0]!.tick
-  ) {
+function findActiveSyllableIndex(syllables: LyricSyllable[], activeTick: number | null): number {
+  if (activeTick === null || syllables.length === 0 || activeTick < syllables[0]!.tick) {
     return -1;
   }
   let lo = 0;
@@ -687,16 +636,9 @@ function partitionStyle(events: StyleMessage[]): StyleGroups {
   };
 }
 
-function StyleSection({
-  data,
-  timing,
-}: {
-  data: XfStyleData;
-  timing: SmfTiming;
-}) {
+function StyleSection({ data, timing }: { data: XfStyleData; timing: SmfTiming }) {
   const g = partitionStyle(data.events);
-  const formatTick = (tick: number): string =>
-    formatTickAsBarBeat(tick, timing);
+  const formatTick = (tick: number): string => formatTickAsBarBeat(tick, timing);
   const showSummary =
     g.chords.length > 0 ||
     g.rehearsals.length > 0 ||
@@ -714,23 +656,13 @@ function StyleSection({
         <StyleSubSection title="概要">
           <div className="style-summary">
             {g.chords.length > 0 && <span>コード: {g.chords.length}</span>}
-            {g.rehearsals.length > 0 && (
-              <span>リハーサル: {g.rehearsals.length}</span>
-            )}
-            {g.guideTracks.length > 0 && (
-              <span>ガイドトラック: {g.guideTracks.length}</span>
-            )}
-            {g.guitarInfos.length > 0 && (
-              <span>ギター情報: {g.guitarInfos.length}</span>
-            )}
+            {g.rehearsals.length > 0 && <span>リハーサル: {g.rehearsals.length}</span>}
+            {g.guideTracks.length > 0 && <span>ガイドトラック: {g.guideTracks.length}</span>}
+            {g.guitarInfos.length > 0 && <span>ギター情報: {g.guitarInfos.length}</span>}
             {g.phraseCount > 0 && <span>フレーズマーク: {g.phraseCount}</span>}
-            {g.maxPhrases[0] && (
-              <span>最大レベル8フレーズ数: {g.maxPhrases[0].count}</span>
-            )}
+            {g.maxPhrases[0] && <span>最大レベル8フレーズ数: {g.maxPhrases[0].count}</span>}
             {g.fingeringCount > 0 && <span>運指番号: {g.fingeringCount}</span>}
-            {g.guitarVoicingCount > 0 && (
-              <span>ギター押弦: {g.guitarVoicingCount}</span>
-            )}
+            {g.guitarVoicingCount > 0 && <span>ギター押弦: {g.guitarVoicingCount}</span>}
           </div>
         </StyleSubSection>
       )}
@@ -778,9 +710,7 @@ function formatStyleDetail(ev: StyleMessage): string {
         ev.hand === 'right' ? '右手' : '左手'
       }, ${ev.context}`;
     case 'guideTrack':
-      return `右手: ${ev.rightHandChannel ?? 'なし'} / 左手: ${
-        ev.leftHandChannel ?? 'なし'
-      }`;
+      return `右手: ${ev.rightHandChannel ?? 'なし'} / 左手: ${ev.leftHandChannel ?? 'なし'}`;
     case 'guitarInfo':
       return `${GUITAR_PART_LABELS[ev.part]} (CH ${
         ev.channel ?? '全'
@@ -792,13 +722,7 @@ function formatStyleDetail(ev: StyleMessage): string {
   }
 }
 
-function StyleSubSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
+function StyleSubSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="style-subsection">
       <h4>{title}</h4>

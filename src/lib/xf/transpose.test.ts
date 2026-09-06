@@ -27,9 +27,10 @@ describe('shiftChordRoot', () => {
   ] as const)(
     '%s%s shift %i preferFlats=%s -> %s%s',
     (note, acc, shift, preferFlats, expNote, expAcc) => {
-      expect(
-        shiftChordRoot({ note, accidental: acc }, shift, preferFlats),
-      ).toEqual({ note: expNote, accidental: expAcc });
+      expect(shiftChordRoot({ note, accidental: acc }, shift, preferFlats)).toEqual({
+        note: expNote,
+        accidental: expAcc,
+      });
     },
   );
 
@@ -53,11 +54,7 @@ describe('shiftChordRoot', () => {
 describe('shiftChordBass', () => {
   test('shifts the bass root and preserves the type', () => {
     expect(
-      shiftChordBass(
-        { root: { note: 'C', accidental: 'natural' }, type: 'm' },
-        2,
-        false,
-      ),
+      shiftChordBass({ root: { note: 'C', accidental: 'natural' }, type: 'm' }, 2, false),
     ).toEqual({ root: { note: 'D', accidental: 'natural' }, type: 'm' });
   });
 

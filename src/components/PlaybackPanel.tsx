@@ -11,11 +11,7 @@ import {
 import type { useMidiPlayer } from '../hooks/useMidiPlayer.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
-import {
-  formatKeySignature,
-  shiftKeySignature,
-  tickToBarBeat,
-} from '../lib/smf/timing.ts';
+import { formatKeySignature, shiftKeySignature, tickToBarBeat } from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 
 interface PlaybackPanelProps {
@@ -24,21 +20,12 @@ interface PlaybackPanelProps {
   player: ReturnType<typeof useMidiPlayer>;
 }
 
-export function PlaybackPanel({
-  sequence,
-  timing,
-  player,
-}: PlaybackPanelProps) {
-  const hasMidiMessages =
-    sequence.midiMessages.length > 0 && sequence.durationSeconds > 0;
-  const midiReady =
-    player.midiAccessState === 'ready' &&
-    player.selectedMidiOutputId.length > 0;
+export function PlaybackPanel({ sequence, timing, player }: PlaybackPanelProps) {
+  const hasMidiMessages = sequence.midiMessages.length > 0 && sequence.durationSeconds > 0;
+  const midiReady = player.midiAccessState === 'ready' && player.selectedMidiOutputId.length > 0;
   const canPlay = hasMidiMessages && midiReady;
   const progress =
-    sequence.durationSeconds > 0
-      ? player.positionSeconds / sequence.durationSeconds
-      : 0;
+    sequence.durationSeconds > 0 ? player.positionSeconds / sequence.durationSeconds : 0;
   const tempoBpm = useMemo(() => {
     if (sequence.tempos.length === 0) return null;
     let segment = sequence.tempos[0]!;
@@ -79,8 +66,7 @@ export function PlaybackPanel({
   const canDecreaseShift = player.keyShift > KEY_SHIFT_MIN;
   const canIncreaseShift = player.keyShift < KEY_SHIFT_MAX;
   const isShiftModified = player.keyShift !== 0;
-  const keyShiftLabel =
-    player.keyShift > 0 ? `+${player.keyShift}` : String(player.keyShift);
+  const keyShiftLabel = player.keyShift > 0 ? `+${player.keyShift}` : String(player.keyShift);
   const timeSigLabel = useMemo(() => {
     if (!timing || timing.timeSignatures.length === 0) return null;
     const tick = secondsToTick(player.positionSeconds, sequence);
@@ -122,11 +108,7 @@ export function PlaybackPanel({
 
       {positionLabel && (
         <div className="playback-position-group">
-          <span
-            className="playback-position"
-            aria-label="Bar.Beat.Tick"
-            title="小節.拍.Tick"
-          >
+          <span className="playback-position" aria-label="Bar.Beat.Tick" title="小節.拍.Tick">
             {positionLabel}
           </span>
           {tempoBpm !== null && (
@@ -154,11 +136,7 @@ export function PlaybackPanel({
                   aria-label="倍率を下げる"
                   title="倍率を下げる"
                   disabled={!canDecreaseRate}
-                  onClick={() =>
-                    player.setPlaybackRate(
-                      player.playbackRate - PLAYBACK_RATE_STEP,
-                    )
-                  }
+                  onClick={() => player.setPlaybackRate(player.playbackRate - PLAYBACK_RATE_STEP)}
                 >
                   <ChevronDownIcon />
                 </button>
@@ -169,11 +147,7 @@ export function PlaybackPanel({
                   aria-label="倍率を上げる"
                   title="倍率を上げる"
                   disabled={!canIncreaseRate}
-                  onClick={() =>
-                    player.setPlaybackRate(
-                      player.playbackRate + PLAYBACK_RATE_STEP,
-                    )
-                  }
+                  onClick={() => player.setPlaybackRate(player.playbackRate + PLAYBACK_RATE_STEP)}
                 >
                   <ChevronUpIcon />
                 </button>
@@ -204,9 +178,7 @@ export function PlaybackPanel({
                 aria-label="移調を下げる"
                 title="移調を下げる"
                 disabled={!canDecreaseShift}
-                onClick={() =>
-                  player.setKeyShift(player.keyShift - KEY_SHIFT_STEP)
-                }
+                onClick={() => player.setKeyShift(player.keyShift - KEY_SHIFT_STEP)}
               >
                 <ChevronDownIcon />
               </button>
@@ -217,9 +189,7 @@ export function PlaybackPanel({
                 aria-label="移調を上げる"
                 title="移調を上げる"
                 disabled={!canIncreaseShift}
-                onClick={() =>
-                  player.setKeyShift(player.keyShift + KEY_SHIFT_STEP)
-                }
+                onClick={() => player.setKeyShift(player.keyShift + KEY_SHIFT_STEP)}
               >
                 <ChevronUpIcon />
               </button>
@@ -264,13 +234,7 @@ export function PlaybackPanel({
 
 function PlayIcon() {
   return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="currentColor"
-      aria-hidden="true"
-    >
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
       <path d="M4 3.2c0-.7.8-1.1 1.4-.7l7.2 4.8c.5.4.5 1.1 0 1.4L5.4 13.5c-.6.4-1.4 0-1.4-.7V3.2Z" />
     </svg>
   );
@@ -278,13 +242,7 @@ function PlayIcon() {
 
 function PauseIcon() {
   return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="currentColor"
-      aria-hidden="true"
-    >
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
       <rect x="4" y="3" width="3" height="10" rx="0.6" />
       <rect x="9" y="3" width="3" height="10" rx="0.6" />
     </svg>
@@ -293,13 +251,7 @@ function PauseIcon() {
 
 function StopIcon() {
   return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="currentColor"
-      aria-hidden="true"
-    >
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
       <rect x="3.5" y="3.5" width="9" height="9" rx="0.8" />
     </svg>
   );

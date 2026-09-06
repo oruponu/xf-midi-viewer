@@ -47,12 +47,7 @@ export function sendMidiReset(
   timestamp: number,
   onFailure?: (failure: MidiSendFailure) => void,
 ): void {
-  trySendMidiMessage(
-    output,
-    [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7],
-    timestamp,
-    onFailure,
-  );
+  trySendMidiMessage(output, [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7], timestamp, onFailure);
   trySendMidiMessage(
     output,
     [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7],

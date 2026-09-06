@@ -74,9 +74,7 @@ function parseTrack(bytes: Uint8Array): SmfTrack {
 
     if (firstByte < 0x80) {
       if (runningStatus === 0) {
-        throw new Error(
-          `running status with no prior status at offset ${r.position - 1}`,
-        );
+        throw new Error(`running status with no prior status at offset ${r.position - 1}`);
       }
       status = runningStatus;
       r.seek(r.position - 1);
@@ -120,9 +118,7 @@ function parseEvent(r: ByteReader, status: number): SmfEvent {
   if (status >= 0x80 && status <= 0xef) {
     return parseChannelEvent(r, status);
   }
-  throw new Error(
-    `unsupported status byte: 0x${status.toString(16).padStart(2, '0')}`,
-  );
+  throw new Error(`unsupported status byte: 0x${status.toString(16).padStart(2, '0')}`);
 }
 
 function parseChannelEvent(r: ByteReader, status: number): ChannelEvent {

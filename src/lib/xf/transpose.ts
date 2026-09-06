@@ -1,9 +1,6 @@
 import type { ChordBass, ChordRoot } from './types.ts';
 
-const NOTE_TO_SEMITONE: Record<
-  Exclude<ChordRoot['note'], 'reserved'>,
-  number
-> = {
+const NOTE_TO_SEMITONE: Record<Exclude<ChordRoot['note'], 'reserved'>, number> = {
   C: 0,
   D: 2,
   E: 4,
@@ -65,9 +62,7 @@ export function shiftChordRoot(
   preferFlats: boolean,
 ): ChordRoot {
   if (semitones === 0 || root.note === 'reserved') return root;
-  const semitone = mod12(
-    NOTE_TO_SEMITONE[root.note] + ACCIDENTAL_TO_OFFSET[root.accidental],
-  );
+  const semitone = mod12(NOTE_TO_SEMITONE[root.note] + ACCIDENTAL_TO_OFFSET[root.accidental]);
   const target = mod12(semitone + semitones);
   const [note, accidental] = (preferFlats ? FLAT_NOTES : SHARP_NOTES)[target]!;
   return { note, accidental };

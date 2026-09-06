@@ -22,16 +22,10 @@ const XF_SUBID = 0x00;
 
 export function parseXfVersion(metaData: Uint8Array): XfVersion | null {
   if (metaData.length < 9) return null;
-  if (metaData[0] !== YAMAHA_ID_HIGH || metaData[1] !== YAMAHA_ID_LOW)
-    return null;
+  if (metaData[0] !== YAMAHA_ID_HIGH || metaData[1] !== YAMAHA_ID_LOW) return null;
   if (metaData[2] !== XF_SUBID) return null;
 
-  const versionString = String.fromCharCode(
-    metaData[3]!,
-    metaData[4]!,
-    metaData[5]!,
-    metaData[6]!,
-  );
+  const versionString = String.fromCharCode(metaData[3]!, metaData[4]!, metaData[5]!, metaData[6]!);
   if (!versionString.startsWith('XF')) return null;
 
   const s0 = metaData[8]!;
@@ -203,8 +197,7 @@ export function parseXfLyricsHeader(text: string): XfLyricsHeader | null {
     }
   }
 
-  const language =
-    fields[2] !== undefined && fields[2] !== '' ? fields[2] : undefined;
+  const language = fields[2] !== undefined && fields[2] !== '' ? fields[2] : undefined;
 
   return { melodyChannels, displayOffset, language };
 }
@@ -241,9 +234,7 @@ function metasFromXfkmChunk(data: Uint8Array): RawMetaAtTick[] {
     tick += r.readVarLen();
     const status = r.readUint8();
     if (status !== 0xff) {
-      throw new Error(
-        `unexpected status 0x${status.toString(16).padStart(2, '0')} in XFKM chunk`,
-      );
+      throw new Error(`unexpected status 0x${status.toString(16).padStart(2, '0')} in XFKM chunk`);
     }
     const metaType = r.readUint8();
     const len = r.readVarLen();
@@ -315,9 +306,7 @@ function parseXfihChunk(data: Uint8Array): XfInfoHeader[] {
     r.readVarLen();
     const status = r.readUint8();
     if (status !== 0xff) {
-      throw new Error(
-        `unexpected status 0x${status.toString(16).padStart(2, '0')} in XFIH chunk`,
-      );
+      throw new Error(`unexpected status 0x${status.toString(16).padStart(2, '0')} in XFIH chunk`);
     }
     const metaType = r.readUint8();
     const length = r.readVarLen();

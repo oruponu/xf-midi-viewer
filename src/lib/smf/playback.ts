@@ -61,8 +61,7 @@ const DEFAULT_NOTE_SECONDS = 0.12;
 
 export function buildPlaybackSequence(smf: SmfFile): PlaybackSequence {
   const division = smf.header.division;
-  const ticksPerQuarter =
-    division.kind === 'tpqn' ? division.ticksPerQuarter : 0;
+  const ticksPerQuarter = division.kind === 'tpqn' ? division.ticksPerQuarter : 0;
   const absoluteTracks = smf.tracks.map(toAbsoluteTrack);
   const durationTicks = absoluteTracks.reduce(
     (max, events) => Math.max(max, events.at(-1)?.tick ?? 0),
@@ -76,31 +75,16 @@ export function buildPlaybackSequence(smf: SmfFile): PlaybackSequence {
 
   const tickToSeconds =
     division.kind === 'tpqn'
-      ? (tick: number): number =>
-          tpqnTickToSeconds(tick, ticksPerQuarter, tempoSegments)
+      ? (tick: number): number => tpqnTickToSeconds(tick, ticksPerQuarter, tempoSegments)
       : (tick: number): number =>
-          smpteTickToSeconds(
-            tick,
-            division.framesPerSecond,
-            division.ticksPerFrame,
-          );
+          smpteTickToSeconds(tick, division.framesPerSecond, division.ticksPerFrame);
 
   const notes = absoluteTracks.flatMap((track) =>
     collectNotes(track, durationTicks, tickToSeconds),
   );
-  const midiMessages = absoluteTracks.flatMap((track) =>
-    collectMidiMessages(track, tickToSeconds),
-  );
-  notes.sort(
-    (a, b) =>
-      a.startSeconds - b.startSeconds ||
-      a.channel - b.channel ||
-      a.note - b.note,
-  );
-  midiMessages.sort(
-    (a, b) =>
-      a.seconds - b.seconds || a.tick - b.tick || a.data[0]! - b.data[0]!,
-  );
+  const midiMessages = absoluteTracks.flatMap((track) => collectMidiMessages(track, tickToSeconds));
+  notes.sort((a, b) => a.startSeconds - b.startSeconds || a.channel - b.channel || a.note - b.note);
+  midiMessages.sort((a, b) => a.seconds - b.seconds || a.tick - b.tick || a.data[0]! - b.data[0]!);
 
   let durationSeconds = Math.max(tickToSeconds(durationTicks), 0);
   for (const note of notes) {
@@ -179,10 +163,7 @@ function xgPartModeChange(data: Uint8Array): XgPartModeChange | null {
   return part <= 15 ? { channel: part, isDrum: mode !== 0 } : null;
 }
 
-export function secondsToTick(
-  seconds: number,
-  sequence: PlaybackSequence,
-): number {
+export function secondsToTick(seconds: number, sequence: PlaybackSequence): number {
   if (!Number.isFinite(seconds) || seconds <= 0) return 0;
   const { tempos, ticksPerQuarter, durationSeconds, durationTicks } = sequence;
   if (ticksPerQuarter <= 0 || tempos.length === 0) {
@@ -196,14 +177,10 @@ export function secondsToTick(
     else break;
   }
   const ticksPerSecond = (segment.bpm * ticksPerQuarter) / 60;
-  return Math.round(
-    segment.tick + (seconds - segment.seconds) * ticksPerSecond,
-  );
+  return Math.round(segment.tick + (seconds - segment.seconds) * ticksPerSecond);
 }
 
-function toAbsoluteTrack(
-  track: SmfTrack,
-): Array<TrackEvent & { tick: number }> {
+function toAbsoluteTrack(track: SmfTrack): Array<TrackEvent & { tick: number }> {
   let tick = 0;
   return track.events.map((event) => {
     tick += event.deltaTime;
@@ -230,8 +207,7 @@ function collectTempoChanges(
       changes.push({
         tick,
         order,
-        microsecondsPerQuarter:
-          (event.data[0]! << 16) | (event.data[1]! << 8) | event.data[2]!,
+        microsecondsPerQuarter: (event.data[0]! << 16) | (event.data[1]! << 8) | event.data[2]!,
       });
       order += 1;
     }
@@ -241,10 +217,7 @@ function collectTempoChanges(
   return changes;
 }
 
-function buildTempoSegments(
-  changes: RawTempoChange[],
-  ticksPerQuarter: number,
-): TempoSegment[] {
+function buildTempoSegments(changes: RawTempoChange[], ticksPerQuarter: number): TempoSegment[] {
   const segments: TempoSegment[] = [];
   let lastTick = 0;
   let seconds = 0;
@@ -254,9 +227,7 @@ function buildTempoSegments(
     if (change.tick > lastTick) {
       seconds +=
         ticksPerQuarter > 0
-          ? ((change.tick - lastTick) * microsecondsPerQuarter) /
-            ticksPerQuarter /
-            1_000_000
+          ? ((change.tick - lastTick) * microsecondsPerQuarter) / ticksPerQuarter / 1_000_000
           : 0;
     }
     lastTick = change.tick;
@@ -299,17 +270,11 @@ function tpqnTickToSeconds(
   }
   return (
     segment.seconds +
-    ((tick - segment.tick) * segment.microsecondsPerQuarter) /
-      ticksPerQuarter /
-      1_000_000
+    ((tick - segment.tick) * segment.microsecondsPerQuarter) / ticksPerQuarter / 1_000_000
   );
 }
 
-function smpteTickToSeconds(
-  tick: number,
-  framesPerSecond: number,
-  ticksPerFrame: number,
-): number {
+function smpteTickToSeconds(tick: number, framesPerSecond: number, ticksPerFrame: number): number {
   const ticksPerSecond = framesPerSecond * ticksPerFrame;
   return ticksPerSecond > 0 ? tick / ticksPerSecond : 0;
 }
@@ -336,9 +301,7 @@ function collectNotes(
       continue;
     }
 
-    const isNoteOff =
-      event.kind === 'noteOff' ||
-      (event.kind === 'noteOn' && event.velocity === 0);
+    const isNoteOff = event.kind === 'noteOff' || (event.kind === 'noteOn' && event.velocity === 0);
     if (!isNoteOff) continue;
 
     const key = noteKey(event.channel, event.note);
@@ -371,9 +334,7 @@ function collectMidiMessages(
   return messages;
 }
 
-function eventToMidiBytes(
-  event: TrackEvent['event'],
-): PlaybackMidiMessage['data'] | null {
+function eventToMidiBytes(event: TrackEvent['event']): PlaybackMidiMessage['data'] | null {
   switch (event.kind) {
     case 'noteOff':
       return [0x80 | event.channel, event.note, event.velocity];
@@ -388,11 +349,7 @@ function eventToMidiBytes(
     case 'channelAftertouch':
       return [0xd0 | event.channel, event.pressure];
     case 'pitchBend':
-      return [
-        0xe0 | event.channel,
-        event.value & 0x7f,
-        (event.value >> 7) & 0x7f,
-      ];
+      return [0xe0 | event.channel, event.value & 0x7f, (event.value >> 7) & 0x7f];
     case 'sysex':
       return [0xf0, ...event.data];
     case 'sysexEscape':

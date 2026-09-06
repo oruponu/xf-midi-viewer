@@ -23,11 +23,7 @@ const makeSmf = (tracks: SmfTrack[], ppq = 480, smpte = false): SmfFile => ({
   extraChunks: [],
 });
 
-const timeSigMeta = (
-  numerator: number,
-  denominatorPow: number,
-  deltaTime = 0,
-) => ({
+const timeSigMeta = (numerator: number, denominatorPow: number, deltaTime = 0) => ({
   deltaTime,
   event: {
     kind: 'meta' as const,
@@ -83,9 +79,7 @@ describe('extractTiming', () => {
   });
 
   test('prepends default 4/4 if first event is not at tick 0', () => {
-    const timing = extractTiming(
-      makeSmf([{ events: [timeSigMeta(3, 2, 1920)] }]),
-    );
+    const timing = extractTiming(makeSmf([{ events: [timeSigMeta(3, 2, 1920)] }]));
     expect(timing.timeSignatures).toHaveLength(2);
     expect(timing.timeSignatures[0]?.tick).toBe(0);
     expect(timing.timeSignatures[0]?.signature.numerator).toBe(4);
@@ -95,10 +89,7 @@ describe('extractTiming', () => {
 
   test('sorts events from multiple tracks', () => {
     const timing = extractTiming(
-      makeSmf([
-        { events: [timeSigMeta(5, 2, 480)] },
-        { events: [timeSigMeta(7, 2, 240)] },
-      ]),
+      makeSmf([{ events: [timeSigMeta(5, 2, 480)] }, { events: [timeSigMeta(7, 2, 240)] }]),
     );
     const ticks = timing.timeSignatures.map((c) => c.tick);
     expect(ticks).toEqual([0, 240, 480]);
@@ -116,31 +107,22 @@ describe('extractTiming', () => {
 
   test('extracts a major Key Signature', () => {
     const timing = extractTiming(makeSmf([{ events: [keySigMeta(2, false)] }]));
-    expect(timing.keySignatures).toEqual([
-      { tick: 0, signature: { sharps: 2, mode: 'major' } },
-    ]);
+    expect(timing.keySignatures).toEqual([{ tick: 0, signature: { sharps: 2, mode: 'major' } }]);
   });
 
   test('extracts a minor Key Signature', () => {
     const timing = extractTiming(makeSmf([{ events: [keySigMeta(0, true)] }]));
-    expect(timing.keySignatures).toEqual([
-      { tick: 0, signature: { sharps: 0, mode: 'minor' } },
-    ]);
+    expect(timing.keySignatures).toEqual([{ tick: 0, signature: { sharps: 0, mode: 'minor' } }]);
   });
 
   test('decodes flats as negative sharps via sign-extension', () => {
-    const timing = extractTiming(
-      makeSmf([{ events: [keySigMeta(-3, false)] }]),
-    );
+    const timing = extractTiming(makeSmf([{ events: [keySigMeta(-3, false)] }]));
     expect(timing.keySignatures[0]?.signature.sharps).toBe(-3);
   });
 
   test('sorts Key Signatures from multiple tracks', () => {
     const timing = extractTiming(
-      makeSmf([
-        { events: [keySigMeta(2, false, 480)] },
-        { events: [keySigMeta(-1, true, 240)] },
-      ]),
+      makeSmf([{ events: [keySigMeta(2, false, 480)] }, { events: [keySigMeta(-1, true, 240)] }]),
     );
     const ticks = timing.keySignatures.map((c) => c.tick);
     expect(ticks).toEqual([240, 480]);

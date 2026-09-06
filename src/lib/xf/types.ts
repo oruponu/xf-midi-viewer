@@ -47,14 +47,7 @@ export interface XfLyricsHeader {
   language: string | undefined;
 }
 
-export type VocalPart =
-  | 'male'
-  | 'female'
-  | 'chorus'
-  | 'solo'
-  | 'mixed'
-  | 'speech'
-  | 'nonLyric';
+export type VocalPart = 'male' | 'female' | 'chorus' | 'solo' | 'mixed' | 'speech' | 'nonLyric';
 
 export type KaraokeEvent =
   | { kind: 'lyric'; tick: number; text: string }
@@ -97,12 +90,7 @@ export type RehearsalLetter =
 
 export type GuitarPart = 'guitar' | 'bass' | 'ukulele' | 'reserved';
 
-export type FingeringContext =
-  | 'keyboard'
-  | 'guitar'
-  | 'upStroke'
-  | 'downStroke'
-  | 'reserved';
+export type FingeringContext = 'keyboard' | 'guitar' | 'upStroke' | 'downStroke' | 'reserved';
 
 export interface GuitarStringVoicing {
   fret: number;

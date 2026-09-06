@@ -29,10 +29,7 @@ function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { settings, updateSettings } = useSettings();
-  const playbackSequence = useMemo(
-    () => (smf ? buildPlaybackSequence(smf) : null),
-    [smf],
-  );
+  const playbackSequence = useMemo(() => (smf ? buildPlaybackSequence(smf) : null), [smf]);
   const player = useMidiPlayer(playbackSequence);
 
   const loadFile = useCallback(
@@ -63,9 +60,7 @@ function App() {
 
   useEffect(() => {
     const hasFiles = (e: DragEvent) =>
-      e.dataTransfer
-        ? Array.from(e.dataTransfer.types).includes('Files')
-        : false;
+      e.dataTransfer ? Array.from(e.dataTransfer.types).includes('Files') : false;
 
     const onDragEnter = (e: DragEvent) => {
       if (!hasFiles(e)) return;
@@ -124,11 +119,7 @@ function App() {
         <div className="app-bar-inner">
           <h1 className="app-bar-title">XF MIDI Viewer</h1>
           <div className="app-bar-actions">
-            <label
-              className="icon-button"
-              title="ファイルを開く"
-              aria-label="ファイルを開く"
-            >
+            <label className="icon-button" title="ファイルを開く" aria-label="ファイルを開く">
               <input
                 type="file"
                 accept=".mid,.midi,.kar,.xih,.xkm,audio/midi"
@@ -155,9 +146,7 @@ function App() {
             <p className="empty-state-headline">
               YAMAHA XF フォーマットの MIDI ファイルを解析・表示します
             </p>
-            <p className="muted">
-              上部のアイコンから開くか、ウィンドウへドラッグ&ドロップ
-            </p>
+            <p className="muted">上部のアイコンから開くか、ウィンドウへドラッグ&ドロップ</p>
           </section>
         )}
 
@@ -168,9 +157,7 @@ function App() {
         )}
 
         <PlayerScope
-          key={
-            file ? `${file.name}-${file.size}-${file.lastModified}` : 'empty'
-          }
+          key={file ? `${file.name}-${file.size}-${file.lastModified}` : 'empty'}
           file={file}
           sequence={playbackSequence}
           xf={xf}
@@ -290,11 +277,7 @@ function PlayerScope({
       {sequence && (
         <div className="player-dock" ref={dockRef}>
           <div className="player-dock-inner">
-            <PlaybackPanel
-              sequence={sequence}
-              timing={xf?.timing ?? null}
-              player={player}
-            />
+            <PlaybackPanel sequence={sequence} timing={xf?.timing ?? null} player={player} />
           </div>
         </div>
       )}
@@ -336,15 +319,7 @@ function ViewTabs({
   );
 }
 
-const TEXT_INPUT_TYPES = new Set([
-  'text',
-  'search',
-  'email',
-  'password',
-  'tel',
-  'url',
-  'number',
-]);
+const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'password', 'tel', 'url', 'number']);
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;

@@ -5,11 +5,7 @@ export function formatChordRoot(r: ChordRoot): string {
   return r.note + (r.accidental === 'natural' ? '' : r.accidental);
 }
 
-export function formatChord(
-  root: ChordRoot,
-  type: string,
-  bass: ChordBass | null,
-): string {
+export function formatChord(root: ChordRoot, type: string, bass: ChordBass | null): string {
   if (type === 'N.C.') return 'N.C.';
   let s = formatChordRoot(root) + type;
   if (bass) {

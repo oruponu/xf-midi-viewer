@@ -31,9 +31,7 @@ describe('parseKaraoke', () => {
   });
 
   test('single lyric event becomes one syllable token', () => {
-    const r = parseKaraoke(
-      karaoke([{ kind: 'lyric', tick: 10, text: 'hello' }]),
-    );
+    const r = parseKaraoke(karaoke([{ kind: 'lyric', tick: 10, text: 'hello' }]));
     expect(r.tokens).toEqual([
       { kind: 'syllable', tick: 10, runs: [{ kind: 'text', text: 'hello' }] },
     ]);
@@ -56,16 +54,12 @@ describe('parseKaraoke', () => {
 
   test('CR meta event becomes lineBreak with metaEvent source', () => {
     const r = parseKaraoke(karaoke([{ kind: 'carriageReturn', tick: 10 }]));
-    expect(r.tokens).toEqual([
-      { kind: 'lineBreak', tick: 10, source: 'metaEvent' },
-    ]);
+    expect(r.tokens).toEqual([{ kind: 'lineBreak', tick: 10, source: 'metaEvent' }]);
   });
 
   test('LF meta event becomes pageBreak with metaEvent source', () => {
     const r = parseKaraoke(karaoke([{ kind: 'lineFeed', tick: 10 }]));
-    expect(r.tokens).toEqual([
-      { kind: 'pageBreak', tick: 10, source: 'metaEvent' },
-    ]);
+    expect(r.tokens).toEqual([{ kind: 'pageBreak', tick: 10, source: 'metaEvent' }]);
   });
 
   test('slash in text becomes lineBreak with controlChar source', () => {
@@ -86,9 +80,7 @@ describe('parseKaraoke', () => {
   });
 
   test('escaped backslash-r becomes lineBreak controlChar', () => {
-    const r = parseKaraoke(
-      karaoke([{ kind: 'lyric', tick: 10, text: 'a\\rb' }]),
-    );
+    const r = parseKaraoke(karaoke([{ kind: 'lyric', tick: 10, text: 'a\\rb' }]));
     expect(r.tokens).toEqual([
       { kind: 'syllable', tick: 10, runs: [{ kind: 'text', text: 'a' }] },
       { kind: 'lineBreak', tick: 10, source: 'controlChar' },
@@ -97,9 +89,7 @@ describe('parseKaraoke', () => {
   });
 
   test('escaped backslash-n becomes pageBreak controlChar', () => {
-    const r = parseKaraoke(
-      karaoke([{ kind: 'lyric', tick: 10, text: 'a\\nb' }]),
-    );
+    const r = parseKaraoke(karaoke([{ kind: 'lyric', tick: 10, text: 'a\\nb' }]));
     expect(r.tokens).toEqual([
       { kind: 'syllable', tick: 10, runs: [{ kind: 'text', text: 'a' }] },
       { kind: 'pageBreak', tick: 10, source: 'controlChar' },
@@ -108,9 +98,7 @@ describe('parseKaraoke', () => {
   });
 
   test('raw CR char becomes lineBreak, raw LF becomes pageBreak', () => {
-    const r = parseKaraoke(
-      karaoke([{ kind: 'lyric', tick: 10, text: 'a\rb\nc' }]),
-    );
+    const r = parseKaraoke(karaoke([{ kind: 'lyric', tick: 10, text: 'a\rb\nc' }]));
     expect(r.tokens).toEqual([
       { kind: 'syllable', tick: 10, runs: [{ kind: 'text', text: 'a' }] },
       { kind: 'lineBreak', tick: 10, source: 'controlChar' },
@@ -144,9 +132,7 @@ describe('parseKaraoke', () => {
   });
 
   test('paren ruby attaches to preceding char', () => {
-    const r = parseKaraoke(
-      karaoke([{ kind: 'lyric', tick: 10, text: '待(ま)てど' }]),
-    );
+    const r = parseKaraoke(karaoke([{ kind: 'lyric', tick: 10, text: '待(ま)てど' }]));
     expect(r.tokens).toEqual([
       {
         kind: 'syllable',
@@ -160,9 +146,7 @@ describe('parseKaraoke', () => {
   });
 
   test('bracket ruby attaches to whole preceding string', () => {
-    const r = parseKaraoke(
-      karaoke([{ kind: 'lyric', tick: 10, text: '元気[げんき]' }]),
-    );
+    const r = parseKaraoke(karaoke([{ kind: 'lyric', tick: 10, text: '元気[げんき]' }]));
     expect(r.tokens).toEqual([
       {
         kind: 'syllable',

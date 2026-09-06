@@ -1,8 +1,7 @@
 import type { VocalPart, XfKaraokeData, XfLyricsHeader } from './types.ts';
 
 export type LyricRun =
-  | { kind: 'text'; text: string }
-  | { kind: 'ruby'; base: string; reading: string };
+  { kind: 'text'; text: string } | { kind: 'ruby'; base: string; reading: string };
 
 export type LyricBreakSource = 'metaEvent' | 'controlChar';
 
@@ -259,9 +258,7 @@ function tokenizeLyricEvent(
 
 function finalizeUnclosedRuby(ruby: RubyState): void {
   const literal =
-    ruby.mode === 'paren'
-      ? ruby.baseChar + '(' + ruby.reading
-      : ruby.base + '[' + ruby.reading;
+    ruby.mode === 'paren' ? ruby.baseChar + '(' + ruby.reading : ruby.base + '[' + ruby.reading;
   appendOrCreateText(ruby.baseSyllable.runs, literal);
 }
 
@@ -299,19 +296,13 @@ function buildSyllables(tokens: LyricToken[]): LyricSyllable[] {
   return result;
 }
 
-function buildLines(
-  tokens: LyricToken[],
-  syllables: LyricSyllable[],
-): LyricLine[] {
+function buildLines(tokens: LyricToken[], syllables: LyricSyllable[]): LyricLine[] {
   const lines: LyricLine[] = [];
   let current: LyricSyllable[] = [];
   let startTick: number | null = null;
   let syllableIdx = 0;
 
-  const closeLine = (
-    closedBy: 'line' | 'page' | null,
-    closerTick: number | null,
-  ): void => {
+  const closeLine = (closedBy: 'line' | 'page' | null, closerTick: number | null): void => {
     if (current.length === 0) return;
     lines.push({
       tick: startTick!,

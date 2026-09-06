@@ -1,8 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  collectChaseMessages,
-  scheduleDueMidiMessages,
-} from './useMidiPlayer.ts';
+import { collectChaseMessages, scheduleDueMidiMessages } from './useMidiPlayer.ts';
 import type { PlaybackMidiMessage } from '../lib/smf/playback.ts';
 
 describe('collectChaseMessages', () => {
@@ -40,16 +37,10 @@ describe('scheduleDueMidiMessages', () => {
     ];
     const attempts: PlaybackMidiMessage[] = [];
 
-    const result = scheduleDueMidiMessages(
-      messages,
-      0,
-      0.45,
-      0.55,
-      (message) => {
-        attempts.push(message);
-        return false;
-      },
-    );
+    const result = scheduleDueMidiMessages(messages, 0, 0.45, 0.55, (message) => {
+      attempts.push(message);
+      return false;
+    });
 
     expect(attempts).toEqual([messages[0]]);
     expect(result).toEqual({ nextIndex: 1, failed: true });

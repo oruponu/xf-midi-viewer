@@ -1,9 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  buildPlaybackSequence,
-  detectDrumChannels,
-  transposeMidiData,
-} from './playback.ts';
+import { buildPlaybackSequence, detectDrumChannels, transposeMidiData } from './playback.ts';
 import type { SmfFile, SmfTrack, TrackEvent } from './types.ts';
 
 const makeSmf = (tracks: SmfTrack[], ppq = 480): SmfFile => ({
@@ -18,30 +14,17 @@ const makeSmf = (tracks: SmfTrack[], ppq = 480): SmfFile => ({
 
 const track = (events: TrackEvent[]): SmfTrack => ({ events });
 
-const noteOn = (
-  deltaTime: number,
-  note: number,
-  velocity = 100,
-  channel = 0,
-): TrackEvent => ({
+const noteOn = (deltaTime: number, note: number, velocity = 100, channel = 0): TrackEvent => ({
   deltaTime,
   event: { kind: 'noteOn', channel, note, velocity },
 });
 
-const noteOff = (
-  deltaTime: number,
-  note: number,
-  velocity = 64,
-  channel = 0,
-): TrackEvent => ({
+const noteOff = (deltaTime: number, note: number, velocity = 64, channel = 0): TrackEvent => ({
   deltaTime,
   event: { kind: 'noteOff', channel, note, velocity },
 });
 
-const tempo = (
-  deltaTime: number,
-  microsecondsPerQuarter: number,
-): TrackEvent => ({
+const tempo = (deltaTime: number, microsecondsPerQuarter: number): TrackEvent => ({
   deltaTime,
   event: {
     kind: 'meta',
@@ -54,11 +37,7 @@ const tempo = (
   },
 });
 
-const programChange = (
-  deltaTime: number,
-  program: number,
-  channel = 0,
-): TrackEvent => ({
+const programChange = (deltaTime: number, program: number, channel = 0): TrackEvent => ({
   deltaTime,
   event: { kind: 'programChange', channel, program },
 });
@@ -73,11 +52,7 @@ const controlChange = (
   event: { kind: 'controlChange', channel, controller, value },
 });
 
-const pitchBend = (
-  deltaTime: number,
-  value: number,
-  channel = 0,
-): TrackEvent => ({
+const pitchBend = (deltaTime: number, value: number, channel = 0): TrackEvent => ({
   deltaTime,
   event: { kind: 'pitchBend', channel, value },
 });
@@ -94,9 +69,7 @@ const sysexEscape = (deltaTime: number, data: number[]): TrackEvent => ({
 
 describe('buildPlaybackSequence', () => {
   test('pairs note on and off events with seconds at the default tempo', () => {
-    const sequence = buildPlaybackSequence(
-      makeSmf([track([noteOn(0, 60), noteOff(480, 60)])]),
-    );
+    const sequence = buildPlaybackSequence(makeSmf([track([noteOn(0, 60), noteOff(480, 60)])]));
 
     expect(sequence.notes).toHaveLength(1);
     expect(sequence.notes[0]).toMatchObject({
@@ -112,9 +85,7 @@ describe('buildPlaybackSequence', () => {
   });
 
   test('treats noteOn velocity 0 as note off', () => {
-    const sequence = buildPlaybackSequence(
-      makeSmf([track([noteOn(0, 62), noteOn(240, 62, 0)])]),
-    );
+    const sequence = buildPlaybackSequence(makeSmf([track([noteOn(0, 62), noteOn(240, 62, 0)])]));
 
     expect(sequence.notes).toHaveLength(1);
     expect(sequence.notes[0]?.endTick).toBe(240);
@@ -129,9 +100,7 @@ describe('buildPlaybackSequence', () => {
       ]),
     );
 
-    expect(sequence.tempos.map((change) => Math.round(change.bpm))).toEqual([
-      120, 60,
-    ]);
+    expect(sequence.tempos.map((change) => Math.round(change.bpm))).toEqual([120, 60]);
     expect(sequence.tempos[1]?.seconds).toBe(0.5);
     expect(sequence.notes[0]?.durationSeconds).toBe(1.5);
   });
@@ -170,9 +139,7 @@ describe('buildPlaybackSequence', () => {
   });
 
   test('computes durationSeconds for huge sequences without overflowing the stack', () => {
-    const events = Array.from({ length: 700_000 }, () =>
-      controlChange(1, 7, 100),
-    );
+    const events = Array.from({ length: 700_000 }, () => controlChange(1, 7, 100));
     const sequence = buildPlaybackSequence(makeSmf([track(events)]));
 
     expect(sequence.midiMessages).toHaveLength(700_000);
@@ -213,38 +180,26 @@ describe('transposeMidiData', () => {
   });
 
   test('shifts Note On pitch upward', () => {
-    expect(transposeMidiData([0x90, 60, 100], 2, noDrums)).toEqual([
-      0x90, 62, 100,
-    ]);
+    expect(transposeMidiData([0x90, 60, 100], 2, noDrums)).toEqual([0x90, 62, 100]);
   });
 
   test('shifts Note Off pitch downward', () => {
-    expect(transposeMidiData([0x80, 64, 0], -3, noDrums)).toEqual([
-      0x80, 61, 0,
-    ]);
+    expect(transposeMidiData([0x80, 64, 0], -3, noDrums)).toEqual([0x80, 61, 0]);
   });
 
   test('shifts Poly Aftertouch pitch', () => {
-    expect(transposeMidiData([0xa3, 70, 64], 5, noDrums)).toEqual([
-      0xa3, 75, 64,
-    ]);
+    expect(transposeMidiData([0xa3, 70, 64], 5, noDrums)).toEqual([0xa3, 75, 64]);
   });
 
   test('does not shift any channel in the drum set', () => {
     const drums = new Set<number>([9, 10]);
-    expect(transposeMidiData([0x99, 36, 110], 5, drums)).toEqual([
-      0x99, 36, 110,
-    ]);
-    expect(transposeMidiData([0x9a, 38, 100], 5, drums)).toEqual([
-      0x9a, 38, 100,
-    ]);
+    expect(transposeMidiData([0x99, 36, 110], 5, drums)).toEqual([0x99, 36, 110]);
+    expect(transposeMidiData([0x9a, 38, 100], 5, drums)).toEqual([0x9a, 38, 100]);
   });
 
   test('shifts non-drum channels even when other channels are drums', () => {
     const drums = new Set<number>([9, 10]);
-    expect(transposeMidiData([0x90, 60, 100], 5, drums)).toEqual([
-      0x90, 65, 100,
-    ]);
+    expect(transposeMidiData([0x90, 60, 100], 5, drums)).toEqual([0x90, 65, 100]);
   });
 
   test('returns null when the resulting note is out of range', () => {
@@ -261,12 +216,7 @@ describe('transposeMidiData', () => {
 });
 
 describe('detectDrumChannels', () => {
-  const cc = (
-    deltaTime: number,
-    controller: number,
-    value: number,
-    channel = 0,
-  ): TrackEvent => ({
+  const cc = (deltaTime: number, controller: number, value: number, channel = 0): TrackEvent => ({
     deltaTime,
     event: { kind: 'controlChange', channel, controller, value },
   });
@@ -286,40 +236,29 @@ describe('detectDrumChannels', () => {
   });
 
   test('ignores Bank Select MSB values other than 127', () => {
-    const smf = makeSmf([
-      track([cc(0, 0, 0, 3), cc(0, 0, 64, 4), cc(0, 0, 120, 5)]),
-    ]);
+    const smf = makeSmf([track([cc(0, 0, 0, 3), cc(0, 0, 64, 4), cc(0, 0, 120, 5)])]);
     expect(detectDrumChannels(smf)).toEqual(new Set([9]));
   });
 
   test('adds a channel from XG Part Mode SysEx (drum mode)', () => {
     // F0 43 10 4C 08 04 07 02 F7 -> part 4, mode 2 (Drum S1)
-    const smf = makeSmf([
-      track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x04, 0x07, 0x02, 0xf7])]),
-    ]);
+    const smf = makeSmf([track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x04, 0x07, 0x02, 0xf7])])]);
     expect(detectDrumChannels(smf)).toEqual(new Set([4, 9]));
   });
 
   test('ignores XG Part Mode SysEx with Normal mode', () => {
-    const smf = makeSmf([
-      track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x04, 0x07, 0x00, 0xf7])]),
-    ]);
+    const smf = makeSmf([track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x04, 0x07, 0x00, 0xf7])])]);
     expect(detectDrumChannels(smf)).toEqual(new Set([9]));
   });
 
   test('removes General MIDI channel 10 when XG Part Mode sets it to Normal', () => {
-    const smf = makeSmf([
-      track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x09, 0x07, 0x00, 0xf7])]),
-    ]);
+    const smf = makeSmf([track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x09, 0x07, 0x00, 0xf7])])]);
     expect(detectDrumChannels(smf)).toEqual(new Set());
   });
 
   test('removes a detected XG drum channel when XG Part Mode sets it to Normal', () => {
     const smf = makeSmf([
-      track([
-        cc(0, 0, 127, 11),
-        sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x0b, 0x07, 0x00, 0xf7]),
-      ]),
+      track([cc(0, 0, 127, 11), sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x0b, 0x07, 0x00, 0xf7])]),
     ]);
     expect(detectDrumChannels(smf)).toEqual(new Set([9]));
   });

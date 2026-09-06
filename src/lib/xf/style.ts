@@ -13,26 +13,9 @@ import type {
 const YAMAHA_ID_HIGH = 0x43;
 const YAMAHA_ID_LOW = 0x7b;
 
-const NOTE_NAMES: ChordRoot['note'][] = [
-  'reserved',
-  'C',
-  'D',
-  'E',
-  'F',
-  'G',
-  'A',
-  'B',
-];
+const NOTE_NAMES: ChordRoot['note'][] = ['reserved', 'C', 'D', 'E', 'F', 'G', 'A', 'B'];
 
-const ACCIDENTALS: ChordRoot['accidental'][] = [
-  'bbb',
-  'bb',
-  'b',
-  'natural',
-  '#',
-  '##',
-  '###',
-];
+const ACCIDENTALS: ChordRoot['accidental'][] = ['bbb', 'bb', 'b', 'natural', '#', '##', '###'];
 
 export const CHORD_TYPES = [
   '',
@@ -93,12 +76,7 @@ const REHEARSAL_LETTERS: RehearsalLetter[] = [
 
 const GUITAR_PARTS: GuitarPart[] = ['guitar', 'bass', 'ukulele'];
 
-const FINGERING_CONTEXTS: FingeringContext[] = [
-  'keyboard',
-  'guitar',
-  'upStroke',
-  'downStroke',
-];
+const FINGERING_CONTEXTS: FingeringContext[] = ['keyboard', 'guitar', 'upStroke', 'downStroke'];
 
 function decodeChordRoot(byte: number): ChordRoot | null {
   const fff = (byte >> 4) & 0x07;
@@ -110,10 +88,7 @@ function decodeChordRoot(byte: number): ChordRoot | null {
   };
 }
 
-export function parseStyleMessage(
-  data: Uint8Array,
-  tick: number,
-): StyleMessage | null {
+export function parseStyleMessage(data: Uint8Array, tick: number): StyleMessage | null {
   if (data.length < 4) return null;
   if (data[0] !== YAMAHA_ID_HIGH || data[1] !== YAMAHA_ID_LOW) return null;
   const type = data[2]!;
@@ -154,8 +129,7 @@ function parseChord(data: Uint8Array, tick: number): StyleMessage | null {
   if (bn !== 127) {
     const bassRoot = decodeChordRoot(bn);
     if (bassRoot !== null) {
-      const btType =
-        bt !== 127 && bt < CHORD_TYPES.length ? CHORD_TYPES[bt]! : '';
+      const btType = bt !== 127 && bt < CHORD_TYPES.length ? CHORD_TYPES[bt]! : '';
       bass = { root: bassRoot, type: btType };
     }
   }
@@ -246,10 +220,7 @@ function parseGuitarInfo(data: Uint8Array, tick: number): StyleMessage | null {
   return { kind: 'guitarInfo', tick, channel, part, capo: kk, stringNotes };
 }
 
-function parseGuitarVoicing(
-  data: Uint8Array,
-  tick: number,
-): StyleMessage | null {
+function parseGuitarVoicing(data: Uint8Array, tick: number): StyleMessage | null {
   if (data.length < 4) return null;
   const xx = data[3]!;
   const allCh = ((xx >> 5) & 0x01) === 1;

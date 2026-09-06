@@ -26,10 +26,7 @@ describe('parseStyleMessage - dispatch', () => {
 
 describe('parseStyleMessage - chord (0x01)', () => {
   test('parses C Maj at given tick', () => {
-    const msg = parseStyleMessage(
-      u8(0x43, 0x7b, 0x01, 0x31, 0x00, 0x7f, 0x7f),
-      100,
-    );
+    const msg = parseStyleMessage(u8(0x43, 0x7b, 0x01, 0x31, 0x00, 0x7f, 0x7f), 100);
     expect(msg).toEqual({
       kind: 'chord',
       tick: 100,
@@ -40,10 +37,7 @@ describe('parseStyleMessage - chord (0x01)', () => {
   });
 
   test('parses C M7 / G with bass', () => {
-    const msg = parseStyleMessage(
-      u8(0x43, 0x7b, 0x01, 0x31, 0x02, 0x35, 0x00),
-      0,
-    );
+    const msg = parseStyleMessage(u8(0x43, 0x7b, 0x01, 0x31, 0x02, 0x35, 0x00), 0);
     expect(msg).toMatchObject({
       kind: 'chord',
       type: 'M7',
@@ -52,10 +46,7 @@ describe('parseStyleMessage - chord (0x01)', () => {
   });
 
   test('parses sharp accidental', () => {
-    const msg = parseStyleMessage(
-      u8(0x43, 0x7b, 0x01, 0x41, 0x00, 0x7f, 0x7f),
-      0,
-    );
+    const msg = parseStyleMessage(u8(0x43, 0x7b, 0x01, 0x41, 0x00, 0x7f, 0x7f), 0);
     expect(msg).toMatchObject({
       kind: 'chord',
       root: { note: 'C', accidental: '#' },
@@ -63,30 +54,20 @@ describe('parseStyleMessage - chord (0x01)', () => {
   });
 
   test('returns null for invalid accidental (fff=7)', () => {
-    expect(
-      parseStyleMessage(u8(0x43, 0x7b, 0x01, 0x71, 0x00, 0x7f, 0x7f), 0),
-    ).toBeNull();
+    expect(parseStyleMessage(u8(0x43, 0x7b, 0x01, 0x71, 0x00, 0x7f, 0x7f), 0)).toBeNull();
   });
 
   test('returns null for out-of-range type', () => {
-    expect(
-      parseStyleMessage(u8(0x43, 0x7b, 0x01, 0x31, 35, 0x7f, 0x7f), 0),
-    ).toBeNull();
+    expect(parseStyleMessage(u8(0x43, 0x7b, 0x01, 0x31, 35, 0x7f, 0x7f), 0)).toBeNull();
   });
 
   test('treats bn=127 as no bass even if bt is valid', () => {
-    const msg = parseStyleMessage(
-      u8(0x43, 0x7b, 0x01, 0x31, 0x00, 0x7f, 0x00),
-      0,
-    );
+    const msg = parseStyleMessage(u8(0x43, 0x7b, 0x01, 0x31, 0x00, 0x7f, 0x00), 0);
     expect(msg).toMatchObject({ kind: 'chord', bass: null });
   });
 
   test('parses on-chord with bt=127 as bass note only', () => {
-    const msg = parseStyleMessage(
-      u8(0x43, 0x7b, 0x01, 0x31, 0x02, 0x35, 0x7f),
-      0,
-    );
+    const msg = parseStyleMessage(u8(0x43, 0x7b, 0x01, 0x31, 0x02, 0x35, 0x7f), 0);
     expect(msg).toMatchObject({
       kind: 'chord',
       type: 'M7',
@@ -180,9 +161,7 @@ describe('parseStyleMessage - fingering (0x05)', () => {
   });
 
   test('returns null for non-zero method (reserved)', () => {
-    expect(
-      parseStyleMessage(u8(0x43, 0x7b, 0x05, 0x20, 60, 0x01), 0),
-    ).toBeNull();
+    expect(parseStyleMessage(u8(0x43, 0x7b, 0x05, 0x20, 60, 0x01), 0)).toBeNull();
   });
 });
 
@@ -197,9 +176,10 @@ describe('parseStyleMessage - guide track flag (0x0C)', () => {
   });
 
   test('treats 0 as null (no channel)', () => {
-    expect(
-      parseStyleMessage(u8(0x43, 0x7b, 0x0c, 0x01, 0x00), 0),
-    ).toMatchObject({ rightHandChannel: 1, leftHandChannel: null });
+    expect(parseStyleMessage(u8(0x43, 0x7b, 0x0c, 0x01, 0x00), 0)).toMatchObject({
+      rightHandChannel: 1,
+      leftHandChannel: null,
+    });
   });
 });
 
@@ -220,10 +200,7 @@ describe('parseStyleMessage - guitar info (0x10)', () => {
   });
 
   test('all-CH flag with bass part', () => {
-    const msg = parseStyleMessage(
-      u8(0x43, 0x7b, 0x10, 0x20, 0x01, 0x00, 28, 33, 38, 43),
-      0,
-    );
+    const msg = parseStyleMessage(u8(0x43, 0x7b, 0x10, 0x20, 0x01, 0x00, 28, 33, 38, 43), 0);
     expect(msg).toMatchObject({
       kind: 'guitarInfo',
       channel: null,
@@ -233,10 +210,7 @@ describe('parseStyleMessage - guitar info (0x10)', () => {
   });
 
   test('reserved part for unknown pp', () => {
-    const msg = parseStyleMessage(
-      u8(0x43, 0x7b, 0x10, 0x0a, 0xff, 0x00, 40),
-      0,
-    );
+    const msg = parseStyleMessage(u8(0x43, 0x7b, 0x10, 0x0a, 0xff, 0x00, 40), 0);
     expect(msg).toMatchObject({ kind: 'guitarInfo', part: 'reserved' });
   });
 });

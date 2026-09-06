@@ -47,12 +47,7 @@ export function SettingsDialog({
       <div className="settings-dialog-inner">
         <header className="settings-dialog-header">
           <h2 id="settings-dialog-title">設定</h2>
-          <button
-            type="button"
-            className="icon-button"
-            onClick={onClose}
-            aria-label="閉じる"
-          >
+          <button type="button" className="icon-button" onClick={onClose} aria-label="閉じる">
             <CloseIcon />
           </button>
         </header>
@@ -76,9 +71,7 @@ export function SettingsDialog({
 
           <section className="settings-section">
             <h3>MIDI出力</h3>
-            <p className="settings-section-desc">
-              再生に使用する MIDI 出力ポートを選択します
-            </p>
+            <p className="settings-section-desc">再生に使用する MIDI 出力ポートを選択します</p>
             <MidiOutputControl player={player} />
           </section>
         </div>
@@ -110,11 +103,7 @@ function ToggleRow({
   );
 }
 
-function MidiOutputControl({
-  player,
-}: {
-  player: ReturnType<typeof useMidiPlayer>;
-}) {
+function MidiOutputControl({ player }: { player: ReturnType<typeof useMidiPlayer> }) {
   return (
     <div className="settings-midi">
       <div className="settings-midi-row">
@@ -141,8 +130,7 @@ function MidiOutputControl({
             className="midi-request-button"
             type="button"
             disabled={
-              player.midiAccessState === 'unsupported' ||
-              player.midiAccessState === 'requesting'
+              player.midiAccessState === 'unsupported' || player.midiAccessState === 'requesting'
             }
             onClick={() => void player.requestMidiAccess()}
           >
@@ -160,9 +148,7 @@ function formatOutputName(output: {
   manufacturer: string;
   connection: MIDIPortConnectionState;
 }): string {
-  const label = output.manufacturer
-    ? `${output.manufacturer} ${output.name}`
-    : output.name;
+  const label = output.manufacturer ? `${output.manufacturer} ${output.name}` : output.name;
   return output.connection === 'open' ? `${label} (open)` : label;
 }
 

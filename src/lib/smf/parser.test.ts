@@ -81,24 +81,7 @@ describe('parseSmf - header', () => {
   });
 
   test('skips extra header bytes when length > 6', () => {
-    const buf = u8(
-      0x4d,
-      0x54,
-      0x68,
-      0x64,
-      0,
-      0,
-      0,
-      8,
-      0,
-      0,
-      0,
-      1,
-      0x01,
-      0xe0,
-      0xab,
-      0xcd,
-    );
+    const buf = u8(0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 8, 0, 0, 0, 1, 0x01, 0xe0, 0xab, 0xcd);
     const file = parseSmf(buf);
     expect(file.header.format).toBe(0);
   });
@@ -140,30 +123,13 @@ describe('parseSmf - tracks', () => {
   test('meta event cancels running status', () => {
     const buf = concat(
       mthd(0, 1, 480),
-      mtrk(
-        0x00,
-        0x90,
-        0x3c,
-        0x40,
-        0x00,
-        0xff,
-        0x06,
-        0x01,
-        0x41,
-        0x00,
-        0x3e,
-        0x40,
-        ...EOT,
-      ),
+      mtrk(0x00, 0x90, 0x3c, 0x40, 0x00, 0xff, 0x06, 0x01, 0x41, 0x00, 0x3e, 0x40, ...EOT),
     );
     expect(() => parseSmf(buf)).toThrow(/running status/);
   });
 
   test('parses tempo meta event', () => {
-    const buf = concat(
-      mthd(0, 1, 480),
-      mtrk(0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20, ...EOT),
-    );
+    const buf = concat(mthd(0, 1, 480), mtrk(0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20, ...EOT));
     const ev = parseSmf(buf).tracks[0]!.events[0]!.event;
     expect(ev.kind).toBe('meta');
     if (ev.kind === 'meta') {
@@ -185,10 +151,7 @@ describe('parseSmf - tracks', () => {
   });
 
   test('parses sysex F7 escape event', () => {
-    const buf = concat(
-      mthd(0, 1, 480),
-      mtrk(0x00, 0xf7, 0x02, 0xaa, 0xbb, ...EOT),
-    );
+    const buf = concat(mthd(0, 1, 480), mtrk(0x00, 0xf7, 0x02, 0xaa, 0xbb, ...EOT));
     const ev = parseSmf(buf).tracks[0]!.events[0]!.event;
     expect(ev.kind).toBe('sysexEscape');
     if (ev.kind === 'sysexEscape') {
@@ -209,16 +172,8 @@ describe('parseSmf - tracks', () => {
 
 describe('parseSmf - channel voice events', () => {
   const cases: Array<[string, number[], SmfEvent]> = [
-    [
-      'noteOff',
-      [0x80, 0x3c, 0x40],
-      { kind: 'noteOff', channel: 0, note: 60, velocity: 64 },
-    ],
-    [
-      'noteOn',
-      [0x91, 0x3c, 0x7f],
-      { kind: 'noteOn', channel: 1, note: 60, velocity: 127 },
-    ],
+    ['noteOff', [0x80, 0x3c, 0x40], { kind: 'noteOff', channel: 0, note: 60, velocity: 64 }],
+    ['noteOn', [0x91, 0x3c, 0x7f], { kind: 'noteOn', channel: 1, note: 60, velocity: 127 }],
     [
       'polyAftertouch',
       [0xa2, 0x3c, 0x50],
@@ -229,26 +184,10 @@ describe('parseSmf - channel voice events', () => {
       [0xb3, 0x07, 0x64],
       { kind: 'controlChange', channel: 3, controller: 7, value: 100 },
     ],
-    [
-      'programChange',
-      [0xc4, 0x10],
-      { kind: 'programChange', channel: 4, program: 16 },
-    ],
-    [
-      'channelAftertouch',
-      [0xd5, 0x40],
-      { kind: 'channelAftertouch', channel: 5, pressure: 64 },
-    ],
-    [
-      'pitchBend center',
-      [0xe6, 0x00, 0x40],
-      { kind: 'pitchBend', channel: 6, value: 8192 },
-    ],
-    [
-      'pitchBend max',
-      [0xe7, 0x7f, 0x7f],
-      { kind: 'pitchBend', channel: 7, value: 16383 },
-    ],
+    ['programChange', [0xc4, 0x10], { kind: 'programChange', channel: 4, program: 16 }],
+    ['channelAftertouch', [0xd5, 0x40], { kind: 'channelAftertouch', channel: 5, pressure: 64 }],
+    ['pitchBend center', [0xe6, 0x00, 0x40], { kind: 'pitchBend', channel: 6, value: 8192 }],
+    ['pitchBend max', [0xe7, 0x7f, 0x7f], { kind: 'pitchBend', channel: 7, value: 16383 }],
   ];
 
   for (const [name, bytes, expected] of cases) {
@@ -262,27 +201,12 @@ describe('parseSmf - channel voice events', () => {
 
 describe('parseSmf - chunks', () => {
   test('preserves unknown chunks (e.g. XFIH) in extraChunks', () => {
-    const xfih = u8(
-      0x58,
-      0x46,
-      0x49,
-      0x48,
-      0x00,
-      0x00,
-      0x00,
-      0x04,
-      0xde,
-      0xad,
-      0xbe,
-      0xef,
-    );
+    const xfih = u8(0x58, 0x46, 0x49, 0x48, 0x00, 0x00, 0x00, 0x04, 0xde, 0xad, 0xbe, 0xef);
     const buf = concat(mthd(0, 1, 480), mtrk(...EOT), xfih);
     const file = parseSmf(buf);
     expect(file.extraChunks).toHaveLength(1);
     expect(file.extraChunks[0]!.type).toBe('XFIH');
-    expect(Array.from(file.extraChunks[0]!.data)).toEqual([
-      0xde, 0xad, 0xbe, 0xef,
-    ]);
+    expect(Array.from(file.extraChunks[0]!.data)).toEqual([0xde, 0xad, 0xbe, 0xef]);
   });
 
   test('throws on multiple MThd', () => {

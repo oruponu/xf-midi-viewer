@@ -1,11 +1,4 @@
-import {
-  memo,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
@@ -46,9 +39,7 @@ export const KaraokeView = memo(function KaraokeView({
       return;
     }
     const sylEls = Array.from(
-      lineEl.querySelectorAll<HTMLSpanElement>(
-        '.karaoke-line-base .karaoke-syl',
-      ),
+      lineEl.querySelectorAll<HTMLSpanElement>('.karaoke-line-base .karaoke-syl'),
     );
     lineMetricsRef.current = {
       width: lineEl.offsetWidth,
@@ -109,10 +100,7 @@ export const KaraokeView = memo(function KaraokeView({
 
   if (pages.length === 0) return null;
   const activePage = pages[Math.min(activeState.pageIdx, pages.length - 1)]!;
-  const activeLineIndex = Math.min(
-    activeState.lineIdx,
-    activePage.lines.length - 1,
-  );
+  const activeLineIndex = Math.min(activeState.lineIdx, activePage.lines.length - 1);
 
   return (
     <div className="card karaoke-view">
@@ -149,18 +137,10 @@ function KaraokePageView({
         if (isPast) className += ' karaoke-line--past';
         if (isActive) className += ' karaoke-line--active';
         return (
-          <div
-            key={i}
-            className={className}
-            ref={isActive ? activeLineRef : undefined}
-          >
+          <div key={i} className={className} ref={isActive ? activeLineRef : undefined}>
             <span className="karaoke-line-base">{renderLineContent(line)}</span>
             {isActive && (
-              <span
-                className="karaoke-line-fill"
-                ref={fillRef}
-                style={{ width: 0 }}
-              >
+              <span className="karaoke-line-fill" ref={fillRef} style={{ width: 0 }}>
                 {renderLineContent(line)}
               </span>
             )}
@@ -245,19 +225,14 @@ function computeFillWidth(
   }
 
   const endTick =
-    activeSyl.endTick ??
-    line.endTick ??
-    page.endTick ??
-    pages[pageIdx + 1]?.startTick ??
-    null;
+    activeSyl.endTick ?? line.endTick ?? page.endTick ?? pages[pageIdx + 1]?.startTick ?? null;
 
   let fraction: number;
   if (endTick === null) {
     fraction = 1;
   } else {
     const span = endTick - activeSyl.tick;
-    fraction =
-      span <= 0 ? 1 : Math.min(1, Math.max(0, (tick - activeSyl.tick) / span));
+    fraction = span <= 0 ? 1 : Math.min(1, Math.max(0, (tick - activeSyl.tick) / span));
   }
 
   const left = metrics.syllableLefts[activeIdx] ?? 0;

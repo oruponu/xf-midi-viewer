@@ -1,11 +1,7 @@
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
-import {
-  formatKeySignature,
-  shiftKeySignature,
-  tickToBarBeat,
-} from '../lib/smf/timing.ts';
+import { formatKeySignature, shiftKeySignature, tickToBarBeat } from '../lib/smf/timing.ts';
 import type {
   KeySignature,
   KeySignatureChange,
@@ -64,18 +60,10 @@ export const LeadSheet = memo(function LeadSheet({
   autoScroll,
   keyShift,
 }: LeadSheetProps) {
-  const renderable = useMemo(
-    () => syllables.filter((s) => s.runs.length > 0),
-    [syllables],
-  );
+  const renderable = useMemo(() => syllables.filter((s) => s.runs.length > 0), [syllables]);
 
   const totalBars = useMemo(() => {
-    if (
-      chords.length === 0 &&
-      rehearsals.length === 0 &&
-      syllables.length === 0
-    )
-      return 0;
+    if (chords.length === 0 && rehearsals.length === 0 && syllables.length === 0) return 0;
     let maxTick = 0;
     for (const c of chords) if (c.tick > maxTick) maxTick = c.tick;
     for (const r of rehearsals) if (r.tick > maxTick) maxTick = r.tick;
@@ -100,8 +88,7 @@ export const LeadSheet = memo(function LeadSheet({
       const bb = tickToBarBeat(change.tick, timing);
       if (!bb) continue;
       if (bb.bar > totalBars) break;
-      if (lastShown && sameSignatureDisplay(lastShown, change.signature))
-        continue;
+      if (lastShown && sameSignatureDisplay(lastShown, change.signature)) continue;
       map.set(bb.bar, change.signature);
       lastShown = change.signature;
     }
@@ -128,20 +115,12 @@ export const LeadSheet = memo(function LeadSheet({
     if (!sequence || !getPositionSeconds) return;
     const container = scoreRef.current;
     if (!container) return;
-    const rowEls = Array.from(
-      container.querySelectorAll<HTMLElement>(':scope > .score-row'),
-    );
+    const rowEls = Array.from(container.querySelectorAll<HTMLElement>(':scope > .score-row'));
     const playheads = Array.from(
-      container.querySelectorAll<HTMLSpanElement>(
-        ':scope > .score-row > .score-playhead',
-      ),
+      container.querySelectorAll<HTMLSpanElement>(':scope > .score-row > .score-playhead'),
     );
-    const chordEls = Array.from(
-      container.querySelectorAll<HTMLElement>('.score-chord'),
-    );
-    const lyricEls = Array.from(
-      container.querySelectorAll<HTMLElement>('.score-lyric'),
-    );
+    const chordEls = Array.from(container.querySelectorAll<HTMLElement>('.score-chord'));
+    const lyricEls = Array.from(container.querySelectorAll<HTMLElement>('.score-lyric'));
     const chordTicks = chordEls.map((el) => Number(el.dataset.tick ?? '0'));
     const lyricTicks = lyricEls.map((el) => Number(el.dataset.tick ?? '0'));
     let raf = 0;
@@ -183,16 +162,10 @@ export const LeadSheet = memo(function LeadSheet({
       if (tickValue !== lastTick) {
         lastTick = tickValue;
         for (let i = 0; i < chordEls.length; i += 1) {
-          chordEls[i]!.classList.toggle(
-            'score-chord--passed',
-            chordTicks[i]! <= tickValue,
-          );
+          chordEls[i]!.classList.toggle('score-chord--passed', chordTicks[i]! <= tickValue);
         }
         for (let i = 0; i < lyricEls.length; i += 1) {
-          lyricEls[i]!.classList.toggle(
-            'score-lyric--passed',
-            lyricTicks[i]! <= tickValue,
-          );
+          lyricEls[i]!.classList.toggle('score-lyric--passed', lyricTicks[i]! <= tickValue);
         }
       }
       raf = requestAnimationFrame(tick);
@@ -298,18 +271,10 @@ function ScoreRow({
 
   return (
     <div className="score-row">
-      <span
-        className="score-playhead"
-        aria-hidden="true"
-        style={{ opacity: 0 }}
-      />
+      <span className="score-playhead" aria-hidden="true" style={{ opacity: 0 }} />
       <div className="score-rehearsals">
         {placedRehearsals.map((p, i) => (
-          <span
-            key={i}
-            className="score-rehearsal"
-            style={{ left: `${p.xPercent}%` }}
-          >
+          <span key={i} className="score-rehearsal" style={{ left: `${p.xPercent}%` }}>
             {p.msg.letter}
             {"'".repeat(p.msg.variation)}
           </span>
@@ -328,8 +293,7 @@ function ScoreRow({
                 <div className="score-bar-meta">
                   {key &&
                     (() => {
-                      const shifted =
-                        keyShift === 0 ? key : shiftKeySignature(key, keyShift);
+                      const shifted = keyShift === 0 ? key : shiftKeySignature(key, keyShift);
                       const label = formatKeySignature(shifted);
                       return (
                         <span className="score-key" aria-label={`Key ${label}`}>
@@ -344,9 +308,7 @@ function ScoreRow({
                       aria-label={`Time signature ${sig.numerator}/${sig.denominator}`}
                     >
                       <span className="score-timesig-num">{sig.numerator}</span>
-                      <span className="score-timesig-den">
-                        {sig.denominator}
-                      </span>
+                      <span className="score-timesig-den">{sig.denominator}</span>
                     </span>
                   )}
                 </div>
@@ -397,10 +359,7 @@ function ScoreRow({
   );
 }
 
-function findSignatureAt(
-  tick: number,
-  signatures: TimeSignatureChange[],
-): TimeSignature {
+function findSignatureAt(tick: number, signatures: TimeSignatureChange[]): TimeSignature {
   let result = signatures[0]!.signature;
   for (const s of signatures) {
     if (s.tick <= tick) result = s.signature;
@@ -411,10 +370,7 @@ function findSignatureAt(
 
 const C_MAJOR: KeySignature = { sharps: 0, mode: 'major' };
 
-function findKeySignatureAt(
-  tick: number,
-  changes: KeySignatureChange[],
-): KeySignature {
+function findKeySignatureAt(tick: number, changes: KeySignatureChange[]): KeySignature {
   if (changes.length === 0) return C_MAJOR;
   let result = changes[0]!.signature;
   for (const c of changes) {
@@ -424,29 +380,19 @@ function findKeySignatureAt(
   return result;
 }
 
-function preferFlatsForChord(
-  tick: number,
-  timing: SmfTiming,
-  keyShift: number,
-): boolean {
+function preferFlatsForChord(tick: number, timing: SmfTiming, keyShift: number): boolean {
   const sig = findKeySignatureAt(tick, timing.keySignatures);
   const shifted = keyShift === 0 ? sig : shiftKeySignature(sig, keyShift);
   return shifted.sharps < 0;
 }
 
-function formatTransposedChord(
-  chord: ChordMsg,
-  timing: SmfTiming,
-  keyShift: number,
-): string {
+function formatTransposedChord(chord: ChordMsg, timing: SmfTiming, keyShift: number): string {
   if (keyShift === 0) return formatChord(chord.root, chord.type, chord.bass);
   const preferFlats = preferFlatsForChord(chord.tick, timing, keyShift);
   return formatChord(
     shiftChordRoot(chord.root, keyShift, preferFlats),
     chord.type,
-    chord.bass === null
-      ? null
-      : shiftChordBass(chord.bass, keyShift, preferFlats),
+    chord.bass === null ? null : shiftChordBass(chord.bass, keyShift, preferFlats),
   );
 }
 
@@ -454,10 +400,7 @@ function barPositionAt(tick: number, timing: SmfTiming): number {
   const bb = tickToBarBeat(tick, timing);
   if (!bb) return 0;
   const sig = findSignatureAt(tick, timing.timeSignatures);
-  const ticksPerBeat = Math.max(
-    1,
-    Math.round((timing.ppq * 4) / sig.denominator),
-  );
+  const ticksPerBeat = Math.max(1, Math.round((timing.ppq * 4) / sig.denominator));
   const beatPos = bb.beat - 1 + bb.tickInBeat / ticksPerBeat;
   return bb.bar - 1 + beatPos / sig.numerator;
 }

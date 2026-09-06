@@ -8,10 +8,7 @@ import {
 } from '../lib/player/messages.ts';
 import type { MidiSendFailure } from '../lib/player/messages.ts';
 import { transposeMidiData } from '../lib/smf/playback.ts';
-import type {
-  PlaybackMidiMessage,
-  PlaybackSequence,
-} from '../lib/smf/playback.ts';
+import type { PlaybackMidiMessage, PlaybackSequence } from '../lib/smf/playback.ts';
 
 interface MidiOutputOption {
   id: string;
@@ -21,12 +18,7 @@ interface MidiOutputOption {
   connection: MIDIPortConnectionState;
 }
 
-type MidiAccessState =
-  | 'unsupported'
-  | 'idle'
-  | 'requesting'
-  | 'ready'
-  | 'denied';
+type MidiAccessState = 'unsupported' | 'idle' | 'requesting' | 'ready' | 'denied';
 
 interface MidiPlayerState {
   isPlaying: boolean;
@@ -100,24 +92,16 @@ export function collectChaseMessages(
 
 function clampPlaybackRate(rate: number): number {
   if (!Number.isFinite(rate)) return 1;
-  const clamped = Math.max(
-    PLAYBACK_RATE_MIN,
-    Math.min(PLAYBACK_RATE_MAX, rate),
-  );
+  const clamped = Math.max(PLAYBACK_RATE_MIN, Math.min(PLAYBACK_RATE_MAX, rate));
   return Math.round(clamped * 10) / 10;
 }
 
 function clampKeyShift(semitones: number): number {
   if (!Number.isFinite(semitones)) return 0;
-  return Math.max(
-    KEY_SHIFT_MIN,
-    Math.min(KEY_SHIFT_MAX, Math.round(semitones)),
-  );
+  return Math.max(KEY_SHIFT_MIN, Math.min(KEY_SHIFT_MAX, Math.round(semitones)));
 }
 
-export function useMidiPlayer(
-  sequence: PlaybackSequence | null,
-): MidiPlayerState {
+export function useMidiPlayer(sequence: PlaybackSequence | null): MidiPlayerState {
   const [isPlaying, setIsPlaying] = useState(false);
   const [positionSeconds, setPositionSeconds] = useState(0);
   const [midiAccessState, setMidiAccessState] = useState<MidiAccessState>(() =>
@@ -145,9 +129,7 @@ export function useMidiPlayer(
   const reportMidiSendFailure = useCallback((failure: MidiSendFailure) => {
     if (midiSendFailureReportedRef.current) return;
     midiSendFailureReportedRef.current = true;
-    setMidiError(
-      `MIDI送信に失敗しました: ${formatMidiSendError(failure.error)}`,
-    );
+    setMidiError(`MIDI送信に失敗しました: ${formatMidiSendError(failure.error)}`);
   }, []);
 
   const clearPanicTimer = useCallback(() => {
@@ -159,10 +141,7 @@ export function useMidiPlayer(
 
   const cleanupScheduled = useCallback(
     (followUpPanic = true) => {
-      const output = getSelectedMidiOutput(
-        midiAccessRef.current,
-        selectedMidiOutputIdRef.current,
-      );
+      const output = getSelectedMidiOutput(midiAccessRef.current, selectedMidiOutputIdRef.current);
       if (output) {
         clearPanicTimer();
         sendMidiPanic(output, performance.now(), reportMidiSendFailure);
@@ -189,8 +168,7 @@ export function useMidiPlayer(
     return Math.min(
       sequence?.durationSeconds ?? 0,
       startOffsetRef.current +
-        ((performance.now() - startedAtMsRef.current) / 1000) *
-          playbackRateRef.current,
+        ((performance.now() - startedAtMsRef.current) / 1000) * playbackRateRef.current,
     );
   }, [sequence]);
 
@@ -212,20 +190,11 @@ export function useMidiPlayer(
   );
 
   const scheduleMidiMessage = useCallback(
-    (
-      output: MIDIOutput,
-      message: PlaybackMidiMessage,
-      position: number,
-    ): boolean => {
-      const data = transposeMidiData(
-        message.data,
-        keyShiftRef.current,
-        drumChannelsRef.current,
-      );
+    (output: MIDIOutput, message: PlaybackMidiMessage, position: number): boolean => {
+      const data = transposeMidiData(message.data, keyShiftRef.current, drumChannelsRef.current);
       if (!data) return true;
       const offsetSeconds = Math.max(0, message.seconds - position);
-      const sendAt =
-        performance.now() + (offsetSeconds / playbackRateRef.current) * 1000;
+      const sendAt = performance.now() + (offsetSeconds / playbackRateRef.current) * 1000;
       return trySendMidiMessage(output, data, sendAt, reportMidiSendFailure);
     },
     [reportMidiSendFailure],
@@ -236,10 +205,7 @@ export function useMidiPlayer(
     const position = currentPosition();
     const until = position + LOOKAHEAD_SECONDS;
 
-    const output = getSelectedMidiOutput(
-      midiAccessRef.current,
-      selectedMidiOutputIdRef.current,
-    );
+    const output = getSelectedMidiOutput(midiAccessRef.current, selectedMidiOutputIdRef.current);
     if (!output) {
       stopInternal(false);
       return;
@@ -271,10 +237,7 @@ export function useMidiPlayer(
 
   const play = useCallback(async () => {
     if (!sequence || sequence.durationSeconds <= 0) return;
-    const output = getSelectedMidiOutput(
-      midiAccessRef.current,
-      selectedMidiOutputIdRef.current,
-    );
+    const output = getSelectedMidiOutput(midiAccessRef.current, selectedMidiOutputIdRef.current);
     if (!output || sequence.midiMessages.length === 0) return;
 
     midiSendFailureReportedRef.current = false;
@@ -299,13 +262,7 @@ export function useMidiPlayer(
     clearTimer();
     scheduleWindow();
     intervalRef.current = window.setInterval(scheduleWindow, SCHEDULER_MS);
-  }, [
-    cleanupScheduled,
-    clearTimer,
-    scheduleMidiMessage,
-    scheduleWindow,
-    sequence,
-  ]);
+  }, [cleanupScheduled, clearTimer, scheduleMidiMessage, scheduleWindow, sequence]);
 
   const pause = useCallback(() => {
     stopInternal(false);
@@ -317,10 +274,7 @@ export function useMidiPlayer(
 
   const seek = useCallback(
     (seconds: number) => {
-      const clamped = Math.max(
-        0,
-        Math.min(seconds, sequence?.durationSeconds ?? 0),
-      );
+      const clamped = Math.max(0, Math.min(seconds, sequence?.durationSeconds ?? 0));
       const wasPlaying = intervalRef.current !== null;
       stopInternal(false);
       positionRef.current = clamped;
@@ -423,19 +377,13 @@ export function useMidiPlayer(
   );
 
   const reset = useCallback(() => {
-    const output = getSelectedMidiOutput(
-      midiAccessRef.current,
-      selectedMidiOutputIdRef.current,
-    );
+    const output = getSelectedMidiOutput(midiAccessRef.current, selectedMidiOutputIdRef.current);
     if (output) sendMidiReset(output, performance.now(), reportMidiSendFailure);
   }, [reportMidiSendFailure]);
 
   const selectMidiOutput = useCallback(
     (id: string) => {
-      const current = getSelectedMidiOutput(
-        midiAccessRef.current,
-        selectedMidiOutputIdRef.current,
-      );
+      const current = getSelectedMidiOutput(midiAccessRef.current, selectedMidiOutputIdRef.current);
       if (current) sendMidiPanic(current, performance.now(), reportMidiSendFailure);
       selectedMidiOutputIdRef.current = id;
       setSelectedMidiOutputId(id);
@@ -496,10 +444,7 @@ export function useMidiPlayer(
   };
 }
 
-function getSelectedMidiOutput(
-  access: MIDIAccess | null,
-  outputId: string,
-): MIDIOutput | null {
+function getSelectedMidiOutput(access: MIDIAccess | null, outputId: string): MIDIOutput | null {
   if (!access || outputId.length === 0) return null;
   return access.outputs.get(outputId) ?? null;
 }
@@ -508,10 +453,7 @@ function formatMidiSendError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function firstMidiMessageIndexAtOrAfter(
-  messages: PlaybackMidiMessage[],
-  seconds: number,
-): number {
+function firstMidiMessageIndexAtOrAfter(messages: PlaybackMidiMessage[], seconds: number): number {
   let lo = 0;
   let hi = messages.length;
   while (lo < hi) {
