@@ -1,4 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  isLiveNoteOn,
+  isNoteMessage,
+  sendMidiPanic,
+  sendMidiReset,
+  trySendMidiMessage,
+} from '../lib/player/messages.ts';
+import type { MidiSendFailure } from '../lib/player/messages.ts';
 import { transposeMidiData } from '../lib/smf/playback.ts';
 import type {
   PlaybackMidiMessage,
@@ -51,28 +59,9 @@ export const KEY_SHIFT_MIN = -6;
 export const KEY_SHIFT_MAX = 6;
 export const KEY_SHIFT_STEP = 1;
 
-interface MidiSendFailure {
-  error: unknown;
-}
-
 interface MidiScheduleWindowResult {
   nextIndex: number;
   failed: boolean;
-}
-
-export function trySendMidiMessage(
-  output: Pick<MIDIOutput, 'send'>,
-  data: number[],
-  timestamp: number,
-  onFailure?: (failure: MidiSendFailure) => void,
-): boolean {
-  try {
-    output.send(data, timestamp);
-    return true;
-  } catch (error) {
-    onFailure?.({ error });
-    return false;
-  }
 }
 
 export function scheduleDueMidiMessages(
@@ -176,10 +165,10 @@ export function useMidiPlayer(
       );
       if (output) {
         clearPanicTimer();
-        sendMidiPanic(output, reportMidiSendFailure);
+        sendMidiPanic(output, performance.now(), reportMidiSendFailure);
         if (followUpPanic) {
           panicTimerRef.current = window.setTimeout(
-            () => sendMidiPanic(output, reportMidiSendFailure),
+            () => sendMidiPanic(output, performance.now(), reportMidiSendFailure),
             LOOKAHEAD_SECONDS * 1000 + 80,
           );
         }
@@ -438,7 +427,7 @@ export function useMidiPlayer(
       midiAccessRef.current,
       selectedMidiOutputIdRef.current,
     );
-    if (output) sendMidiReset(output, reportMidiSendFailure);
+    if (output) sendMidiReset(output, performance.now(), reportMidiSendFailure);
   }, [reportMidiSendFailure]);
 
   const selectMidiOutput = useCallback(
@@ -447,7 +436,7 @@ export function useMidiPlayer(
         midiAccessRef.current,
         selectedMidiOutputIdRef.current,
       );
-      if (current) sendMidiPanic(current, reportMidiSendFailure);
+      if (current) sendMidiPanic(current, performance.now(), reportMidiSendFailure);
       selectedMidiOutputIdRef.current = id;
       setSelectedMidiOutputId(id);
     },
@@ -513,46 +502,6 @@ function getSelectedMidiOutput(
 ): MIDIOutput | null {
   if (!access || outputId.length === 0) return null;
   return access.outputs.get(outputId) ?? null;
-}
-
-function isLiveNoteOn(data: number[]): boolean {
-  return (data[0]! & 0xf0) === 0x90 && (data[2] ?? 0) > 0;
-}
-
-function isNoteMessage(data: number[]): boolean {
-  const status = data[0]! & 0xf0;
-  return status === 0x80 || status === 0x90 || status === 0xa0;
-}
-
-function sendMidiPanic(
-  output: MIDIOutput,
-  onFailure?: (failure: MidiSendFailure) => void,
-): void {
-  (output as MIDIOutput & { clear?: () => void }).clear?.();
-  const now = performance.now();
-  for (let channel = 0; channel < 16; channel += 1) {
-    trySendMidiMessage(output, [0xb0 | channel, 120, 0], now, onFailure);
-    trySendMidiMessage(output, [0xb0 | channel, 123, 0], now, onFailure);
-  }
-}
-
-function sendMidiReset(
-  output: MIDIOutput,
-  onFailure?: (failure: MidiSendFailure) => void,
-): void {
-  const now = performance.now();
-  trySendMidiMessage(
-    output,
-    [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7],
-    now,
-    onFailure,
-  );
-  trySendMidiMessage(
-    output,
-    [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7],
-    now,
-    onFailure,
-  );
 }
 
 function formatMidiSendError(error: unknown): string {
