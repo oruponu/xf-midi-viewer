@@ -7,7 +7,7 @@ import {
   PLAYBACK_RATE_MAX,
   PLAYBACK_RATE_MIN,
   PLAYBACK_RATE_STEP,
-} from '../hooks/useMidiPlayer.ts';
+} from '../lib/player/scheduler.ts';
 import type { useMidiPlayer } from '../hooks/useMidiPlayer.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';

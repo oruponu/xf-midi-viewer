@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  isLiveNoteOn,
-  sendMidiPanic,
-  sendMidiReset,
-  trySendMidiMessage,
-} from '../lib/player/messages.ts';
+import { sendMidiPanic, sendMidiReset, trySendMidiMessage } from '../lib/player/messages.ts';
 import type { MidiSendFailure } from '../lib/player/messages.ts';
 import { collectChaseMessages } from '../lib/player/chase.ts';
+import {
+  clampKeyShift,
+  clampPlaybackRate,
+  firstMidiMessageIndexAtOrAfter,
+  LOOKAHEAD_SECONDS,
+  scheduleDueMidiMessages,
+  SCHEDULER_MS,
+  UI_UPDATE_INTERVAL_MS,
+} from '../lib/player/scheduler.ts';
 import { transposeMidiData } from '../lib/smf/playback.ts';
 import type { PlaybackMidiMessage, PlaybackSequence } from '../lib/smf/playback.ts';
 
@@ -39,54 +43,6 @@ interface MidiPlayerState {
   setPlaybackRate: (rate: number) => void;
   setKeyShift: (semitones: number) => void;
   reset: () => void;
-}
-
-const LOOKAHEAD_SECONDS = 0.05;
-const SCHEDULER_MS = 10;
-const UI_UPDATE_INTERVAL_MS = 33;
-export const PLAYBACK_RATE_MIN = 0.5;
-export const PLAYBACK_RATE_MAX = 2.0;
-export const PLAYBACK_RATE_STEP = 0.1;
-export const KEY_SHIFT_MIN = -6;
-export const KEY_SHIFT_MAX = 6;
-export const KEY_SHIFT_STEP = 1;
-
-interface MidiScheduleWindowResult {
-  nextIndex: number;
-  failed: boolean;
-}
-
-export function scheduleDueMidiMessages(
-  messages: readonly PlaybackMidiMessage[],
-  startIndex: number,
-  position: number,
-  until: number,
-  scheduleMessage: (message: PlaybackMidiMessage) => boolean,
-): MidiScheduleWindowResult {
-  let i = startIndex;
-  while (i < messages.length) {
-    const message = messages[i]!;
-    if (message.seconds > until) break;
-    if (message.seconds >= position || !isLiveNoteOn(message.data)) {
-      const sent = scheduleMessage(message);
-      i += 1;
-      if (!sent) return { nextIndex: i, failed: true };
-      continue;
-    }
-    i += 1;
-  }
-  return { nextIndex: i, failed: false };
-}
-
-function clampPlaybackRate(rate: number): number {
-  if (!Number.isFinite(rate)) return 1;
-  const clamped = Math.max(PLAYBACK_RATE_MIN, Math.min(PLAYBACK_RATE_MAX, rate));
-  return Math.round(clamped * 10) / 10;
-}
-
-function clampKeyShift(semitones: number): number {
-  if (!Number.isFinite(semitones)) return 0;
-  return Math.max(KEY_SHIFT_MIN, Math.min(KEY_SHIFT_MAX, Math.round(semitones)));
 }
 
 export function useMidiPlayer(sequence: PlaybackSequence | null): MidiPlayerState {
@@ -439,17 +395,6 @@ function getSelectedMidiOutput(access: MIDIAccess | null, outputId: string): MID
 
 function formatMidiSendError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function firstMidiMessageIndexAtOrAfter(messages: PlaybackMidiMessage[], seconds: number): number {
-  let lo = 0;
-  let hi = messages.length;
-  while (lo < hi) {
-    const mid = Math.floor((lo + hi) / 2);
-    if (messages[mid]!.seconds < seconds) lo = mid + 1;
-    else hi = mid;
-  }
-  return lo;
 }
 
 type MidiPermissionDescriptor = PermissionDescriptor & {
