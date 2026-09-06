@@ -35,7 +35,11 @@ export function sendMidiPanic(
   timestamp: number,
   onFailure?: (failure: MidiSendFailure) => void,
 ): void {
-  output.clear?.();
+  try {
+    output.clear?.();
+  } catch (error) {
+    onFailure?.({ error });
+  }
   for (let channel = 0; channel < 16; channel += 1) {
     trySendMidiMessage(output, [0xb0 | channel, 120, 0], timestamp, onFailure);
     trySendMidiMessage(output, [0xb0 | channel, 123, 0], timestamp, onFailure);

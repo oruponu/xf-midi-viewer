@@ -94,6 +94,31 @@ describe('sendMidiPanic', () => {
 
     expect(sent).toHaveLength(32);
   });
+
+  test('swallows a throwing clear() when no onFailure is given', () => {
+    const { output, sent } = createRecordingOutput();
+    const error = new Error('clear failed');
+    output.clear = () => {
+      throw error;
+    };
+
+    expect(() => sendMidiPanic(output, 0)).not.toThrow();
+    expect(sent).toHaveLength(32);
+  });
+
+  test('reports a throwing clear() to onFailure instead of throwing', () => {
+    const { output, sent } = createRecordingOutput();
+    const error = new Error('clear failed');
+    output.clear = () => {
+      throw error;
+    };
+    const reports: unknown[] = [];
+
+    sendMidiPanic(output, 0, (failure) => reports.push(failure.error));
+
+    expect(reports).toEqual([error]);
+    expect(sent).toHaveLength(32);
+  });
 });
 
 describe('sendMidiReset', () => {
