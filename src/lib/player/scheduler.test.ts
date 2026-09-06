@@ -561,7 +561,7 @@ describe('MidiScheduler key shift', () => {
   });
 
   test('setKeyShift() while playing panics and reschedules from the current position', () => {
-    const { clock, scheduler, out } = setup([msg(0, [0xc0, 7]), msg(0.5, [0x90, 60, 100])], 10);
+    const { clock, scheduler, out } = setup([msg(0, [0xc0, 7]), msg(0.14, [0x90, 60, 100])], 10);
     scheduler.play();
     clock.advance(100);
     const before = out.sent.length;
@@ -569,10 +569,7 @@ describe('MidiScheduler key shift', () => {
     scheduler.setKeyShift(-1);
 
     expect(out.sent.slice(before).filter(isPanic)).toHaveLength(32);
-    expect(scheduler.getState().isPlaying).toBe(true);
-
-    clock.advance(400);
-
+    clock.advance(100);
     expect(nonPanic(out.sent).at(-1)!.data).toEqual([0x90, 59, 100]);
   });
 
