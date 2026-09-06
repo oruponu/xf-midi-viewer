@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { CSSProperties } from 'react';
+import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
 import {
   KEY_SHIFT_MAX,
   KEY_SHIFT_MIN,
@@ -8,7 +9,7 @@ import {
   PLAYBACK_RATE_MIN,
   PLAYBACK_RATE_STEP,
 } from '../lib/player/scheduler.ts';
-import type { useMidiPlayer } from '../hooks/useMidiPlayer.ts';
+import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatKeySignature, shiftKeySignature, tickToBarBeat } from '../lib/smf/timing.ts';
@@ -17,66 +18,24 @@ import type { SmfTiming } from '../lib/smf/timing.ts';
 interface PlaybackPanelProps {
   sequence: PlaybackSequence;
   timing: SmfTiming | null;
-  player: ReturnType<typeof useMidiPlayer>;
+  scheduler: MidiScheduler;
+  isPlaying: boolean;
+  playbackRate: number;
+  keyShift: number;
+  midiReady: boolean;
 }
 
-export function PlaybackPanel({ sequence, timing, player }: PlaybackPanelProps) {
+export function PlaybackPanel({
+  sequence,
+  timing,
+  scheduler,
+  isPlaying,
+  playbackRate,
+  keyShift,
+  midiReady,
+}: PlaybackPanelProps) {
   const hasMidiMessages = sequence.midiMessages.length > 0 && sequence.durationSeconds > 0;
-  const midiReady = player.midiAccessState === 'ready' && player.selectedMidiOutputId.length > 0;
   const canPlay = hasMidiMessages && midiReady;
-  const progress =
-    sequence.durationSeconds > 0 ? player.positionSeconds / sequence.durationSeconds : 0;
-  const tempoBpm = useMemo(() => {
-    if (sequence.tempos.length === 0) return null;
-    let segment = sequence.tempos[0]!;
-    for (const t of sequence.tempos) {
-      if (t.seconds <= player.positionSeconds) segment = t;
-      else break;
-    }
-    return Math.round(segment.bpm * player.playbackRate);
-  }, [player.playbackRate, player.positionSeconds, sequence.tempos]);
-  const canDecreaseRate = player.playbackRate > PLAYBACK_RATE_MIN + 1e-6;
-  const canIncreaseRate = player.playbackRate < PLAYBACK_RATE_MAX - 1e-6;
-  const isRateModified = Math.abs(player.playbackRate - 1) > 1e-6;
-  const playbackRateLabel = `×${player.playbackRate.toFixed(1)}`;
-  const positionLabel = useMemo(() => {
-    if (!timing || timing.ppq <= 0) return null;
-    const tick = secondsToTick(player.positionSeconds, sequence);
-    const bb = tickToBarBeat(tick, timing);
-    if (!bb) return null;
-    return `${String(bb.bar).padStart(3, '0')}.${String(bb.beat).padStart(
-      2,
-      '0',
-    )}.${String(bb.tickInBeat).padStart(4, '0')}`;
-  }, [player.positionSeconds, sequence, timing]);
-  const keyLabel = useMemo(() => {
-    if (!timing || timing.keySignatures.length === 0) return null;
-    const tick = secondsToTick(player.positionSeconds, sequence);
-    let current = timing.keySignatures[0]!;
-    for (const change of timing.keySignatures) {
-      if (change.tick <= tick) current = change;
-      else break;
-    }
-    const shifted =
-      player.keyShift === 0
-        ? current.signature
-        : shiftKeySignature(current.signature, player.keyShift);
-    return formatKeySignature(shifted);
-  }, [player.keyShift, player.positionSeconds, sequence, timing]);
-  const canDecreaseShift = player.keyShift > KEY_SHIFT_MIN;
-  const canIncreaseShift = player.keyShift < KEY_SHIFT_MAX;
-  const isShiftModified = player.keyShift !== 0;
-  const keyShiftLabel = player.keyShift > 0 ? `+${player.keyShift}` : String(player.keyShift);
-  const timeSigLabel = useMemo(() => {
-    if (!timing || timing.timeSignatures.length === 0) return null;
-    const tick = secondsToTick(player.positionSeconds, sequence);
-    let current = timing.timeSignatures[0]!;
-    for (const change of timing.timeSignatures) {
-      if (change.tick <= tick) current = change;
-      else break;
-    }
-    return `${current.signature.numerator}/${current.signature.denominator}`;
-  }, [player.positionSeconds, sequence, timing]);
 
   return (
     <section className="playback-panel" aria-label="MIDI playback">
@@ -85,14 +44,14 @@ export function PlaybackPanel({ sequence, timing, player }: PlaybackPanelProps) 
           className="transport-button primary"
           type="button"
           disabled={!canPlay}
-          aria-label={player.isPlaying ? 'Pause' : 'Play'}
-          title={player.isPlaying ? 'Pause' : 'Play'}
+          aria-label={isPlaying ? 'Pause' : 'Play'}
+          title={isPlaying ? 'Pause' : 'Play'}
           onClick={() => {
-            if (player.isPlaying) player.pause();
-            else void player.play();
+            if (isPlaying) scheduler.pause();
+            else scheduler.play();
           }}
         >
-          {player.isPlaying ? <PauseIcon /> : <PlayIcon />}
+          {isPlaying ? <PauseIcon /> : <PlayIcon />}
         </button>
         <button
           className="transport-button"
@@ -100,12 +59,100 @@ export function PlaybackPanel({ sequence, timing, player }: PlaybackPanelProps) 
           disabled={!canPlay}
           aria-label="Stop"
           title="Stop"
-          onClick={player.stop}
+          onClick={() => scheduler.stop()}
         >
           <StopIcon />
         </button>
       </div>
 
+      <PlaybackReadout
+        sequence={sequence}
+        timing={timing}
+        scheduler={scheduler}
+        playbackRate={playbackRate}
+        keyShift={keyShift}
+        canPlay={canPlay}
+      />
+
+      <div className="playback-meta">
+        <span>{sequence.notes.length.toLocaleString()} notes</span>
+        <span>{sequence.midiMessages.length.toLocaleString()} MIDI events</span>
+      </div>
+    </section>
+  );
+}
+
+interface PlaybackReadoutProps {
+  sequence: PlaybackSequence;
+  timing: SmfTiming | null;
+  scheduler: MidiScheduler;
+  playbackRate: number;
+  keyShift: number;
+  canPlay: boolean;
+}
+
+function PlaybackReadout({
+  sequence,
+  timing,
+  scheduler,
+  playbackRate,
+  keyShift,
+  canPlay,
+}: PlaybackReadoutProps) {
+  const positionSeconds = usePlaybackPosition(scheduler, (seconds) => seconds);
+  const progress = sequence.durationSeconds > 0 ? positionSeconds / sequence.durationSeconds : 0;
+  const tempoBpm = useMemo(() => {
+    if (sequence.tempos.length === 0) return null;
+    let segment = sequence.tempos[0]!;
+    for (const t of sequence.tempos) {
+      if (t.seconds <= positionSeconds) segment = t;
+      else break;
+    }
+    return Math.round(segment.bpm * playbackRate);
+  }, [playbackRate, positionSeconds, sequence.tempos]);
+  const canDecreaseRate = playbackRate > PLAYBACK_RATE_MIN + 1e-6;
+  const canIncreaseRate = playbackRate < PLAYBACK_RATE_MAX - 1e-6;
+  const isRateModified = Math.abs(playbackRate - 1) > 1e-6;
+  const playbackRateLabel = `×${playbackRate.toFixed(1)}`;
+  const positionLabel = useMemo(() => {
+    if (!timing || timing.ppq <= 0) return null;
+    const tick = secondsToTick(positionSeconds, sequence);
+    const bb = tickToBarBeat(tick, timing);
+    if (!bb) return null;
+    return `${String(bb.bar).padStart(3, '0')}.${String(bb.beat).padStart(
+      2,
+      '0',
+    )}.${String(bb.tickInBeat).padStart(4, '0')}`;
+  }, [positionSeconds, sequence, timing]);
+  const keyLabel = useMemo(() => {
+    if (!timing || timing.keySignatures.length === 0) return null;
+    const tick = secondsToTick(positionSeconds, sequence);
+    let current = timing.keySignatures[0]!;
+    for (const change of timing.keySignatures) {
+      if (change.tick <= tick) current = change;
+      else break;
+    }
+    const shifted =
+      keyShift === 0 ? current.signature : shiftKeySignature(current.signature, keyShift);
+    return formatKeySignature(shifted);
+  }, [keyShift, positionSeconds, sequence, timing]);
+  const canDecreaseShift = keyShift > KEY_SHIFT_MIN;
+  const canIncreaseShift = keyShift < KEY_SHIFT_MAX;
+  const isShiftModified = keyShift !== 0;
+  const keyShiftLabel = keyShift > 0 ? `+${keyShift}` : String(keyShift);
+  const timeSigLabel = useMemo(() => {
+    if (!timing || timing.timeSignatures.length === 0) return null;
+    const tick = secondsToTick(positionSeconds, sequence);
+    let current = timing.timeSignatures[0]!;
+    for (const change of timing.timeSignatures) {
+      if (change.tick <= tick) current = change;
+      else break;
+    }
+    return `${current.signature.numerator}/${current.signature.denominator}`;
+  }, [positionSeconds, sequence, timing]);
+
+  return (
+    <>
       {positionLabel && (
         <div className="playback-position-group">
           <span className="playback-position" aria-label="Bar.Beat.Tick" title="小節.拍.Tick">
@@ -136,7 +183,7 @@ export function PlaybackPanel({ sequence, timing, player }: PlaybackPanelProps) 
                   aria-label="倍率を下げる"
                   title="倍率を下げる"
                   disabled={!canDecreaseRate}
-                  onClick={() => player.setPlaybackRate(player.playbackRate - PLAYBACK_RATE_STEP)}
+                  onClick={() => scheduler.setPlaybackRate(playbackRate - PLAYBACK_RATE_STEP)}
                 >
                   <ChevronDownIcon />
                 </button>
@@ -147,7 +194,7 @@ export function PlaybackPanel({ sequence, timing, player }: PlaybackPanelProps) 
                   aria-label="倍率を上げる"
                   title="倍率を上げる"
                   disabled={!canIncreaseRate}
-                  onClick={() => player.setPlaybackRate(player.playbackRate + PLAYBACK_RATE_STEP)}
+                  onClick={() => scheduler.setPlaybackRate(playbackRate + PLAYBACK_RATE_STEP)}
                 >
                   <ChevronUpIcon />
                 </button>
@@ -178,7 +225,7 @@ export function PlaybackPanel({ sequence, timing, player }: PlaybackPanelProps) 
                 aria-label="移調を下げる"
                 title="移調を下げる"
                 disabled={!canDecreaseShift}
-                onClick={() => player.setKeyShift(player.keyShift - KEY_SHIFT_STEP)}
+                onClick={() => scheduler.setKeyShift(keyShift - KEY_SHIFT_STEP)}
               >
                 <ChevronDownIcon />
               </button>
@@ -189,7 +236,7 @@ export function PlaybackPanel({ sequence, timing, player }: PlaybackPanelProps) 
                 aria-label="移調を上げる"
                 title="移調を上げる"
                 disabled={!canIncreaseShift}
-                onClick={() => player.setKeyShift(player.keyShift + KEY_SHIFT_STEP)}
+                onClick={() => scheduler.setKeyShift(keyShift + KEY_SHIFT_STEP)}
               >
                 <ChevronUpIcon />
               </button>
@@ -209,26 +256,21 @@ export function PlaybackPanel({ sequence, timing, player }: PlaybackPanelProps) 
       )}
 
       <div className="playback-timeline">
-        <span className="timecode">{formatTime(player.positionSeconds)}</span>
+        <span className="timecode">{formatTime(positionSeconds)}</span>
         <input
           aria-label="Playback position"
           type="range"
           min="0"
           max={Math.max(0, sequence.durationSeconds)}
           step="0.01"
-          value={Math.min(player.positionSeconds, sequence.durationSeconds)}
+          value={Math.min(positionSeconds, sequence.durationSeconds)}
           disabled={!canPlay}
           style={progressStyle(progress)}
-          onChange={(e) => player.seek(e.currentTarget.valueAsNumber)}
+          onChange={(e) => scheduler.seek(e.currentTarget.valueAsNumber)}
         />
         <span className="timecode">{formatTime(sequence.durationSeconds)}</span>
       </div>
-
-      <div className="playback-meta">
-        <span>{sequence.notes.length.toLocaleString()} notes</span>
-        <span>{sequence.midiMessages.length.toLocaleString()} MIDI events</span>
-      </div>
-    </section>
+    </>
   );
 }
 

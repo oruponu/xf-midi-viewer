@@ -1,18 +1,29 @@
 import { useEffect, useRef } from 'react';
-import type { useMidiPlayer } from '../hooks/useMidiPlayer.ts';
+import type { MidiPlayer } from '../hooks/useMidiPlayer.ts';
 import type { Settings } from '../hooks/useSettings.ts';
+
+export type MidiPortProps = Pick<
+  MidiPlayer,
+  | 'midiAccessState'
+  | 'midiError'
+  | 'midiOutputs'
+  | 'selectedMidiOutputId'
+  | 'isPlaying'
+  | 'requestMidiAccess'
+  | 'selectMidiOutput'
+>;
 
 export function SettingsDialog({
   open,
   settings,
   onChange,
-  player,
+  midi,
   onClose,
 }: {
   open: boolean;
   settings: Settings;
   onChange: (patch: Partial<Settings>) => void;
-  player: ReturnType<typeof useMidiPlayer>;
+  midi: MidiPortProps;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
@@ -72,7 +83,7 @@ export function SettingsDialog({
           <section className="settings-section">
             <h3>MIDI出力</h3>
             <p className="settings-section-desc">再生に使用する MIDI 出力ポートを選択します</p>
-            <MidiOutputControl player={player} />
+            <MidiOutputControl midi={midi} />
           </section>
         </div>
       </div>
@@ -103,22 +114,22 @@ function ToggleRow({
   );
 }
 
-function MidiOutputControl({ player }: { player: ReturnType<typeof useMidiPlayer> }) {
+function MidiOutputControl({ midi }: { midi: MidiPortProps }) {
   return (
     <div className="settings-midi">
       <div className="settings-midi-row">
-        {player.midiAccessState === 'ready' ? (
+        {midi.midiAccessState === 'ready' ? (
           <select
             aria-label="MIDI output port"
             className="midi-output-select"
-            value={player.selectedMidiOutputId}
-            disabled={player.isPlaying}
-            onChange={(e) => player.selectMidiOutput(e.currentTarget.value)}
+            value={midi.selectedMidiOutputId}
+            disabled={midi.isPlaying}
+            onChange={(e) => midi.selectMidiOutput(e.currentTarget.value)}
           >
-            {player.midiOutputs.length === 0 ? (
+            {midi.midiOutputs.length === 0 ? (
               <option value="">MIDIポートなし</option>
             ) : (
-              player.midiOutputs.map((output) => (
+              midi.midiOutputs.map((output) => (
                 <option key={output.id} value={output.id}>
                   {formatOutputName(output)}
                 </option>
@@ -130,15 +141,15 @@ function MidiOutputControl({ player }: { player: ReturnType<typeof useMidiPlayer
             className="midi-request-button"
             type="button"
             disabled={
-              player.midiAccessState === 'unsupported' || player.midiAccessState === 'requesting'
+              midi.midiAccessState === 'unsupported' || midi.midiAccessState === 'requesting'
             }
-            onClick={() => void player.requestMidiAccess()}
+            onClick={() => void midi.requestMidiAccess()}
           >
-            {player.midiAccessState === 'requesting' ? '確認中' : 'MIDI許可'}
+            {midi.midiAccessState === 'requesting' ? '確認中' : 'MIDI許可'}
           </button>
         )}
       </div>
-      <p className="settings-midi-status">{midiStatusText(player)}</p>
+      <p className="settings-midi-status">{midiStatusText(midi)}</p>
     </div>
   );
 }
@@ -152,9 +163,9 @@ function formatOutputName(output: {
   return output.connection === 'open' ? `${label} (open)` : label;
 }
 
-function midiStatusText(player: ReturnType<typeof useMidiPlayer>): string {
-  if (player.midiError) return player.midiError;
-  switch (player.midiAccessState) {
+function midiStatusText(midi: MidiPortProps): string {
+  if (midi.midiError) return midi.midiError;
+  switch (midi.midiAccessState) {
     case 'unsupported':
       return 'Web MIDI未対応';
     case 'requesting':
@@ -162,7 +173,7 @@ function midiStatusText(player: ReturnType<typeof useMidiPlayer>): string {
     case 'denied':
       return 'MIDI権限なし';
     case 'ready':
-      return player.midiOutputs.length > 0 ? '接続済み' : '出力なし';
+      return midi.midiOutputs.length > 0 ? '接続済み' : '出力なし';
     case 'idle':
       return '未接続';
   }

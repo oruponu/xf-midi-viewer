@@ -9,8 +9,9 @@ import { useMidiPlayer } from './hooks/useMidiPlayer.ts';
 import { useSettings } from './hooks/useSettings.ts';
 import type { Settings } from './hooks/useSettings.ts';
 import { parseSmf } from './lib/smf/parser.ts';
-import { buildPlaybackSequence, secondsToTick } from './lib/smf/playback.ts';
+import { buildPlaybackSequence } from './lib/smf/playback.ts';
 import type { PlaybackSequence } from './lib/smf/playback.ts';
+import type { MidiScheduler } from './lib/player/scheduler.ts';
 import type { SmfFile } from './lib/smf/types.ts';
 import { extractXf } from './lib/xf/parser.ts';
 import type { XfData } from './lib/xf/types.ts';
@@ -31,11 +32,13 @@ function App() {
   const { settings, updateSettings } = useSettings();
   const playbackSequence = useMemo(() => (smf ? buildPlaybackSequence(smf) : null), [smf]);
   const player = useMidiPlayer(playbackSequence);
+  const { scheduler, isPlaying } = player;
+  const midiReady = player.midiAccessState === 'ready' && player.selectedMidiOutputId.length > 0;
 
   const loadFile = useCallback(
     async (f: File) => {
-      player.stop();
-      player.reset();
+      scheduler.stop();
+      scheduler.sendReset();
       setFile({ name: f.name, size: f.size, lastModified: f.lastModified });
       setError(null);
       setXf(null);
@@ -49,7 +52,7 @@ function App() {
         setError(err instanceof Error ? err.message : String(err));
       }
     },
-    [player],
+    [scheduler],
   );
 
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -96,7 +99,6 @@ function App() {
     };
   }, [loadFile]);
 
-  const { isPlaying, play, pause } = player;
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code !== 'Space') return;
@@ -106,12 +108,12 @@ function App() {
       if (!playbackSequence) return;
       if (isEditableTarget(e.target)) return;
       e.preventDefault();
-      if (isPlaying) pause();
-      else void play();
+      if (isPlaying) scheduler.pause();
+      else scheduler.play();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isPlaying, isSettingsOpen, pause, play, playbackSequence]);
+  }, [isPlaying, isSettingsOpen, playbackSequence, scheduler]);
 
   return (
     <>
@@ -162,7 +164,11 @@ function App() {
           sequence={playbackSequence}
           xf={xf}
           settings={settings}
-          player={player}
+          scheduler={scheduler}
+          isPlaying={isPlaying}
+          playbackRate={player.playbackRate}
+          keyShift={player.keyShift}
+          midiReady={midiReady}
         />
       </main>
 
@@ -170,7 +176,7 @@ function App() {
         open={isSettingsOpen}
         settings={settings}
         onChange={updateSettings}
-        player={player}
+        midi={player}
         onClose={() => setIsSettingsOpen(false)}
       />
     </>
@@ -220,19 +226,23 @@ function PlayerScope({
   sequence,
   xf,
   settings,
-  player,
+  scheduler,
+  isPlaying,
+  playbackRate,
+  keyShift,
+  midiReady,
 }: {
   file: SelectedFile | null;
   sequence: PlaybackSequence | null;
   xf: XfData | null;
   settings: Settings;
-  player: ReturnType<typeof useMidiPlayer>;
+  scheduler: MidiScheduler;
+  isPlaying: boolean;
+  playbackRate: number;
+  keyShift: number;
+  midiReady: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
-  const activeTick = useMemo(
-    () => (sequence ? secondsToTick(player.positionSeconds, sequence) : null),
-    [player.positionSeconds, sequence],
-  );
   const dockRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -266,18 +276,24 @@ function PlayerScope({
           file={file}
           data={xf}
           activeTab={activeTab}
-          activeTick={activeTick}
           sequence={sequence}
-          getPositionSeconds={player.getPositionSeconds}
           autoScrollLeadSheet={settings.autoScrollLeadSheet}
           autoScrollLyrics={settings.autoScrollLyrics}
-          keyShift={player.keyShift}
+          keyShift={keyShift}
         />
       )}
       {sequence && (
         <div className="player-dock" ref={dockRef}>
           <div className="player-dock-inner">
-            <PlaybackPanel sequence={sequence} timing={xf?.timing ?? null} player={player} />
+            <PlaybackPanel
+              sequence={sequence}
+              timing={xf?.timing ?? null}
+              scheduler={scheduler}
+              isPlaying={isPlaying}
+              playbackRate={playbackRate}
+              keyShift={keyShift}
+              midiReady={midiReady}
+            />
           </div>
         </div>
       )}
