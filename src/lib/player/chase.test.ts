@@ -1,8 +1,23 @@
 import { describe, expect, test } from 'bun:test';
-import { collectChaseMessages, emitChaseMessages, reduceChaseState } from './chase.ts';
+import {
+  collectChaseMessages,
+  emitChaseMessages,
+  isResetSysex,
+  reduceChaseState,
+} from './chase.ts';
 import type { PlaybackMidiMessage } from '../smf/playback.ts';
 
 const PRELUDE = Array.from({ length: 16 }, (_, channel) => [0xb0 | channel, 121, 0]);
+const GM_SYSTEM_ON = [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7];
+const GM_SYSTEM_OFF = [0xf0, 0x7e, 0x7f, 0x09, 0x02, 0xf7];
+const GM2_SYSTEM_ON = [0xf0, 0x7e, 0x7f, 0x09, 0x03, 0xf7];
+const XG_SYSTEM_ON = [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7];
+const XG_ALL_PARAMETER_RESET = [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7f, 0x00, 0xf7];
+const GS_RESET = [0xf0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7f, 0x00, 0x41, 0xf7];
+const GS_SYSTEM_MODE_SET = [0xf0, 0x41, 0x10, 0x42, 0x12, 0x00, 0x00, 0x7f, 0x00, 0x01, 0xf7];
+const XG_PART_MODE = [0xf0, 0x43, 0x10, 0x4c, 0x08, 0x09, 0x07, 0x02, 0xf7];
+const XG_MASTER_VOLUME = [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x04, 0x7f, 0xf7];
+const UNIVERSAL_MASTER_VOLUME = [0xf0, 0x7f, 0x7f, 0x04, 0x01, 0x00, 0x7f, 0xf7];
 
 function sequence(...datas: number[][]): PlaybackMidiMessage[] {
   return datas.map((data, index) => ({ tick: index * 120, seconds: index * 0.125, data }));
@@ -393,5 +408,63 @@ describe('chase Reset All Controllers in the file', () => {
 
   test('resets only its own channel', () => {
     expect(body(sequence([0xb1, 1, 100], [0xb0, 121, 0]))).toEqual([[0xb1, 1, 100]]);
+  });
+});
+
+const RESET_SYSEX: [string, number[]][] = [
+  ['GM System On', GM_SYSTEM_ON],
+  ['GM System Off', GM_SYSTEM_OFF],
+  ['GM2 System On', GM2_SYSTEM_ON],
+  ['XG System On', XG_SYSTEM_ON],
+  ['XG All Parameter Reset', XG_ALL_PARAMETER_RESET],
+  ['GS Reset', GS_RESET],
+  ['GS System Mode Set', GS_SYSTEM_MODE_SET],
+  ['XG System On for device 2', [0xf0, 0x43, 0x12, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7]],
+];
+
+const NON_RESET_SYSEX: [string, number[]][] = [
+  ['XG part mode', XG_PART_MODE],
+  ['XG master volume', XG_MASTER_VOLUME],
+  ['universal master volume', UNIVERSAL_MASTER_VOLUME],
+  ['an XG bulk dump header', [0xf0, 0x43, 0x00, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7]],
+];
+
+describe('isResetSysex', () => {
+  test.each(RESET_SYSEX)('recognizes %s', (_, data) => {
+    expect(isResetSysex(data)).toBe(true);
+  });
+
+  test.each(NON_RESET_SYSEX)('does not treat %s as a reset', (_, data) => {
+    expect(isResetSysex(data)).toBe(false);
+  });
+});
+
+describe('chase reset SysEx', () => {
+  test('drops the state and SysEx before a reset and puts the reset first', () => {
+    expect(
+      body(sequence([0xb0, 7, 100], XG_PART_MODE, [0xc0, 1], XG_SYSTEM_ON, [0xb0, 7, 64])),
+    ).toEqual([XG_SYSTEM_ON, [0xb0, 7, 64]]);
+  });
+
+  test('keeps only the last reset', () => {
+    expect(body(sequence(GM_SYSTEM_ON, XG_SYSTEM_ON))).toEqual([XG_SYSTEM_ON]);
+  });
+
+  test('keeps the prelude before the reset', () => {
+    expect(fold(sequence(XG_SYSTEM_ON))).toEqual([...PRELUDE, XG_SYSTEM_ON]);
+  });
+
+  test('drops the RPN selection and bank before a reset', () => {
+    expect(
+      body(sequence([0xb0, 101, 0], [0xb0, 100, 0], [0xb0, 0, 127], [0xc0, 1], GM_SYSTEM_ON)),
+    ).toEqual([GM_SYSTEM_ON]);
+  });
+
+  test('keeps state that comes after the reset on every channel', () => {
+    expect(body(sequence([0xb1, 7, 1], XG_SYSTEM_ON, [0xb1, 7, 2], [0xb2, 10, 3]))).toEqual([
+      XG_SYSTEM_ON,
+      [0xb1, 7, 2],
+      [0xb2, 10, 3],
+    ]);
   });
 });

@@ -97,7 +97,7 @@ export function reduceChaseState(
     const slot: Slot = { message, index };
     const status = message.data[0]!;
     if (status >= 0xf0) {
-      if (status === 0xf0) state.sysex.push(slot);
+      if (status === 0xf0) applySysex(state, slot);
       continue;
     }
     const channel = state.channels[status & 0x0f]!;
@@ -134,6 +134,58 @@ export function emitChaseMessages(state: ChaseState): PlaybackMidiMessage[] {
   ];
 }
 
+export function isResetSysex(data: readonly number[]): boolean {
+  return (
+    isGmSystemMessage(data) || isXgSystemReset(data) || isGsReset(data) || isGsSystemModeSet(data)
+  );
+}
+
+function isGmSystemMessage(data: readonly number[]): boolean {
+  return (
+    data.length === 6 && data[1] === 0x7e && data[3] === 0x09 && data[4]! < 0x10 && data[5] === 0xf7
+  );
+}
+
+function isXgSystemReset(data: readonly number[]): boolean {
+  return (
+    data.length === 9 &&
+    data[1] === 0x43 &&
+    (data[2]! & 0xf0) === 0x10 &&
+    data[3] === 0x4c &&
+    data[4] === 0x00 &&
+    data[5] === 0x00 &&
+    (data[6] === 0x7e || data[6] === 0x7f) &&
+    data[7] === 0x00 &&
+    data[8] === 0xf7
+  );
+}
+
+function isGsReset(data: readonly number[]): boolean {
+  return (
+    data.length === 11 &&
+    data[1] === 0x41 &&
+    data[3] === 0x42 &&
+    data[4] === 0x12 &&
+    data[5] === 0x40 &&
+    data[6] === 0x00 &&
+    data[7] === 0x7f &&
+    data[8] === 0x00 &&
+    data[10] === 0xf7
+  );
+}
+
+function isGsSystemModeSet(data: readonly number[]): boolean {
+  return (
+    data.length >= 8 &&
+    data[1] === 0x41 &&
+    data[3] === 0x42 &&
+    data[4] === 0x12 &&
+    data[5] === 0x00 &&
+    data[6] === 0x00 &&
+    data[7] === 0x7f
+  );
+}
+
 function createChaseState(): ChaseState {
   return { channels: createChannels(), sysex: [] };
 }
@@ -157,6 +209,15 @@ function createChannelState(): ChannelState {
 
 function createRegisters(): Record<ParameterKind, RegisterState> {
   return { rpn: { msb: null, lsb: null }, nrpn: { msb: null, lsb: null } };
+}
+
+function applySysex(state: ChaseState, slot: Slot): void {
+  if (isResetSysex(slot.message.data)) {
+    state.channels = createChannels();
+    state.sysex = [slot];
+  } else {
+    state.sysex.push(slot);
+  }
 }
 
 function applyControlChange(channel: ChannelState, slot: Slot): void {
