@@ -151,3 +151,131 @@ describe('chase bank and program', () => {
     ]);
   });
 });
+
+describe('chase RPN and NRPN', () => {
+  test('a typical pitch bend range block comes out unchanged', () => {
+    const block = [
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 6, 2],
+      [0xb0, 101, 127],
+      [0xb0, 100, 127],
+    ];
+    expect(body(sequence(...block))).toEqual(block);
+  });
+
+  test('keeps the last data entry per parameter, each with its selection, and restores the final selection', () => {
+    expect(
+      body(sequence([0xb0, 101, 0], [0xb0, 100, 0], [0xb0, 6, 2], [0xb0, 6, 12], [0xb0, 38, 5])),
+    ).toEqual([
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 6, 12],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 38, 5],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+    ]);
+  });
+
+  test('keeps the last write per controller in the order they were written', () => {
+    expect(
+      body(sequence([0xb0, 101, 0], [0xb0, 100, 1], [0xb0, 6, 2], [0xb0, 38, 5], [0xb0, 6, 3])),
+    ).toEqual([
+      [0xb0, 101, 0],
+      [0xb0, 100, 1],
+      [0xb0, 38, 5],
+      [0xb0, 101, 0],
+      [0xb0, 100, 1],
+      [0xb0, 6, 3],
+      [0xb0, 101, 0],
+      [0xb0, 100, 1],
+    ]);
+  });
+
+  test('drops increment and decrement', () => {
+    expect(
+      body(sequence([0xb0, 101, 0], [0xb0, 100, 0], [0xb0, 6, 2], [0xb0, 96, 0], [0xb0, 97, 0])),
+    ).toEqual([
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 6, 2],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+    ]);
+  });
+
+  test('keeps each data write at its own position among other messages', () => {
+    expect(
+      body(sequence([0xb0, 101, 0], [0xb0, 100, 0], [0xb0, 6, 2], [0xb1, 7, 100], [0xb0, 38, 5])),
+    ).toEqual([
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 6, 2],
+      [0xb1, 7, 100],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 38, 5],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+    ]);
+  });
+
+  test('handles NRPN separately from RPN and restores the inactive registers first', () => {
+    expect(
+      body(
+        sequence(
+          [0xb0, 101, 0],
+          [0xb0, 100, 0],
+          [0xb0, 6, 2],
+          [0xb0, 99, 1],
+          [0xb0, 98, 8],
+          [0xb0, 6, 64],
+        ),
+      ),
+    ).toEqual([
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 6, 2],
+      [0xb0, 99, 1],
+      [0xb0, 98, 8],
+      [0xb0, 6, 64],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 99, 1],
+      [0xb0, 98, 8],
+    ]);
+  });
+
+  test('drops data entry while no parameter or the null parameter is selected', () => {
+    expect(body(sequence([0xb0, 6, 2], [0xb0, 101, 127], [0xb0, 100, 127], [0xb0, 6, 3]))).toEqual([
+      [0xb0, 101, 127],
+      [0xb0, 100, 127],
+    ]);
+  });
+
+  test('drops data entry while only one register byte of the selection is set', () => {
+    expect(body(sequence([0xb0, 101, 0], [0xb0, 6, 2]))).toEqual([[0xb0, 101, 0]]);
+  });
+
+  test('moves a superseded write to the position of its last value', () => {
+    expect(
+      body(sequence([0xb0, 101, 0], [0xb0, 100, 0], [0xb0, 6, 2], [0xb0, 7, 100], [0xb0, 6, 4])),
+    ).toEqual([
+      [0xb0, 7, 100],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 6, 4],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+    ]);
+  });
+
+  test('keeps the selection per channel', () => {
+    expect(body(sequence([0xb0, 101, 0], [0xb0, 100, 0], [0xb1, 6, 2]))).toEqual([
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+    ]);
+  });
+});
