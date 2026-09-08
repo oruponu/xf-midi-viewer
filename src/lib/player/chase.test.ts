@@ -279,3 +279,119 @@ describe('chase RPN and NRPN', () => {
     ]);
   });
 });
+
+describe('chase Reset All Controllers in the file', () => {
+  test('forgets the controllers it resets and keeps the others', () => {
+    expect(
+      body(
+        sequence(
+          [0xb0, 1, 100],
+          [0xb0, 7, 90],
+          [0xb0, 64, 127],
+          [0xe0, 0, 0],
+          [0xd0, 50],
+          [0xb0, 121, 0],
+          [0xb0, 11, 80],
+        ),
+      ),
+    ).toEqual([
+      [0xb0, 7, 90],
+      [0xb0, 11, 80],
+    ]);
+  });
+
+  test('resets exactly the XG set and leaves legato and hold 2 alone', () => {
+    const targets = [1, 11, 64, 65, 66, 67, 84].map((controller) => [0xb0, controller, 1]);
+    expect(body(sequence(...targets, [0xb0, 68, 1], [0xb0, 69, 1], [0xb0, 121, 0]))).toEqual([
+      [0xb0, 68, 1],
+      [0xb0, 69, 1],
+    ]);
+  });
+
+  test('keeps the parameter values but ends with the null selection so a data entry right after the seek is ignored', () => {
+    expect(body(sequence([0xb0, 101, 0], [0xb0, 100, 0], [0xb0, 6, 2], [0xb0, 121, 0]))).toEqual([
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 6, 2],
+      [0xb0, 101, 127],
+      [0xb0, 100, 127],
+    ]);
+  });
+
+  test('ends with the null selection of every kind it re-sent', () => {
+    expect(
+      body(
+        sequence(
+          [0xb0, 99, 1],
+          [0xb0, 98, 8],
+          [0xb0, 6, 64],
+          [0xb0, 101, 0],
+          [0xb0, 100, 0],
+          [0xb0, 6, 2],
+          [0xb0, 121, 0],
+        ),
+      ),
+    ).toEqual([
+      [0xb0, 99, 1],
+      [0xb0, 98, 8],
+      [0xb0, 6, 64],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 6, 2],
+      [0xb0, 101, 127],
+      [0xb0, 100, 127],
+      [0xb0, 99, 127],
+      [0xb0, 98, 127],
+    ]);
+  });
+
+  test('restores a selection made after the reset and nulls the other kind it re-sent', () => {
+    expect(
+      body(
+        sequence(
+          [0xb0, 99, 1],
+          [0xb0, 98, 8],
+          [0xb0, 6, 64],
+          [0xb0, 121, 0],
+          [0xb0, 101, 0],
+          [0xb0, 100, 0],
+          [0xb0, 6, 2],
+        ),
+      ),
+    ).toEqual([
+      [0xb0, 99, 1],
+      [0xb0, 98, 8],
+      [0xb0, 6, 64],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 6, 2],
+      [0xb0, 99, 127],
+      [0xb0, 98, 127],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+    ]);
+  });
+
+  test('fills the untouched half of a selection made after the reset with null', () => {
+    expect(
+      body(sequence([0xb0, 101, 0], [0xb0, 100, 0], [0xb0, 6, 2], [0xb0, 121, 0], [0xb0, 101, 0])),
+    ).toEqual([
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 6, 2],
+      [0xb0, 101, 0],
+      [0xb0, 100, 127],
+    ]);
+  });
+
+  test('keeps bank and program', () => {
+    expect(body(sequence([0xb0, 0, 127], [0xc0, 1], [0xb0, 121, 0]))).toEqual([
+      [0xb0, 0, 127],
+      [0xc0, 1],
+    ]);
+  });
+
+  test('resets only its own channel', () => {
+    expect(body(sequence([0xb1, 1, 100], [0xb0, 121, 0]))).toEqual([[0xb1, 1, 100]]);
+  });
+});

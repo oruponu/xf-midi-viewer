@@ -69,6 +69,7 @@ const RESET_ALL_CONTROLLERS = 121;
 const ALL_NOTES_OFF = 123;
 
 const NULL_PARAMETER = 127;
+const RESET_ALL_CONTROLLERS_TARGETS = [1, 11, 64, 65, 66, 67, 84];
 const SELECTION_CONTROLLERS: Record<ParameterKind, { msb: number; lsb: number }> = {
   rpn: { msb: RPN_MSB, lsb: RPN_LSB },
   nrpn: { msb: NRPN_MSB, lsb: NRPN_LSB },
@@ -189,6 +190,9 @@ function applyControlChange(channel: ChannelState, slot: Slot): void {
     case ALL_SOUND_OFF:
     case ALL_NOTES_OFF:
       break;
+    case RESET_ALL_CONTROLLERS:
+      resetControllers(channel);
+      break;
     default:
       channel.controllers[controller] = slot;
   }
@@ -224,6 +228,14 @@ function selectedParameter(channel: ChannelState): ParameterEntry | null {
     channel.parameters.set(key, entry);
   }
   return entry;
+}
+
+function resetControllers(channel: ChannelState): void {
+  for (const controller of RESET_ALL_CONTROLLERS_TARGETS) channel.controllers[controller] = null;
+  channel.pitchBend = null;
+  channel.pressure = null;
+  channel.registers = createRegisters();
+  channel.selected = null;
 }
 
 function collectChannelGroups(groups: Group[], channel: ChannelState, channelNumber: number): void {
@@ -262,12 +274,17 @@ function parameterGroups(channelNumber: number, entry: ParameterEntry): Group[] 
 function collectRegisterRestore(state: ChaseState): PlaybackMidiMessage[] {
   const messages: PlaybackMidiMessage[] = [];
   state.channels.forEach((channel, channelNumber) => {
-    if (!channel.selected) return;
     const status = 0xb0 | channelNumber;
+    const touched = new Set(Array.from(channel.parameters.values(), (entry) => entry.kind));
     const kinds: ParameterKind[] = channel.selected === 'rpn' ? ['nrpn', 'rpn'] : ['rpn', 'nrpn'];
     for (const kind of kinds) {
       const register = channel.registers[kind];
       const selection = SELECTION_CONTROLLERS[kind];
+      if (touched.has(kind)) {
+        messages.push(synthesizeAtStart([status, selection.msb, register.msb ?? NULL_PARAMETER]));
+        messages.push(synthesizeAtStart([status, selection.lsb, register.lsb ?? NULL_PARAMETER]));
+        continue;
+      }
       if (register.msb !== null) {
         messages.push(synthesizeAtStart([status, selection.msb, register.msb]));
       }
