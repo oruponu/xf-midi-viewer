@@ -177,13 +177,66 @@ describe('chase RPN and NRPN', () => {
     ]);
   });
 
-  test('drops increment and decrement', () => {
+  test('keeps increment and decrement in order after an absolute write', () => {
     expect(
       body(sequence([0xb0, 101, 0], [0xb0, 100, 0], [0xb0, 6, 2], [0xb0, 96, 0], [0xb0, 97, 0])),
     ).toEqual([
       [0xb0, 101, 0],
       [0xb0, 100, 0],
       [0xb0, 6, 2],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 96, 0],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 97, 0],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+    ]);
+  });
+
+  test('drops a relative operation without an absolute write', () => {
+    expect(body(sequence([0xb0, 101, 0], [0xb0, 100, 0], [0xb0, 96, 0]))).toEqual([
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+    ]);
+  });
+
+  test('drops a relative operation based only on Data Entry LSB', () => {
+    expect(body(sequence([0xb0, 101, 0], [0xb0, 100, 0], [0xb0, 38, 5], [0xb0, 96, 0]))).toEqual([
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 38, 5],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+    ]);
+  });
+
+  test('keeps a relative operation after Data Entry LSB when Data Entry MSB is present', () => {
+    expect(
+      body(sequence([0xb0, 101, 0], [0xb0, 100, 0], [0xb0, 6, 2], [0xb0, 38, 5], [0xb0, 96, 0])),
+    ).toEqual([
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 6, 2],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 38, 5],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 96, 0],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+    ]);
+  });
+
+  test('collapses repeated Data Entry LSB writes when a relative operation between them is dropped', () => {
+    expect(
+      body(sequence([0xb0, 101, 0], [0xb0, 100, 0], [0xb0, 38, 5], [0xb0, 96, 0], [0xb0, 38, 7])),
+    ).toEqual([
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 38, 7],
       [0xb0, 101, 0],
       [0xb0, 100, 0],
     ]);
@@ -451,19 +504,31 @@ describe('collectChaseMessages size', () => {
     expect(fold(sequence(...datas))).toHaveLength(16 + 16 + 16);
   });
 
-  test('drops relative data operations and keeps one write per controller', () => {
+  test('keeps repeated absolute and relative data operations', () => {
     const datas: number[][] = [
       [0xb0, 101, 0],
       [0xb0, 100, 0],
     ];
     for (let i = 0; i < 1000; i += 1) datas.push([0xb0, 6, 2], [0xb0, 96, 0]);
-    expect(body(sequence(...datas))).toEqual([
+    expect(body(sequence(...datas))).toHaveLength(6002);
+  });
+
+  test('handles many relative operations on one parameter', () => {
+    const messages = sequence([0xb0, 101, 0], [0xb0, 100, 0], [0xb0, 6, 2]);
+    for (let i = 0; i < 200_000; i += 1) {
+      const index = messages.length;
+      messages.push({ tick: index * 120, seconds: index * 0.125, data: [0xb0, 96, 0] });
+    }
+    expect(body(messages)).toHaveLength(600_005);
+  });
+
+  test('collapses repeated absolute data operations to one write', () => {
+    const datas: number[][] = [
       [0xb0, 101, 0],
       [0xb0, 100, 0],
-      [0xb0, 6, 2],
-      [0xb0, 101, 0],
-      [0xb0, 100, 0],
-    ]);
+    ];
+    for (let i = 0; i < 1000; i += 1) datas.push([0xb0, 6, 2]);
+    expect(body(sequence(...datas))).toHaveLength(5);
   });
 
   test('keeps every SysEx after the last reset and drops every SysEx before it', () => {

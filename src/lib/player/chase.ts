@@ -226,6 +226,8 @@ function applyControlChange(channel: ChannelState, slot: Slot): void {
       break;
     case DATA_ENTRY_MSB:
     case DATA_ENTRY_LSB:
+    case DATA_INCREMENT:
+    case DATA_DECREMENT:
       applyDataEntry(channel, controller, slot);
       break;
     case NRPN_LSB:
@@ -240,8 +242,6 @@ function applyControlChange(channel: ChannelState, slot: Slot): void {
     case RPN_MSB:
       selectParameter(channel, 'rpn', 'msb', value);
       break;
-    case DATA_INCREMENT:
-    case DATA_DECREMENT:
     case ALL_SOUND_OFF:
     case ALL_NOTES_OFF:
       break;
@@ -266,8 +266,23 @@ function selectParameter(
 function applyDataEntry(channel: ChannelState, controller: number, slot: Slot): void {
   const entry = selectedParameter(channel);
   if (!entry) return;
-  entry.ops = entry.ops.filter((op) => op.message.data[1] !== controller);
+  if (controller === DATA_INCREMENT || controller === DATA_DECREMENT) {
+    if (!entry.ops.some((op) => op.message.data[1] === DATA_ENTRY_MSB)) return;
+    entry.ops.push(slot);
+    return;
+  }
+  const previousIndex = findReplaceableDataEntry(entry.ops, controller);
+  if (previousIndex !== -1) entry.ops.splice(previousIndex, 1);
   entry.ops.push(slot);
+}
+
+function findReplaceableDataEntry(ops: Slot[], controller: number): number {
+  for (let index = ops.length - 1; index >= 0; index -= 1) {
+    const previousController = ops[index]!.message.data[1];
+    if (previousController === controller) return index;
+    if (previousController === DATA_INCREMENT || previousController === DATA_DECREMENT) return -1;
+  }
+  return -1;
 }
 
 function selectedParameter(channel: ChannelState): ParameterEntry | null {
@@ -307,7 +322,7 @@ function collectChannelGroups(groups: Group[], channel: ChannelState, channelNum
     }
   }
   for (const entry of channel.parameters.values()) {
-    groups.push(...parameterGroups(channelNumber, entry));
+    for (const group of parameterGroups(channelNumber, entry)) groups.push(group);
   }
   if (channel.pitchBend) groups.push(singleGroup(channel.pitchBend));
   if (channel.pressure) groups.push(singleGroup(channel.pressure));
