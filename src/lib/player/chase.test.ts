@@ -1,10 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  collectChaseMessages,
-  emitChaseMessages,
-  isResetSysex,
-  reduceChaseState,
-} from './chase.ts';
+import { collectChaseMessages, isResetSysex } from './chase.ts';
 import type { PlaybackMidiMessage } from '../smf/playback.ts';
 
 const PRELUDE = Array.from({ length: 16 }, (_, channel) => [0xb0 | channel, 121, 0]);
@@ -24,39 +19,12 @@ function sequence(...datas: number[][]): PlaybackMidiMessage[] {
 }
 
 function fold(messages: PlaybackMidiMessage[], startIndex = messages.length): number[][] {
-  return emitChaseMessages(reduceChaseState(messages, startIndex)).map((message) => message.data);
+  return collectChaseMessages(messages, startIndex).map((message) => message.data);
 }
 
 function body(messages: PlaybackMidiMessage[], startIndex = messages.length): number[][] {
   return fold(messages, startIndex).slice(PRELUDE.length);
 }
-
-describe('collectChaseMessages', () => {
-  const messages: PlaybackMidiMessage[] = [
-    { tick: 0, seconds: 0, data: [0xb0, 0, 1] },
-    { tick: 0, seconds: 0, data: [0xc0, 48] },
-    { tick: 0, seconds: 0, data: [0xb0, 7, 100] },
-    { tick: 0, seconds: 0, data: [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7] },
-    // note on / off / poly aftertouch are skipped
-    { tick: 240, seconds: 0.25, data: [0x90, 60, 100] },
-    { tick: 240, seconds: 0.25, data: [0xa0, 60, 40] },
-    { tick: 480, seconds: 0.5, data: [0x80, 60, 0] },
-    { tick: 720, seconds: 0.75, data: [0xb0, 7, 64] },
-  ];
-
-  test('keeps non-note state messages before the seek index so voices survive a seek', () => {
-    expect(collectChaseMessages(messages, 7)).toEqual([
-      messages[0]!,
-      messages[1]!,
-      messages[2]!,
-      messages[3]!,
-    ]);
-  });
-
-  test('returns nothing when starting from the beginning', () => {
-    expect(collectChaseMessages(messages, 0)).toEqual([]);
-  });
-});
 
 describe('chase prelude', () => {
   test('starts with Reset All Controllers on every channel even when starting from the beginning', () => {
@@ -113,7 +81,7 @@ describe('chase channel messages', () => {
 
   test('reuses the original message objects', () => {
     const messages = sequence([0xb0, 7, 100]);
-    expect(emitChaseMessages(reduceChaseState(messages, 1)).at(-1)).toBe(messages[0]!);
+    expect(collectChaseMessages(messages, 1).at(-1)).toBe(messages[0]!);
   });
 });
 
@@ -465,6 +433,55 @@ describe('chase reset SysEx', () => {
       XG_SYSTEM_ON,
       [0xb1, 7, 2],
       [0xb2, 10, 3],
+    ]);
+  });
+});
+
+describe('collectChaseMessages size', () => {
+  test('does not grow with the number of messages before the seek position', () => {
+    const bends = Array.from({ length: 5000 }, (_, i) => [0xe0, i & 0x7f, (i >> 7) & 0x7f]);
+    expect(body(sequence(...bends))).toEqual([bends.at(-1)!]);
+  });
+
+  test('bounds a dense automation file to the prelude plus one message per state slot', () => {
+    const datas: number[][] = [];
+    for (let i = 0; i < 2000; i += 1) {
+      datas.push([0xb0 | (i % 16), 11, i & 0x7f], [0xe0 | (i % 16), i & 0x7f, 0x40]);
+    }
+    expect(fold(sequence(...datas))).toHaveLength(16 + 16 + 16);
+  });
+
+  test('drops relative data operations and keeps one write per controller', () => {
+    const datas: number[][] = [
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+    ];
+    for (let i = 0; i < 1000; i += 1) datas.push([0xb0, 6, 2], [0xb0, 96, 0]);
+    expect(body(sequence(...datas))).toEqual([
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+      [0xb0, 6, 2],
+      [0xb0, 101, 0],
+      [0xb0, 100, 0],
+    ]);
+  });
+
+  test('keeps every SysEx after the last reset and drops every SysEx before it', () => {
+    const parameterChanges = Array.from({ length: 50 }, (_, i) => [
+      0xf0,
+      0x43,
+      0x10,
+      0x4c,
+      0x08,
+      i % 16,
+      0x0b,
+      0x40 + (i % 32),
+      0xf7,
+    ]);
+    expect(body(sequence(...parameterChanges, XG_SYSTEM_ON))).toEqual([XG_SYSTEM_ON]);
+    expect(body(sequence(XG_SYSTEM_ON, ...parameterChanges))).toEqual([
+      XG_SYSTEM_ON,
+      ...parameterChanges,
     ]);
   });
 });

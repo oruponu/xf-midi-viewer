@@ -180,8 +180,12 @@ function isPanic(m: SentMessage): boolean {
   return (m.data[0]! & 0xf0) === 0xb0 && (m.data[1] === 120 || m.data[1] === 123);
 }
 
-function nonPanic(sent: SentMessage[]): SentMessage[] {
-  return sent.filter((m) => !isPanic(m));
+function isChasePrelude(m: SentMessage): boolean {
+  return (m.data[0]! & 0xf0) === 0xb0 && m.data[1] === 121;
+}
+
+function playbackOnly(sent: SentMessage[]): SentMessage[] {
+  return sent.filter((m) => !isPanic(m) && !isChasePrelude(m));
 }
 
 function makeSequence(
@@ -225,14 +229,14 @@ describe('MidiScheduler playback', () => {
     scheduler.play();
 
     expect(scheduler.getState().isPlaying).toBe(true);
-    expect(nonPanic(out.sent)).toEqual([
+    expect(playbackOnly(out.sent)).toEqual([
       { data: [0xc0, 5], timestamp: 1000 },
       { data: [0x90, 60, 100], timestamp: 1020 },
     ]);
 
     clock.advance(200);
 
-    const noteOff = nonPanic(out.sent).at(-1)!;
+    const noteOff = playbackOnly(out.sent).at(-1)!;
     expect(noteOff.data).toEqual([0x80, 60, 0]);
     expect(noteOff.timestamp).toBeCloseTo(1200, 6);
   });
@@ -242,7 +246,7 @@ describe('MidiScheduler playback', () => {
 
     scheduler.play();
 
-    expect(nonPanic(out.sent).map((m) => m.data)).toEqual([[0x90, 60, 100]]);
+    expect(playbackOnly(out.sent).map((m) => m.data)).toEqual([[0x90, 60, 100]]);
   });
 
   test('play() does nothing without an output or without messages', () => {
@@ -280,7 +284,7 @@ describe('MidiScheduler playback', () => {
     clock.advance(500);
 
     expect(scheduler.getPosition()).toBeCloseTo(0.25, 6);
-    expect(nonPanic(out.sent)).toHaveLength(1);
+    expect(playbackOnly(out.sent)).toHaveLength(1);
   });
 
   test('stop() rewinds to 0', () => {
@@ -330,7 +334,7 @@ describe('MidiScheduler playback', () => {
 
     expect(scheduler.getState().isPlaying).toBe(true);
     expect(scheduler.getState().sendError).toBeNull();
-    expect(nonPanic(next.sent).map((m) => m.data)).toEqual([[0x90, 60, 100]]);
+    expect(playbackOnly(next.sent).map((m) => m.data)).toEqual([[0x90, 60, 100]]);
     expect(out.sent.length).toBe(oldCount);
   });
 
@@ -461,7 +465,7 @@ describe('MidiScheduler seek', () => {
 
     scheduler.play();
 
-    expect(nonPanic(out.sent).map((m) => m.data)).toEqual([
+    expect(playbackOnly(out.sent).map((m) => m.data)).toEqual([
       [0xc0, 7],
       [0xb0, 7, 100],
     ]);
@@ -476,7 +480,7 @@ describe('MidiScheduler seek', () => {
 
     expect(scheduler.getState().isPlaying).toBe(true);
     expect(scheduler.getPosition()).toBeCloseTo(0.98, 6);
-    expect(nonPanic(out.sent).map((m) => m.data)).toEqual([
+    expect(playbackOnly(out.sent).map((m) => m.data)).toEqual([
       [0xc0, 7],
       [0xc0, 7],
       [0x90, 60, 100],
@@ -499,7 +503,7 @@ describe('MidiScheduler seek', () => {
     scheduler.seek(0.5);
     scheduler.play();
 
-    expect(nonPanic(out.sent).map((m) => m.data)).toEqual([
+    expect(playbackOnly(out.sent).map((m) => m.data)).toEqual([
       [0xc0, 7],
       [0x90, 60, 100],
     ]);
@@ -520,7 +524,7 @@ describe('MidiScheduler playback rate', () => {
     clock.advance(50);
 
     expect(scheduler.getPosition()).toBeCloseTo(0.3, 6);
-    const noteOn = nonPanic(out.sent).find((m) => m.data[0] === 0x90)!;
+    const noteOn = playbackOnly(out.sent).find((m) => m.data[0] === 0x90)!;
     expect(noteOn.timestamp).toBeCloseTo(1250, 6);
   });
 
@@ -554,7 +558,7 @@ describe('MidiScheduler key shift', () => {
     scheduler.setKeyShift(2);
     scheduler.play();
 
-    expect(nonPanic(out.sent).map((m) => m.data)).toEqual([
+    expect(playbackOnly(out.sent).map((m) => m.data)).toEqual([
       [0x90, 62, 100],
       [0x99, 36, 100],
     ]);
@@ -570,7 +574,7 @@ describe('MidiScheduler key shift', () => {
 
     expect(out.sent.slice(before).filter(isPanic)).toHaveLength(32);
     clock.advance(100);
-    expect(nonPanic(out.sent).at(-1)!.data).toEqual([0x90, 59, 100]);
+    expect(playbackOnly(out.sent).at(-1)!.data).toEqual([0x90, 59, 100]);
   });
 
   test('setKeyShift() applies the clamp and skips notification when unchanged', () => {
