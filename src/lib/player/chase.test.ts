@@ -112,3 +112,42 @@ describe('chase system exclusive', () => {
     ]);
   });
 });
+
+describe('chase bank and program', () => {
+  test('emits the bank that was pending when the program changed, right before it', () => {
+    expect(body(sequence([0xb0, 0, 127], [0xb0, 32, 0], [0xc0, 1]))).toEqual([
+      [0xb0, 0, 127],
+      [0xb0, 32, 0],
+      [0xc0, 1],
+    ]);
+  });
+
+  test('keeps the captured bank when the bank changes after the program', () => {
+    expect(body(sequence([0xb0, 0, 127], [0xc0, 1], [0xb0, 0, 0]))).toEqual([
+      [0xb0, 0, 127],
+      [0xc0, 1],
+      [0xb0, 0, 0],
+    ]);
+  });
+
+  test('keeps only the last program per channel with its own bank', () => {
+    expect(body(sequence([0xb0, 0, 0], [0xc0, 1], [0xb0, 0, 8], [0xc0, 2]))).toEqual([
+      [0xb0, 0, 8],
+      [0xc0, 2],
+    ]);
+  });
+
+  test('emits a program without bank, and a bank without program', () => {
+    expect(body(sequence([0xc0, 5], [0xb1, 32, 3]))).toEqual([
+      [0xc0, 5],
+      [0xb1, 32, 3],
+    ]);
+  });
+
+  test('emits only the bank byte that was set', () => {
+    expect(body(sequence([0xb0, 32, 2], [0xc0, 9]))).toEqual([
+      [0xb0, 32, 2],
+      [0xc0, 9],
+    ]);
+  });
+});
