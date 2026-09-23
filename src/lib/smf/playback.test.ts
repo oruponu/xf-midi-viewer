@@ -138,6 +138,47 @@ describe('buildPlaybackSequence', () => {
     ]);
   });
 
+  test('keeps the file order of messages at the same tick within a track', () => {
+    const sequence = buildPlaybackSequence(
+      makeSmf([
+        track([
+          sysex(0, [0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7]),
+          controlChange(0, 7, 100),
+          programChange(480, 40),
+          pitchBend(0, 8192),
+          noteOn(0, 60),
+          noteOff(480, 60),
+        ]),
+      ]),
+    );
+
+    expect(sequence.midiMessages.map((message) => message.data)).toEqual([
+      [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7],
+      [0xb0, 7, 100],
+      [0xc0, 40],
+      [0xe0, 0, 64],
+      [0x90, 60, 100],
+      [0x80, 60, 64],
+    ]);
+  });
+
+  test('orders messages at the same tick across tracks by track order', () => {
+    const sequence = buildPlaybackSequence(
+      makeSmf([
+        track([noteOn(480, 64, 100, 1), noteOff(480, 64, 64, 1)]),
+        track([programChange(480, 40, 0), noteOn(0, 60, 100, 0), noteOff(480, 60, 64, 0)]),
+      ]),
+    );
+
+    expect(sequence.midiMessages.map((message) => message.data)).toEqual([
+      [0x91, 64, 100],
+      [0xc0, 40],
+      [0x90, 60, 100],
+      [0x81, 64, 64],
+      [0x80, 60, 64],
+    ]);
+  });
+
   test('computes durationSeconds for huge sequences without overflowing the stack', () => {
     const events = Array.from({ length: 700_000 }, () => controlChange(1, 7, 100));
     const sequence = buildPlaybackSequence(makeSmf([track(events)]));

@@ -84,7 +84,7 @@ export function buildPlaybackSequence(smf: SmfFile): PlaybackSequence {
   );
   const midiMessages = absoluteTracks.flatMap((track) => collectMidiMessages(track, tickToSeconds));
   notes.sort((a, b) => a.startSeconds - b.startSeconds || a.channel - b.channel || a.note - b.note);
-  midiMessages.sort((a, b) => a.seconds - b.seconds || a.tick - b.tick || a.data[0]! - b.data[0]!);
+  midiMessages.sort((a, b) => a.tick - b.tick);
 
   let durationSeconds = Math.max(tickToSeconds(durationTicks), 0);
   for (const note of notes) {
