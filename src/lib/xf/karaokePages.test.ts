@@ -4,10 +4,13 @@ import {
   buildKaraokeRows,
   chooseMergedPairs,
   lineAlignment,
+  mergeSingleRowPages,
   resolveKaraokeDisplay,
 } from './karaokePages.ts';
 import type { KaraokePage } from './karaokePages.ts';
+import { parseKaraoke } from './lyrics.ts';
 import type { ParsedKaraoke, LyricLine, LyricSyllable } from './lyrics.ts';
+import type { RehearsalMessage } from './types.ts';
 
 function line(tick: number, endTick: number | null): LyricLine {
   return { tick, endTick, syllables: [], closedBy: null };
@@ -45,8 +48,8 @@ describe('buildKaraokePages', () => {
       }),
     );
     expect(result).toEqual([
-      { startTick: 10, displayTick: 10, endTick: 100, lines: [l1, l2] },
-      { startTick: 100, displayTick: 100, endTick: null, lines: [l3] },
+      { startTick: 10, displayTick: 10, endTick: 100, sectionStart: false, lines: [l1, l2] },
+      { startTick: 100, displayTick: 100, endTick: null, sectionStart: false, lines: [l3] },
     ]);
   });
 
@@ -70,16 +73,55 @@ describe('buildKaraokePages', () => {
         startTick: 10,
         displayTick: 10,
         endTick: 50,
+        sectionStart: false,
         lines: [lines[0]!, lines[1]!, lines[2]!, lines[3]!],
       },
-      { startTick: 50, displayTick: 50, endTick: null, lines: [lines[4]!, lines[5]!] },
+      {
+        startTick: 50,
+        displayTick: 50,
+        endTick: null,
+        sectionStart: false,
+        lines: [lines[4]!, lines[5]!],
+      },
     ]);
   });
 
   test('falls back to 4-line chunking when no page breaks', () => {
     const lines = [line(0, 10), line(10, 20), line(20, null)];
     const result = buildKaraokePages(parsed({ lines, pages: [] }));
-    expect(result).toEqual([{ startTick: 0, displayTick: 0, endTick: null, lines }]);
+    expect(result).toEqual([
+      { startTick: 0, displayTick: 0, endTick: null, sectionStart: false, lines },
+    ]);
+  });
+});
+
+describe('buildKaraokePages section start', () => {
+  const lyric = (tick: number, text: string) => ({ kind: 'lyric' as const, tick, text });
+  const rehearsal = (tick: number): RehearsalMessage => ({
+    kind: 'rehearsal',
+    tick,
+    letter: 'A',
+    variation: 0,
+  });
+  const karaoke = parseKaraoke({
+    header: null,
+    events: [
+      lyric(0, 'a1/'),
+      lyric(480, 'a2<'),
+      lyric(960, 'b1/'),
+      lyric(1440, 'b2<'),
+      lyric(1920, 'c1'),
+    ],
+  });
+
+  test('marks the page that follows a section break', () => {
+    const result = buildKaraokePages(karaoke, [rehearsal(900)]);
+    expect(result.map((p) => p.sectionStart)).toEqual([false, true, false]);
+  });
+
+  test('ignores a section break inside a page', () => {
+    const result = buildKaraokePages(karaoke, [rehearsal(1000)]);
+    expect(result.map((p) => p.sectionStart)).toEqual([false, false, false]);
   });
 });
 
@@ -129,6 +171,7 @@ describe('resolveKaraokeDisplay', () => {
     startTick: lines[0]!.tick,
     displayTick,
     endTick: null,
+    sectionStart: false,
     lines,
   });
   const pages = [
@@ -188,6 +231,179 @@ describe('resolveKaraokeDisplay', () => {
       lineIdx: 0,
       preview: true,
     });
+  });
+});
+
+describe('mergeSingleRowPages', () => {
+  const page = (...lines: LyricLine[]): KaraokePage => ({
+    startTick: lines[0]!.tick,
+    displayTick: lines[0]!.tick,
+    endTick: lines.at(-1)!.syllables.at(-1)!.endTick,
+    sectionStart: false,
+    lines,
+  });
+  const sectionPage = (...lines: LyricLine[]): KaraokePage => ({
+    ...page(...lines),
+    sectionStart: true,
+  });
+  const nonLyricLine = (tick: number, endTick: number): LyricLine => ({
+    ...sungLine(syl(tick, endTick)),
+    syllables: [{ ...syl(tick, endTick), vocalPart: 'nonLyric' }],
+  });
+
+  test('appends a single-row page to the previous page', () => {
+    const a = page(sungLine(syl(0, 100)), sungLine(syl(100, 200)));
+    const b = page(sungLine(syl(300, 400)), sungLine(syl(400, 500)));
+    const result = mergeSingleRowPages(
+      [a, b],
+      [
+        [false, false],
+        [true, false],
+      ],
+    );
+    expect(result).toEqual({
+      pages: [
+        {
+          startTick: a.startTick,
+          displayTick: a.displayTick,
+          endTick: b.endTick,
+          sectionStart: false,
+          lines: [...a.lines, ...b.lines],
+        },
+      ],
+      pairs: [[false, false, true, false]],
+    });
+  });
+
+  test('keeps pages with more than one row', () => {
+    const a = page(sungLine(syl(0, 100)), sungLine(syl(100, 200)));
+    const b = page(sungLine(syl(300, 400)), sungLine(syl(400, 500)));
+    const pairs = [
+      [false, false],
+      [false, false],
+    ];
+    expect(mergeSingleRowPages([a, b], pairs)).toEqual({ pages: [a, b], pairs });
+  });
+
+  test('keeps a single-row first page', () => {
+    const a = page(sungLine(syl(0, 100)));
+    expect(mergeSingleRowPages([a], [[false]])).toEqual({ pages: [a], pairs: [[false]] });
+  });
+
+  test('does not merge a non-lyric page', () => {
+    const a = page(sungLine(syl(0, 100)), sungLine(syl(100, 200)));
+    const b = page(nonLyricLine(300, 400));
+    const pairs = [[false, false], [false]];
+    expect(mergeSingleRowPages([a, b], pairs)).toEqual({ pages: [a, b], pairs });
+  });
+
+  test('does not merge into a non-lyric page', () => {
+    const a = page(nonLyricLine(0, 100), nonLyricLine(100, 200));
+    const b = page(sungLine(syl(300, 400)));
+    const pairs = [[false, false], [false]];
+    expect(mergeSingleRowPages([a, b], pairs)).toEqual({ pages: [a, b], pairs });
+  });
+
+  test('merges a page mixing lyrics and non-lyric syllables', () => {
+    const a = page(sungLine(syl(0, 100)), sungLine(syl(100, 200)));
+    const mixed = sungLine(syl(300, 400), { ...syl(400, 500), vocalPart: 'nonLyric' });
+    const b = page(mixed);
+    const result = mergeSingleRowPages([a, b], [[false, false], [false]]);
+    expect(result.pages.map((p) => p.lines)).toEqual([[...a.lines, mixed]]);
+  });
+
+  test('keeps merging consecutive single-row pages into the same page', () => {
+    const a = page(sungLine(syl(0, 100)), sungLine(syl(100, 200)));
+    const b = page(sungLine(syl(300, 400)));
+    const c = page(sungLine(syl(500, 600)));
+    const d = page(sungLine(syl(700, 800)), sungLine(syl(800, 900)));
+    const result = mergeSingleRowPages(
+      [a, b, c, d],
+      [[false, false], [false], [false], [false, false]],
+    );
+    expect(result.pages.map((p) => p.lines)).toEqual([
+      [...a.lines, ...b.lines, ...c.lines],
+      d.lines,
+    ]);
+    expect(result.pages[0]!.endTick).toBe(c.endTick);
+    expect(result.pairs).toEqual([
+      [false, false, false, false],
+      [false, false],
+    ]);
+  });
+
+  test('prepends a single-row page that starts a section to the next page', () => {
+    const a = page(sungLine(syl(0, 100)), sungLine(syl(100, 200)));
+    const b = sectionPage(sungLine(syl(300, 400)));
+    const c = page(sungLine(syl(500, 600)), sungLine(syl(600, 700)));
+    const result = mergeSingleRowPages([a, b, c], [[false, false], [false], [true, false]]);
+    expect(result).toEqual({
+      pages: [
+        a,
+        {
+          startTick: b.startTick,
+          displayTick: b.displayTick,
+          endTick: c.endTick,
+          sectionStart: true,
+          lines: [...b.lines, ...c.lines],
+        },
+      ],
+      pairs: [
+        [false, false],
+        [false, true, false],
+      ],
+    });
+  });
+
+  test('prepends a single-row first page to the next page', () => {
+    const a = page(sungLine(syl(0, 100)));
+    const b = page(sungLine(syl(300, 400)), sungLine(syl(400, 500)));
+    const result = mergeSingleRowPages([a, b], [[false], [false, false]]);
+    expect(result.pages.map((p) => p.lines)).toEqual([[...a.lines, ...b.lines]]);
+  });
+
+  test('prepends a single-row page after a non-lyric page to the next page', () => {
+    const a = page(nonLyricLine(0, 100));
+    const b = page(sungLine(syl(300, 400)));
+    const c = page(sungLine(syl(500, 600)), sungLine(syl(600, 700)));
+    const result = mergeSingleRowPages([a, b, c], [[false], [false], [false, false]]);
+    expect(result.pages.map((p) => p.lines)).toEqual([a.lines, [...b.lines, ...c.lines]]);
+  });
+
+  test('prefers the previous page when both neighbors are in the same section', () => {
+    const a = page(sungLine(syl(0, 100)), sungLine(syl(100, 200)));
+    const b = page(sungLine(syl(300, 400)));
+    const c = page(sungLine(syl(500, 600)), sungLine(syl(600, 700)));
+    const result = mergeSingleRowPages([a, b, c], [[false, false], [false], [false, false]]);
+    expect(result.pages.map((p) => p.lines)).toEqual([[...a.lines, ...b.lines], c.lines]);
+  });
+
+  test('merges across a section into the previous page when both neighbors are in other sections', () => {
+    const a = page(sungLine(syl(0, 100)), sungLine(syl(100, 200)));
+    const b = sectionPage(sungLine(syl(300, 400)));
+    const c = sectionPage(sungLine(syl(500, 600)), sungLine(syl(600, 700)));
+    const result = mergeSingleRowPages([a, b, c], [[false, false], [false], [false, false]]);
+    expect(result.pages.map((p) => p.lines)).toEqual([[...a.lines, ...b.lines], c.lines]);
+  });
+
+  test('merges across a section into the next page when the previous page is unavailable', () => {
+    const a = page(nonLyricLine(0, 100));
+    const b = page(sungLine(syl(300, 400)));
+    const c = sectionPage(sungLine(syl(500, 600)), sungLine(syl(600, 700)));
+    const result = mergeSingleRowPages([a, b, c], [[false], [false], [false, false]]);
+    expect(result.pages.map((p) => p.lines)).toEqual([a.lines, [...b.lines, ...c.lines]]);
+  });
+
+  test('joins consecutive single-row pages that start a section', () => {
+    const a = page(sungLine(syl(0, 100)), sungLine(syl(100, 200)));
+    const b = sectionPage(sungLine(syl(300, 400)));
+    const c = page(sungLine(syl(500, 600)));
+    const d = page(sungLine(syl(700, 800)), sungLine(syl(800, 900)));
+    const result = mergeSingleRowPages(
+      [a, b, c, d],
+      [[false, false], [false], [false], [false, false]],
+    );
+    expect(result.pages.map((p) => p.lines)).toEqual([a.lines, [...b.lines, ...c.lines], d.lines]);
   });
 });
 

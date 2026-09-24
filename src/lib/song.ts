@@ -39,7 +39,7 @@ export function buildSong(smf: SmfFile): Song {
     karaoke,
     chords,
     rehearsals,
-    karaokePages: buildKaraokePages(karaoke),
+    karaokePages: buildKaraokePages(karaoke, rehearsals),
   };
 }
 

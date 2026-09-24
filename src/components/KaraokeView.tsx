@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
@@ -6,6 +6,7 @@ import { secondsToTick } from '../lib/smf/playback.ts';
 import {
   buildKaraokeRows,
   chooseMergedPairs,
+  mergeSingleRowPages,
   resolveKaraokeDisplay,
 } from '../lib/xf/karaokePages.ts';
 import type {
@@ -80,6 +81,15 @@ export const KaraokeView = memo(function KaraokeView({
     };
   }, [pages]);
 
+  const layout = useMemo(
+    () =>
+      mergeState.pages === pages
+        ? mergeSingleRowPages(pages, mergeState.pairs)
+        : { pages, pairs: pages.map((page) => page.lines.map(() => false)) },
+    [pages, mergeState],
+  );
+  const displayPages = layout.pages;
+
   const activeLineRef = useRef<HTMLDivElement | null>(null);
   const lineMetricsRef = useRef<{
     width: number;
@@ -111,7 +121,7 @@ export const KaraokeView = memo(function KaraokeView({
   }, [activeState, mergeState]);
 
   useEffect(() => {
-    if (pages.length === 0) return;
+    if (displayPages.length === 0) return;
 
     let raf = 0;
     let cancelled = false;
@@ -125,9 +135,9 @@ export const KaraokeView = memo(function KaraokeView({
         position + PREVIEW_LEAD_SECONDS * scheduler.getState().playbackRate,
         sequence,
       );
-      const display = resolveKaraokeDisplay(pages, tick, lookaheadTick);
+      const display = resolveKaraokeDisplay(displayPages, tick, lookaheadTick);
       const { pageIdx, lineIdx } = display;
-      const page = pages[pageIdx]!;
+      const page = displayPages[pageIdx]!;
       const switched =
         last === null ||
         pageIdx !== last.pageIdx ||
@@ -145,7 +155,7 @@ export const KaraokeView = memo(function KaraokeView({
           const widthPx = computeFillWidth(
             page.lines[lineIdx]!,
             page,
-            pages,
+            displayPages,
             pageIdx,
             tick,
             metrics,
@@ -161,16 +171,14 @@ export const KaraokeView = memo(function KaraokeView({
       cancelled = true;
       cancelAnimationFrame(raf);
     };
-  }, [sequence, scheduler, pages]);
+  }, [sequence, scheduler, displayPages]);
 
-  if (pages.length === 0) return null;
-  const activePage = pages[Math.min(activeState.pageIdx, pages.length - 1)]!;
+  if (displayPages.length === 0) return null;
+  const activePageIdx = Math.min(activeState.pageIdx, displayPages.length - 1);
+  const activePage = displayPages[activePageIdx]!;
   const activeLineIndex = Math.min(activeState.lineIdx, activePage.lines.length - 1);
-  const nextPage = activeState.preview ? pages[activeState.pageIdx + 1] : undefined;
-  const rowsOf = (pageIdx: number) => {
-    const pairs = mergeState.pages === pages ? mergeState.pairs[pageIdx] : undefined;
-    return buildKaraokeRows(pairs ?? pages[pageIdx]!.lines.map(() => false));
-  };
+  const nextPage = activeState.preview ? displayPages[activePageIdx + 1] : undefined;
+  const rowsOf = (pageIdx: number) => buildKaraokeRows(layout.pairs[pageIdx]!);
 
   return (
     <div className="card karaoke-view">
@@ -178,7 +186,7 @@ export const KaraokeView = memo(function KaraokeView({
       <div className="karaoke-stage" ref={stageRef}>
         <KaraokeMeasureLayer pages={pages} layerRef={measureLayerRef} />
         {nextPage &&
-          rowsOf(activeState.pageIdx + 1)
+          rowsOf(activePageIdx + 1)
             .slice(0, -1)
             .map((row) => (
               <KaraokeRowView
@@ -190,7 +198,7 @@ export const KaraokeView = memo(function KaraokeView({
                 fillRef={fillRef}
               />
             ))}
-        {rowsOf(activeState.pageIdx).map((row) => (
+        {rowsOf(activePageIdx).map((row) => (
           <KaraokeRowView
             key={rowKey(row)}
             row={row}

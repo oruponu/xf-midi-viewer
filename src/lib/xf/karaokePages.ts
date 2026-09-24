@@ -1,9 +1,12 @@
-import type { LyricLine, ParsedKaraoke } from './lyrics.ts';
+import { computeKaraokeSectionBreaks } from './lyricSections.ts';
+import type { LyricLine, LyricToken, ParsedKaraoke } from './lyrics.ts';
+import type { RehearsalMessage } from './types.ts';
 
 export interface KaraokePage {
   startTick: number;
   displayTick: number;
   endTick: number | null;
+  sectionStart: boolean;
   lines: LyricLine[];
 }
 
@@ -15,10 +18,13 @@ export interface KaraokeDisplay {
 
 const FALLBACK_LINES_PER_PAGE = 4;
 
-export function buildKaraokePages(parsed: ParsedKaraoke): KaraokePage[] {
+export function buildKaraokePages(
+  parsed: ParsedKaraoke,
+  rehearsals: readonly RehearsalMessage[] = [],
+): KaraokePage[] {
   if (parsed.lines.length === 0) return [];
 
-  const pages: Omit<KaraokePage, 'displayTick'>[] = [];
+  const pages: Omit<KaraokePage, 'displayTick' | 'sectionStart'>[] = [];
   if (parsed.pages.length >= 2) {
     parsed.pages.forEach((page, i) => {
       pages.push({
@@ -38,13 +44,32 @@ export function buildKaraokePages(parsed: ParsedKaraoke): KaraokePage[] {
     }
   }
 
+  const sectionStarts = sectionStartSyllables(parsed.tokens, rehearsals);
+  let syllableIdx = 0;
   return pages.map((page, i) => {
     const wipeEnd = pages[i - 1]?.lines.at(-1)?.syllables.at(-1)?.endTick ?? null;
+    const sectionStart = sectionStarts.has(syllableIdx);
+    syllableIdx += page.lines.reduce((sum, line) => sum + line.syllables.length, 0);
     return {
       ...page,
       displayTick: wipeEnd === null ? page.startTick : Math.min(wipeEnd, page.startTick),
+      sectionStart,
     };
   });
+}
+
+function sectionStartSyllables(
+  tokens: readonly LyricToken[],
+  rehearsals: readonly RehearsalMessage[],
+): Set<number> {
+  const { replaceWithDivider, dividerBefore } = computeKaraokeSectionBreaks(tokens, rehearsals);
+  const starts = new Set<number>();
+  let syllableIdx = 0;
+  tokens.forEach((token, i) => {
+    if (replaceWithDivider.has(i) || dividerBefore.has(i)) starts.add(syllableIdx);
+    if (token.kind === 'syllable') syllableIdx += 1;
+  });
+  return starts;
 }
 
 export function resolveKaraokeDisplay(
@@ -123,6 +148,47 @@ export function buildKaraokeRows(merged: readonly boolean[]): KaraokeRow[] {
     lineIndices,
     alignment: lineAlignment(i, groups.length),
   }));
+}
+
+export function mergeSingleRowPages(
+  pages: readonly KaraokePage[],
+  pairs: readonly (readonly boolean[])[],
+): { pages: KaraokePage[]; pairs: boolean[][] } {
+  const pagePairs = pages.map((page, i) => pairs[i] ?? page.lines.map(() => false));
+  const canJoin = (i: number) => {
+    const page = pages[i];
+    return page !== undefined && !isNonLyricPage(page);
+  };
+  const joinsPrev = pages.map(() => false);
+  pages.forEach((page, i) => {
+    if (buildKaraokeRows(pagePairs[i]!).length !== 1 || !canJoin(i)) return;
+    if (canJoin(i - 1) && !page.sectionStart) joinsPrev[i] = true;
+    else if (canJoin(i + 1) && !pages[i + 1]!.sectionStart) joinsPrev[i + 1] = true;
+    else if (canJoin(i - 1)) joinsPrev[i] = true;
+    else if (canJoin(i + 1)) joinsPrev[i + 1] = true;
+  });
+
+  const mergedPages: KaraokePage[] = [];
+  const mergedPairs: boolean[][] = [];
+  pages.forEach((page, i) => {
+    const prev = mergedPages.at(-1);
+    if (joinsPrev[i] && prev !== undefined) {
+      mergedPages[mergedPages.length - 1] = {
+        ...prev,
+        endTick: page.endTick,
+        lines: [...prev.lines, ...page.lines],
+      };
+      mergedPairs[mergedPairs.length - 1] = [...mergedPairs.at(-1)!, ...pagePairs[i]!];
+      return;
+    }
+    mergedPages.push(page);
+    mergedPairs.push([...pagePairs[i]!]);
+  });
+  return { pages: mergedPages, pairs: mergedPairs };
+}
+
+function isNonLyricPage(page: KaraokePage): boolean {
+  return page.lines.every((line) => line.syllables.every((syl) => syl.vocalPart === 'nonLyric'));
 }
 
 function findActiveLineIndex(lines: LyricLine[], tick: number): number {
