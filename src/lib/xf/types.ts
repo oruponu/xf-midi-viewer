@@ -153,6 +153,10 @@ export type StyleMessage =
       strings: GuitarStringVoicing[];
     };
 
+export type ChordMessage = Extract<StyleMessage, { kind: 'chord' }>;
+
+export type RehearsalMessage = Extract<StyleMessage, { kind: 'rehearsal' }>;
+
 export interface XfStyleData {
   events: StyleMessage[];
 }
