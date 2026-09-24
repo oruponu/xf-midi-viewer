@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import './App.css';
 import { InfoPanel } from './components/InfoPanel.tsx';
@@ -8,57 +8,36 @@ import { SettingsDialog } from './components/SettingsDialog.tsx';
 import { useMidiPlayer } from './hooks/useMidiPlayer.ts';
 import { useSettings } from './hooks/useSettings.ts';
 import type { Settings } from './hooks/useSettings.ts';
-import { parseSmf } from './lib/smf/parser.ts';
-import { buildPlaybackSequence } from './lib/smf/playback.ts';
-import type { PlaybackSequence } from './lib/smf/playback.ts';
+import { useSongLoader } from './hooks/useSongLoader.ts';
 import type { MidiScheduler } from './lib/player/scheduler.ts';
-import type { SmfFile } from './lib/smf/types.ts';
-import { extractXf } from './lib/xf/parser.ts';
-import type { XfData } from './lib/xf/types.ts';
-
-type SelectedFile = {
-  name: string;
-  size: number;
-  lastModified: number;
-};
+import type { Song } from './lib/song.ts';
+import type { FileSummary } from './lib/songLoader.ts';
 
 function App() {
-  const [file, setFile] = useState<SelectedFile | null>(null);
-  const [smf, setSmf] = useState<SmfFile | null>(null);
-  const [xf, setXf] = useState<XfData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { state: songState, loadFile } = useSongLoader();
   const [isDragging, setIsDragging] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { settings, updateSettings } = useSettings();
-  const playbackSequence = useMemo(() => (smf ? buildPlaybackSequence(smf) : null), [smf]);
-  const player = useMidiPlayer(playbackSequence);
+  const song = songState.status === 'loaded' ? songState.song : null;
+  const file = songState.status === 'empty' ? null : songState.file;
+  const errorMessage = songState.status === 'error' ? songState.message : (song?.xfError ?? null);
+  const player = useMidiPlayer(song?.sequence ?? null);
   const { scheduler, isPlaying } = player;
   const midiReady = player.midiAccessState === 'ready' && player.selectedMidiOutputId.length > 0;
 
-  const loadFile = useCallback(
-    async (f: File) => {
+  const openFile = useCallback(
+    (f: File) => {
       scheduler.stop();
       scheduler.sendReset();
-      setFile({ name: f.name, size: f.size, lastModified: f.lastModified });
-      setError(null);
-      setXf(null);
-      setSmf(null);
-      try {
-        const buffer = await f.arrayBuffer();
-        const parsedSmf = parseSmf(buffer);
-        setSmf(parsedSmf);
-        setXf(extractXf(parsedSmf));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
-      }
+      void loadFile(f);
     },
-    [scheduler],
+    [scheduler, loadFile],
   );
 
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    void loadFile(f);
+    openFile(f);
   };
 
   useEffect(() => {
@@ -84,7 +63,7 @@ function App() {
       setIsDragging(false);
       const f = e.dataTransfer?.files?.[0];
       if (!f) return;
-      void loadFile(f);
+      openFile(f);
     };
 
     document.addEventListener('dragenter', onDragEnter);
@@ -97,7 +76,7 @@ function App() {
       document.removeEventListener('dragleave', onDragLeave);
       document.removeEventListener('drop', onDrop);
     };
-  }, [loadFile]);
+  }, [openFile]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -105,7 +84,7 @@ function App() {
       if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
       if (e.repeat) return;
       if (isSettingsOpen) return;
-      if (!playbackSequence) return;
+      if (!song) return;
       if (isEditableTarget(e.target)) return;
       e.preventDefault();
       if (isPlaying) scheduler.pause();
@@ -113,7 +92,7 @@ function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isPlaying, isSettingsOpen, playbackSequence, scheduler]);
+  }, [isPlaying, isSettingsOpen, song, scheduler]);
 
   return (
     <>
@@ -143,7 +122,7 @@ function App() {
       </header>
 
       <main className={`app${isDragging ? ' app--dragging' : ''}`}>
-        {!xf && !error && (
+        {(songState.status === 'empty' || songState.status === 'loading') && (
           <section className="empty-state">
             <p className="empty-state-headline">
               YAMAHA XF フォーマットの MIDI ファイルを解析・表示します
@@ -152,17 +131,16 @@ function App() {
           </section>
         )}
 
-        {error && (
+        {errorMessage && (
           <section className="error" role="alert">
-            <strong>パースエラー:</strong> {error}
+            <strong>パースエラー:</strong> {errorMessage}
           </section>
         )}
 
         <PlayerScope
           key={file ? `${file.name}-${file.size}-${file.lastModified}` : 'empty'}
           file={file}
-          sequence={playbackSequence}
-          xf={xf}
+          song={song}
           settings={settings}
           scheduler={scheduler}
           isPlaying={isPlaying}
@@ -223,8 +201,7 @@ function SettingsIcon() {
 
 function PlayerScope({
   file,
-  sequence,
-  xf,
+  song,
   settings,
   scheduler,
   isPlaying,
@@ -232,9 +209,8 @@ function PlayerScope({
   keyShift,
   midiReady,
 }: {
-  file: SelectedFile | null;
-  sequence: PlaybackSequence | null;
-  xf: XfData | null;
+  file: FileSummary | null;
+  song: Song | null;
   settings: Settings;
   scheduler: MidiScheduler;
   isPlaying: boolean;
@@ -262,42 +238,38 @@ function PlayerScope({
       observer.disconnect();
       root.style.removeProperty('--dock-height');
     };
-  }, [sequence]);
+  }, [song]);
+
+  if (!song) return null;
 
   return (
     <>
-      {xf && (
-        <div className="viewer-chrome">
-          <ViewTabs activeTab={activeTab} onChange={setActiveTab} />
+      <div className="viewer-chrome">
+        <ViewTabs activeTab={activeTab} onChange={setActiveTab} />
+      </div>
+      <InfoPanel
+        file={file}
+        data={song.xf}
+        activeTab={activeTab}
+        scheduler={scheduler}
+        sequence={song.sequence}
+        autoScrollLeadSheet={settings.autoScrollLeadSheet}
+        autoScrollLyrics={settings.autoScrollLyrics}
+        keyShift={keyShift}
+      />
+      <div className="player-dock" ref={dockRef}>
+        <div className="player-dock-inner">
+          <PlaybackPanel
+            sequence={song.sequence}
+            timing={song.timing}
+            scheduler={scheduler}
+            isPlaying={isPlaying}
+            playbackRate={playbackRate}
+            keyShift={keyShift}
+            midiReady={midiReady}
+          />
         </div>
-      )}
-      {xf && (
-        <InfoPanel
-          file={file}
-          data={xf}
-          activeTab={activeTab}
-          scheduler={scheduler}
-          sequence={sequence}
-          autoScrollLeadSheet={settings.autoScrollLeadSheet}
-          autoScrollLyrics={settings.autoScrollLyrics}
-          keyShift={keyShift}
-        />
-      )}
-      {sequence && (
-        <div className="player-dock" ref={dockRef}>
-          <div className="player-dock-inner">
-            <PlaybackPanel
-              sequence={sequence}
-              timing={xf?.timing ?? null}
-              scheduler={scheduler}
-              isPlaying={isPlaying}
-              playbackRate={playbackRate}
-              keyShift={keyShift}
-              midiReady={midiReady}
-            />
-          </div>
-        </div>
-      )}
+      </div>
     </>
   );
 }
