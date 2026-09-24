@@ -15,6 +15,7 @@ import type {
   LineAlignment,
 } from '../lib/xf/karaokePages.ts';
 import type { LyricLine, LyricRun } from '../lib/xf/lyrics.ts';
+import type { VocalPart } from '../lib/xf/types.ts';
 
 const PREVIEW_LEAD_SECONDS = 1;
 
@@ -325,14 +326,16 @@ function samePairs(a: boolean[][], b: boolean[][]): boolean {
 
 function renderLineContent(line: LyricLine): ReactNode {
   return line.syllables.map((syl, i) => (
-    <span
-      key={i}
-      className={syl.vocalPart === 'speech' ? 'karaoke-syl karaoke-syl--speech' : 'karaoke-syl'}
-      data-syl-idx={i}
-    >
+    <span key={i} className={syllableClassName(syl.vocalPart)} data-syl-idx={i}>
       {syl.runs.map((run, j) => renderRun(run, j))}
     </span>
   ));
+}
+
+function syllableClassName(vocalPart: VocalPart | null): string {
+  if (vocalPart === 'speech') return 'karaoke-syl karaoke-syl--speech';
+  if (vocalPart === 'nonLyric') return 'karaoke-syl karaoke-syl--non-lyric';
+  return 'karaoke-syl';
 }
 
 function renderRun(run: LyricRun, index: number): ReactNode {

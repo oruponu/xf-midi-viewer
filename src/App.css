@@ -1232,6 +1232,10 @@
   visibility: hidden;
 }
 
+.karaoke-line-base .karaoke-syl--non-lyric {
+  color: var(--text);
+}
+
 .karaoke-line ruby {
   display: inline-grid;
   justify-items: center;
@@ -1246,7 +1250,7 @@
   transform: translateY(-100%);
   font-size: var(--karaoke-ruby-size);
   line-height: 1;
-  color: var(--text);
+  color: inherit;
   white-space: nowrap;
   pointer-events: none;
 }
