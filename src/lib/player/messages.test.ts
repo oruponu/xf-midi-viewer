@@ -2,7 +2,9 @@ import { describe, expect, test } from 'bun:test';
 import {
   isLiveNoteOn,
   isNoteMessage,
+  isValidMidiMessage,
   sendMidiPanic,
+  splitMidiMessages,
   sendMidiReset,
   trySendMidiMessage,
 } from './messages.ts';
@@ -66,6 +68,48 @@ describe('isNoteMessage', () => {
     expect(isNoteMessage([0xb0, 7, 100])).toBe(false);
     expect(isNoteMessage([0xc0, 1])).toBe(false);
     expect(isNoteMessage([0xf0, 0x7e, 0xf7])).toBe(false);
+  });
+});
+
+describe('isValidMidiMessage', () => {
+  test('accepts channel messages with the right length and 7-bit data', () => {
+    expect(isValidMidiMessage([0x90, 60, 100])).toBe(true);
+    expect(isValidMidiMessage([0xc5, 40])).toBe(true);
+    expect(isValidMidiMessage([0xef, 0, 64])).toBe(true);
+  });
+
+  test('accepts complete sysex, system common and realtime messages', () => {
+    expect(isValidMidiMessage([0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7])).toBe(true);
+    expect(isValidMidiMessage([0xf2, 0x10, 0x20])).toBe(true);
+    expect(isValidMidiMessage([0xf8])).toBe(true);
+  });
+
+  test('rejects wrong lengths and data bytes above 0x7f', () => {
+    expect(isValidMidiMessage([])).toBe(false);
+    expect(isValidMidiMessage([0x90, 60])).toBe(false);
+    expect(isValidMidiMessage([0xc0, 1, 2])).toBe(false);
+    expect(isValidMidiMessage([0x90, 60, 0x80])).toBe(false);
+    expect(isValidMidiMessage([60, 100])).toBe(false);
+  });
+
+  test('rejects unterminated sysex, sysex with a status byte inside and undefined statuses', () => {
+    expect(isValidMidiMessage([0xf0, 0x43, 0x10])).toBe(false);
+    expect(isValidMidiMessage([0xf0, 0x43, 0x90, 0xf7])).toBe(false);
+    expect(isValidMidiMessage([0xf7])).toBe(false);
+    expect(isValidMidiMessage([0xf4])).toBe(false);
+    expect(isValidMidiMessage([0xfd])).toBe(false);
+  });
+});
+
+describe('splitMidiMessages', () => {
+  test('splits a byte sequence into valid messages and skips broken parts', () => {
+    expect(
+      splitMidiMessages(
+        new Uint8Array([
+          0x90, 60, 100, 0x10, 0xf0, 0x43, 0xf7, 0xc0, 0xf8, 0xf0, 0x43, 0x90, 60, 0, 0xf4,
+        ]),
+      ),
+    ).toEqual([[0x90, 60, 100], [0xf0, 0x43, 0xf7], [0xf8], [0x90, 60, 0]]);
   });
 });
 

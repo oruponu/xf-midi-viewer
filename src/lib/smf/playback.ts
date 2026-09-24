@@ -1,3 +1,4 @@
+import { isValidMidiMessage, splitMidiMessages } from '../player/messages.ts';
 import type { SmfFile, SmfTrack, TrackEvent } from './types.ts';
 
 export interface PlaybackNote {
@@ -326,10 +327,31 @@ function collectMidiMessages(
   tickToSeconds: (tick: number) => number,
 ): PlaybackMidiMessage[] {
   const messages: PlaybackMidiMessage[] = [];
+  let pendingSysex: { tick: number; data: number[] } | null = null;
+  const push = (tick: number, data: number[]): void => {
+    if (isValidMidiMessage(data)) messages.push({ tick, seconds: tickToSeconds(tick), data });
+  };
   for (const { tick, event } of track) {
+    if (event.kind === 'sysexEscape' && pendingSysex) {
+      for (const byte of event.data) pendingSysex.data.push(byte);
+      if (event.data.at(-1) === 0xf7) {
+        push(pendingSysex.tick, pendingSysex.data);
+        pendingSysex = null;
+      }
+      continue;
+    }
+    if (event.kind === 'meta') continue;
+    pendingSysex = null;
+    if (event.kind === 'sysexEscape') {
+      for (const message of splitMidiMessages(event.data)) push(tick, message);
+      continue;
+    }
+    if (event.kind === 'sysex' && event.data.at(-1) !== 0xf7) {
+      pendingSysex = { tick, data: [0xf0, ...event.data] };
+      continue;
+    }
     const data = eventToMidiBytes(event);
-    if (!data) continue;
-    messages.push({ tick, seconds: tickToSeconds(tick), data });
+    if (data) push(tick, data);
   }
   return messages;
 }
@@ -353,7 +375,6 @@ function eventToMidiBytes(event: TrackEvent['event']): PlaybackMidiMessage['data
     case 'sysex':
       return [0xf0, ...event.data];
     case 'sysexEscape':
-      return [...event.data];
     case 'meta':
       return null;
   }

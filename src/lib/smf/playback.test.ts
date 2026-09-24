@@ -179,6 +179,77 @@ describe('buildPlaybackSequence', () => {
     ]);
   });
 
+  test('joins a split sysex into one message at the tick of the first packet', () => {
+    const sequence = buildPlaybackSequence(
+      makeSmf([
+        track([
+          sysex(0, [0x43, 0x10, 0x4c]),
+          sysexEscape(10, [0x00, 0x00, 0x7e]),
+          sysexEscape(10, [0x00, 0xf7]),
+          noteOn(0, 60),
+        ]),
+      ]),
+    );
+
+    expect(sequence.midiMessages.map((m) => [m.tick, m.data])).toEqual([
+      [0, [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7]],
+      [20, [0x90, 60, 100]],
+    ]);
+  });
+
+  test('drops a split sysex that never terminates before the end of the track', () => {
+    const sequence = buildPlaybackSequence(
+      makeSmf([track([noteOn(0, 60), sysex(10, [0x43, 0x10]), sysexEscape(10, [0x4c])])]),
+    );
+
+    expect(sequence.midiMessages.map((m) => m.data)).toEqual([[0x90, 60, 100]]);
+  });
+
+  test('drops a split sysex interrupted by another MIDI event', () => {
+    const sequence = buildPlaybackSequence(
+      makeSmf([track([sysex(0, [0x43, 0x10]), noteOn(0, 60), sysexEscape(0, [0x4c, 0xf7])])]),
+    );
+
+    expect(sequence.midiMessages.map((m) => m.data)).toEqual([[0x90, 60, 100]]);
+  });
+
+  test('keeps valid escaped messages and drops invalid escapes and out-of-range channel data', () => {
+    const sequence = buildPlaybackSequence(
+      makeSmf([
+        track([
+          sysexEscape(0, [0xf8]),
+          sysexEscape(0, [0x10, 0x20]),
+          noteOn(0, 60, 0x80),
+          controlChange(0, 7, 100),
+        ]),
+      ]),
+    );
+
+    expect(sequence.midiMessages.map((m) => m.data)).toEqual([[0xf8], [0xb0, 7, 100]]);
+  });
+
+  test('splits an escape that carries several messages and keeps each valid one', () => {
+    const sequence = buildPlaybackSequence(
+      makeSmf([track([sysexEscape(0, [0x90, 60, 100, 0x80, 60, 0, 0x10, 0xf8])])]),
+    );
+
+    expect(sequence.midiMessages.map((m) => m.data)).toEqual([
+      [0x90, 60, 100],
+      [0x80, 60, 0],
+      [0xf8],
+    ]);
+  });
+
+  test('joins a split sysex with a very large continuation packet', () => {
+    const body = new Array<number>(2_000_000).fill(0x01);
+    const sequence = buildPlaybackSequence(
+      makeSmf([track([sysex(0, [0x43]), sysexEscape(0, [...body, 0xf7])])]),
+    );
+
+    expect(sequence.midiMessages).toHaveLength(1);
+    expect(sequence.midiMessages[0]!.data).toHaveLength(2_000_003);
+  });
+
   test('computes durationSeconds for huge sequences without overflowing the stack', () => {
     const events = Array.from({ length: 700_000 }, () => controlChange(1, 7, 100));
     const sequence = buildPlaybackSequence(makeSmf([track(events)]));

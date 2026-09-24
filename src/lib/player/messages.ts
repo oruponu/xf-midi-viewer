@@ -30,6 +30,68 @@ export function isNoteMessage(data: number[]): boolean {
   return status === 0x80 || status === 0x90 || status === 0xa0;
 }
 
+export function isValidMidiMessage(data: readonly number[]): boolean {
+  if (data.length === 0) return false;
+  const status = data[0]!;
+  if (status < 0x80) return false;
+  if (status === 0xf0) {
+    return data.length >= 2 && data.at(-1) === 0xf7 && data.slice(1, -1).every(isDataByte);
+  }
+  return data.length === messageLength(status) && data.slice(1).every(isDataByte);
+}
+
+export function splitMidiMessages(bytes: Uint8Array | readonly number[]): number[][] {
+  const messages: number[][] = [];
+  let start = 0;
+  while (start < bytes.length) {
+    const status = bytes[start]!;
+    if (status < 0x80) {
+      start += 1;
+      continue;
+    }
+    let end = start + 1;
+    if (status === 0xf0) {
+      while (end < bytes.length && bytes[end]! < 0x80) end += 1;
+      if (bytes[end] === 0xf7) end += 1;
+    } else {
+      const length = messageLength(status) ?? 1;
+      while (end < bytes.length && end < start + length && bytes[end]! < 0x80) end += 1;
+    }
+    const message = Array.from(bytes.slice(start, end));
+    if (isValidMidiMessage(message)) messages.push(message);
+    start = end;
+  }
+  return messages;
+}
+
+function messageLength(status: number): number | null {
+  if (status < 0xf0) {
+    const type = status & 0xf0;
+    return type === 0xc0 || type === 0xd0 ? 2 : 3;
+  }
+  switch (status) {
+    case 0xf1:
+    case 0xf3:
+      return 2;
+    case 0xf2:
+      return 3;
+    case 0xf6:
+    case 0xf8:
+    case 0xfa:
+    case 0xfb:
+    case 0xfc:
+    case 0xfe:
+    case 0xff:
+      return 1;
+    default:
+      return null;
+  }
+}
+
+function isDataByte(byte: number): boolean {
+  return byte <= 0x7f;
+}
+
 export function sendMidiPanic(
   output: MidiOutputLike,
   timestamp: number,
