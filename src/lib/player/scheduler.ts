@@ -73,8 +73,6 @@ export type TimerHandle = number;
 export interface Timers {
   setInterval(fn: () => void, ms: number): TimerHandle;
   clearInterval(handle: TimerHandle): void;
-  setTimeout(fn: () => void, ms: number): TimerHandle;
-  clearTimeout(handle: TimerHandle): void;
 }
 
 export interface SchedulerState {
@@ -92,8 +90,6 @@ export interface SchedulerOptions {
 const windowTimers: Timers = {
   setInterval: (fn, ms) => window.setInterval(fn, ms),
   clearInterval: (handle) => window.clearInterval(handle),
-  setTimeout: (fn, ms) => window.setTimeout(fn, ms),
-  clearTimeout: (handle) => window.clearTimeout(handle),
 };
 
 const INITIAL_STATE: SchedulerState = {
@@ -107,12 +103,12 @@ export class MidiScheduler {
   private readonly now: () => number;
   private readonly timers: Timers;
   private readonly listeners = new Set<() => void>();
+  private readonly fences = new WeakMap<MidiOutputLike, number>();
   private sequence: PlaybackSequence | null = null;
   private output: MidiOutputLike | null = null;
   private drumChannels: ReadonlySet<number> = new Set();
   private nextMessageIndex = 0;
   private intervalHandle: TimerHandle | null = null;
-  private panicTimerHandle: TimerHandle | null = null;
   private startedAtMs = 0;
   private startOffset = 0;
   private position = 0;
@@ -141,7 +137,7 @@ export class MidiScheduler {
 
   setSequence(sequence: PlaybackSequence | null): void {
     if (this.intervalHandle !== null) {
-      this.stopInternal(true, true);
+      this.stopInternal(true);
     } else {
       this.position = 0;
       this.positionSnapshot = 0;
@@ -155,10 +151,7 @@ export class MidiScheduler {
     if (output === this.output) return;
     const previous = this.output;
     this.output = output;
-    if (previous) {
-      this.clearPanicTimer();
-      sendMidiPanic(previous, this.now());
-    }
+    if (previous) this.silence(previous);
     if (output === null && this.intervalHandle !== null) this.pause();
   }
 
@@ -169,37 +162,28 @@ export class MidiScheduler {
     if (!output || sequence.midiMessages.length === 0) return;
 
     this.setState({ sendError: null });
-    this.cleanupScheduled(false);
-    this.startOffset = Math.min(this.position, Math.max(0, sequence.durationSeconds - 0.01));
-    this.startedAtMs = this.now();
-    this.nextMessageIndex = firstMidiMessageIndexAtOrAfter(sequence.midiMessages, this.startOffset);
-    for (const message of collectChaseMessages(sequence.midiMessages, this.nextMessageIndex)) {
-      this.scheduleMessage(output, message);
-    }
-    this.lastNotifyAtMs = this.startedAtMs;
-    this.positionSnapshot = this.startOffset;
     this.intervalHandle = this.timers.setInterval(() => this.tick(), SCHEDULER_MS);
     this.setState({ isPlaying: true });
-    this.notify();
-    this.scheduleWindow(this.startOffset, this.now());
+    this.restart(this.position);
   }
 
   pause(): void {
-    this.stopInternal(false, true);
+    this.stopInternal(false);
   }
 
   stop(): void {
-    this.stopInternal(true, true);
+    this.stopInternal(true);
   }
 
   seek(seconds: number): void {
     const clamped = Math.max(0, Math.min(seconds, this.sequence?.durationSeconds ?? 0));
-    const wasPlaying = this.intervalHandle !== null;
-    this.stopInternal(false, true);
+    if (this.intervalHandle !== null) {
+      this.restart(clamped);
+      return;
+    }
     this.position = clamped;
     this.positionSnapshot = clamped;
     this.notify();
-    if (wasPlaying) this.play();
   }
 
   setPlaybackRate(rate: number): void {
@@ -208,7 +192,7 @@ export class MidiScheduler {
     if (this.intervalHandle !== null) {
       const nowMs = this.now();
       this.startOffset = this.playingPosition(nowMs);
-      this.startedAtMs = nowMs;
+      this.startedAtMs = Math.max(nowMs, this.startedAtMs);
       this.position = this.startOffset;
     }
     this.setState({ playbackRate: clamped });
@@ -218,29 +202,64 @@ export class MidiScheduler {
   setKeyShift(semitones: number): void {
     const clamped = clampKeyShift(semitones);
     if (clamped === this.state.keyShift) return;
+    const isPlaying = this.intervalHandle !== null;
+    const position = this.getPosition();
     this.setState({ keyShift: clamped });
-    if (this.intervalHandle !== null && this.sequence) {
-      const position = this.getPosition();
-      this.cleanupScheduled(false);
-      this.nextMessageIndex = firstMidiMessageIndexAtOrAfter(this.sequence.midiMessages, position);
-    }
-    this.notify();
+    if (isPlaying) this.restart(position);
+    else this.notify();
   }
 
   sendReset(): void {
-    if (this.output) {
-      sendMidiReset(this.output, this.now(), this.reportSendFailure);
-    }
+    const output = this.output;
+    if (!output) return;
+    const nowMs = this.now();
+    sendMidiReset(output, nowMs, this.reportSendFailure);
+    this.extendFence(output, nowMs);
   }
 
   dispose(): void {
-    this.stopInternal(false, false);
+    this.stopInternal(false);
   }
 
-  private stopInternal(resetPosition: boolean, followUpPanic: boolean): void {
+  private restart(position: number): void {
+    const { sequence, output } = this;
+    if (!sequence || !output) return;
+    const resumeAtMs = this.silence(output, this.reportSendFailure);
+    this.startOffset = Math.min(position, Math.max(0, sequence.durationSeconds - 0.01));
+    this.startedAtMs = resumeAtMs;
+    this.nextMessageIndex = firstMidiMessageIndexAtOrAfter(sequence.midiMessages, this.startOffset);
+    for (const message of collectChaseMessages(sequence.midiMessages, this.nextMessageIndex)) {
+      this.scheduleMessage(output, message);
+    }
+    if (this.state.sendError !== null) {
+      this.stopInternal(false);
+      return;
+    }
+    const nowMs = this.now();
+    this.position = this.startOffset;
+    this.positionSnapshot = this.startOffset;
+    this.lastNotifyAtMs = nowMs;
+    this.notify();
+    this.scheduleWindow(this.startOffset, nowMs);
+  }
+
+  private silence(output: MidiOutputLike, onFailure?: (failure: MidiSendFailure) => void): number {
+    const nowMs = this.now();
+    const pendingUntil = this.fences.get(output) ?? 0;
+    sendMidiPanic(output, nowMs, onFailure);
+    this.extendFence(output, nowMs);
+    if (pendingUntil <= nowMs) return nowMs;
+    for (let channel = 0; channel < 16; channel += 1) {
+      this.send(output, [0xb0 | channel, 120, 0], pendingUntil, onFailure);
+      this.send(output, [0xb0 | channel, 123, 0], pendingUntil, onFailure);
+    }
+    return pendingUntil;
+  }
+
+  private stopInternal(resetPosition: boolean): void {
     const position = resetPosition ? 0 : this.getPosition();
     this.clearTimer();
-    this.cleanupScheduled(followUpPanic);
+    if (this.output) this.silence(this.output, this.reportSendFailure);
     this.position = position;
     this.positionSnapshot = position;
     this.setState({ isPlaying: false });
@@ -256,7 +275,7 @@ export class MidiScheduler {
     const { sequence, output } = this;
     if (!sequence) return;
     if (!output) {
-      this.stopInternal(false, true);
+      this.stopInternal(false);
       return;
     }
     const result = scheduleDueMidiMessages(
@@ -268,7 +287,7 @@ export class MidiScheduler {
     );
     this.nextMessageIndex = result.nextIndex;
     if (result.failed) {
-      this.stopInternal(false, true);
+      this.stopInternal(false);
       return;
     }
     this.position = position;
@@ -277,15 +296,31 @@ export class MidiScheduler {
       this.positionSnapshot = position;
       this.notify();
     }
-    if (position >= sequence.durationSeconds) this.stopInternal(true, true);
+    if (position >= sequence.durationSeconds) this.stopInternal(true);
   }
 
   private scheduleMessage(output: MidiOutputLike, message: PlaybackMidiMessage): boolean {
     const data = transposeMidiData(message.data, this.state.keyShift, this.drumChannels);
     if (!data) return true;
     const offsetSeconds = Math.max(0, message.seconds - this.startOffset);
-    const sendAt = this.startedAtMs + (offsetSeconds / this.state.playbackRate) * 1000;
-    return trySendMidiMessage(output, data, sendAt, this.reportSendFailure);
+    const scheduledAt = this.startedAtMs + (offsetSeconds / this.state.playbackRate) * 1000;
+    const sendAt = Math.max(scheduledAt, this.fences.get(output) ?? 0);
+    return this.send(output, data, sendAt, this.reportSendFailure);
+  }
+
+  private send(
+    output: MidiOutputLike,
+    data: number[],
+    timestamp: number,
+    onFailure?: (failure: MidiSendFailure) => void,
+  ): boolean {
+    this.extendFence(output, timestamp);
+    return trySendMidiMessage(output, data, timestamp, onFailure);
+  }
+
+  private extendFence(output: MidiOutputLike, timestamp: number): void {
+    const current = this.fences.get(output) ?? 0;
+    if (timestamp > current) this.fences.set(output, timestamp);
   }
 
   private reportSendFailure = (failure: MidiSendFailure): void => {
@@ -294,38 +329,17 @@ export class MidiScheduler {
     this.notify();
   };
 
-  private cleanupScheduled(followUpPanic: boolean): void {
-    const output = this.output;
-    if (!output) return;
-    this.clearPanicTimer();
-    sendMidiPanic(output, this.now(), this.reportSendFailure);
-    if (followUpPanic) {
-      this.panicTimerHandle = this.timers.setTimeout(
-        () => {
-          this.panicTimerHandle = null;
-          sendMidiPanic(output, this.now(), this.reportSendFailure);
-        },
-        LOOKAHEAD_SECONDS * 1000 + 80,
-      );
-    }
-  }
-
   private clearTimer(): void {
     if (this.intervalHandle === null) return;
     this.timers.clearInterval(this.intervalHandle);
     this.intervalHandle = null;
   }
 
-  private clearPanicTimer(): void {
-    if (this.panicTimerHandle === null) return;
-    this.timers.clearTimeout(this.panicTimerHandle);
-    this.panicTimerHandle = null;
-  }
-
   private playingPosition(nowMs: number): number {
+    const elapsedMs = Math.max(0, nowMs - this.startedAtMs);
     return Math.min(
       this.sequence?.durationSeconds ?? 0,
-      this.startOffset + ((nowMs - this.startedAtMs) / 1000) * this.state.playbackRate,
+      this.startOffset + (elapsedMs / 1000) * this.state.playbackRate,
     );
   }
 

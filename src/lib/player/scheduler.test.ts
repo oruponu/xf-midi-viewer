@@ -87,7 +87,6 @@ class FakeClock {
   now = 1000;
   private nextHandle = 1;
   private readonly intervals = new Map<number, { fn: () => void; ms: number; due: number }>();
-  private readonly timeouts = new Map<number, { fn: () => void; due: number }>();
 
   readonly timers: Timers = {
     setInterval: (fn, ms) => {
@@ -99,16 +98,11 @@ class FakeClock {
     clearInterval: (handle) => {
       this.intervals.delete(handle);
     },
-    setTimeout: (fn, ms) => {
-      const handle = this.nextHandle;
-      this.nextHandle += 1;
-      this.timeouts.set(handle, { fn, due: this.now + ms });
-      return handle;
-    },
-    clearTimeout: (handle) => {
-      this.timeouts.delete(handle);
-    },
   };
+
+  activeTimerCount(): number {
+    return this.intervals.size;
+  }
 
   advance(ms: number): void {
     const target = this.now + ms;
@@ -123,17 +117,6 @@ class FakeClock {
 
   private earliest(): { due: number; fire: () => void } | null {
     let best: { due: number; fire: () => void } | null = null;
-    for (const [handle, t] of this.timeouts) {
-      if (!best || t.due < best.due) {
-        best = {
-          due: t.due,
-          fire: () => {
-            this.timeouts.delete(handle);
-            t.fn();
-          },
-        };
-      }
-    }
     for (const t of this.intervals.values()) {
       if (!best || t.due < best.due) {
         best = {
@@ -194,6 +177,25 @@ function isChasePrelude(m: SentMessage): boolean {
 
 function playbackOnly(sent: SentMessage[]): SentMessage[] {
   return sent.filter((m) => !isPanic(m) && !isChasePrelude(m));
+}
+
+interface Arrival extends SentMessage {
+  order: number;
+}
+
+function arrivesBefore(a: Arrival, b: Arrival): boolean {
+  return a.timestamp < b.timestamp || (a.timestamp === b.timestamp && a.order < b.order);
+}
+
+function expectFenced(sent: SentMessage[], interruptedAt: number): void {
+  const all: Arrival[] = sent.map((m, order) => ({ ...m, order }));
+  const earlier = all.slice(0, interruptedAt);
+  const later = all.slice(interruptedAt);
+  const lastPanic = later
+    .filter(isPanic)
+    .reduce((latest, m) => (arrivesBefore(latest, m) ? m : latest));
+  for (const m of earlier) expect(arrivesBefore(m, lastPanic)).toBe(true);
+  for (const m of later.filter((m) => !isPanic(m))) expect(arrivesBefore(lastPanic, m)).toBe(true);
 }
 
 function makeSequence(
@@ -362,7 +364,7 @@ describe('MidiScheduler playback', () => {
     expect(scheduler.getPosition()).toBe(0);
   });
 
-  test('dispose() stops the timer and sends a panic without a follow-up', () => {
+  test('dispose() stops the timer and silences the output', () => {
     const { clock, scheduler, out } = setup([msg(0, [0xc0, 1])], 10);
     scheduler.play();
     clock.advance(100);
@@ -577,7 +579,7 @@ describe('MidiScheduler key shift', () => {
     ]);
   });
 
-  test('setKeyShift() while playing panics and reschedules from the current position', () => {
+  test('setKeyShift() while playing silences queued notes and reschedules from the current position', () => {
     const { clock, scheduler, out } = setup([msg(0, [0xc0, 7]), msg(0.14, [0x90, 60, 100])], 10);
     scheduler.play();
     clock.advance(100);
@@ -585,7 +587,7 @@ describe('MidiScheduler key shift', () => {
 
     scheduler.setKeyShift(-1);
 
-    expect(out.sent.slice(before).filter(isPanic)).toHaveLength(32);
+    expect(out.sent.slice(before).filter(isPanic)).toHaveLength(64);
     clock.advance(100);
     expect(playbackOnly(out.sent).at(-1)!.data).toEqual([0x90, 59, 100]);
   });
@@ -637,5 +639,211 @@ describe('MidiScheduler lookahead', () => {
       [0x90, 60, 100],
     ]);
     expect(playbackOnly(out.sent)[1]!.timestamp).toBeCloseTo(1045, 6);
+  });
+});
+
+describe('MidiScheduler fence', () => {
+  const queuedNote = () => [
+    msg(0, [0xc0, 7]),
+    msg(0.03, [0xb0, 7, 90]),
+    msg(0.04, [0x90, 60, 100]),
+    msg(1, [0x80, 60, 0]),
+    msg(5, [0x90, 62, 100]),
+    msg(6, [0x80, 62, 0]),
+  ];
+
+  test('seek() while playing delivers queued messages before the last panic and the chase after it', () => {
+    const { clock, scheduler, out } = setup(queuedNote(), 10, 0, { clear: false });
+    scheduler.play();
+    clock.advance(5);
+    const before = out.sent.length;
+
+    scheduler.seek(5);
+
+    expectFenced(out.sent, before);
+    expect(out.sent.slice(before).find((m) => !isPanic(m))!.data).toEqual([0xb0, 121, 0]);
+    expect(playbackOnly(out.sent.slice(before)).map((m) => m.data)).toEqual([
+      [0xc0, 7],
+      [0xb0, 7, 90],
+      [0x90, 62, 100],
+    ]);
+  });
+
+  test('getPosition() stays at the seek target until the restart time', () => {
+    const { clock, scheduler } = setup(queuedNote(), 10, 0, { clear: false });
+    scheduler.play();
+    clock.advance(5);
+
+    scheduler.seek(5);
+
+    expect(scheduler.getPosition()).toBe(5);
+    clock.advance(30);
+    expect(scheduler.getPosition()).toBe(5);
+    clock.advance(20);
+    expect(scheduler.getPosition()).toBeCloseTo(5.015, 6);
+  });
+
+  test('setPlaybackRate() during the wait does not move the restart earlier', () => {
+    const { clock, scheduler } = setup(queuedNote(), 10, 0, { clear: false });
+    scheduler.play();
+    clock.advance(5);
+    scheduler.seek(5);
+
+    scheduler.setPlaybackRate(2);
+
+    clock.advance(35);
+    expect(scheduler.getPosition()).toBe(5);
+    clock.advance(10);
+    expect(scheduler.getPosition()).toBeCloseTo(5.02, 6);
+  });
+
+  test('seek() while playing keeps isPlaying=true in every notification', () => {
+    const { clock, scheduler } = setup(queuedNote(), 10, 0, { clear: false });
+    scheduler.play();
+    clock.advance(5);
+    const observed: boolean[] = [];
+    scheduler.subscribe(() => observed.push(scheduler.getState().isPlaying));
+
+    scheduler.seek(5);
+
+    expect(observed.length).toBeGreaterThan(0);
+    expect(observed.every((isPlaying) => isPlaying)).toBe(true);
+  });
+
+  test('repeated seeks while waiting never push the restart more than 50ms ahead', () => {
+    const messages = Array.from({ length: 200 }, (_, i) =>
+      msg(i * 0.01, [0x90, 60 + (i % 12), 100]),
+    );
+    const { clock, scheduler, out } = setup(messages, 3, 0, { clear: false });
+    scheduler.play();
+
+    for (let i = 0; i < 20; i += 1) {
+      clock.advance(5);
+      const before = out.sent.length;
+      scheduler.seek(0.5 + i * 0.05);
+      const chaseStart = out.sent.slice(before).find((m) => !isPanic(m))!;
+      expect(chaseStart.timestamp).toBeLessThanOrEqual(clock.now + 50);
+    }
+
+    out.sent.forEach((m, i) => {
+      expect(m.timestamp).toBeLessThanOrEqual(out.sendTimes[i]! + 50 + 1e-6);
+    });
+  });
+
+  test('setKeyShift() while playing delivers queued old-key notes before the last panic', () => {
+    const { clock, scheduler, out } = setup(queuedNote(), 10, 0, { clear: false });
+    scheduler.play();
+    clock.advance(5);
+    const before = out.sent.length;
+
+    scheduler.setKeyShift(2);
+
+    expectFenced(out.sent, before);
+    clock.advance(60);
+    const resumedNoteOns = playbackOnly(out.sent.slice(before)).filter((m) => m.data[0] === 0x90);
+    expect(resumedNoteOns.map((m) => m.data)).toEqual([[0x90, 62, 100]]);
+  });
+
+  test('pause() delivers queued messages before the last panic and leaves no timers', () => {
+    const { clock, scheduler, out } = setup(queuedNote(), 10, 0, { clear: false });
+    scheduler.play();
+    clock.advance(5);
+    const before = out.sent.length;
+
+    scheduler.pause();
+
+    expectFenced(out.sent, before);
+    expect(clock.activeTimerCount()).toBe(0);
+  });
+
+  test('stop() leaves no timers', () => {
+    const { clock, scheduler } = setup(queuedNote(), 10, 0, { clear: false });
+    scheduler.play();
+    clock.advance(5);
+
+    scheduler.stop();
+
+    expect(clock.activeTimerCount()).toBe(0);
+  });
+
+  test('play() right after pause() sends the chase after the pause panic', () => {
+    const { clock, scheduler, out } = setup(queuedNote(), 10, 0, { clear: false });
+    scheduler.play();
+    clock.advance(5);
+    const beforePause = out.sent.length;
+    scheduler.pause();
+
+    scheduler.play();
+
+    expectFenced(out.sent, beforePause);
+  });
+
+  test('pause() during the wait keeps the seek target and fences the chase', () => {
+    const { clock, scheduler, out } = setup(queuedNote(), 10, 0, { clear: false });
+    scheduler.play();
+    clock.advance(5);
+    scheduler.seek(5);
+    const beforePause = out.sent.length;
+
+    scheduler.pause();
+
+    expect(scheduler.getPosition()).toBe(5);
+    expectFenced(out.sent, beforePause);
+  });
+
+  test('seek() to the end while playing stops and rewinds to 0', () => {
+    const { clock, scheduler } = setup(queuedNote(), 1, 0, { clear: false });
+    scheduler.play();
+    clock.advance(5);
+
+    scheduler.seek(1);
+    clock.advance(200);
+
+    expect(scheduler.getState().isPlaying).toBe(false);
+    expect(scheduler.getPosition()).toBe(0);
+  });
+
+  test('a send failure while restarting stops even when the next window is empty', () => {
+    const { clock, scheduler, out } = setup(queuedNote(), 10, 0, { clear: false });
+    scheduler.play();
+    clock.advance(5);
+    out.failWith(new Error('boom'));
+
+    scheduler.seek(3);
+
+    expect(scheduler.getState().isPlaying).toBe(false);
+    expect(scheduler.getPosition()).toBe(3);
+  });
+
+  test('setPlaybackRate() while playing never lets a later message arrive before a queued one', () => {
+    const { clock, scheduler, out } = setup(
+      [msg(0.04, [0x90, 60, 100]), msg(0.06, [0x80, 60, 0])],
+      10,
+      0,
+      { clear: false },
+    );
+    scheduler.play();
+    clock.advance(5);
+
+    scheduler.setPlaybackRate(2);
+    clock.advance(100);
+
+    const all: Arrival[] = out.sent.map((m, order) => ({ ...m, order }));
+    const noteOn = all.find((m) => m.data[0] === 0x90)!;
+    const noteOff = all.find((m) => m.data[0] === 0x80)!;
+    expect(arrivesBefore(noteOn, noteOff)).toBe(true);
+  });
+
+  test('a send failure during a seek records the error and stops', () => {
+    const { clock, scheduler, out } = setup(queuedNote(), 10, 0, { clear: false });
+    scheduler.play();
+    clock.advance(5);
+    const boom = new Error('boom');
+    out.failWith(boom);
+
+    expect(() => scheduler.seek(5)).not.toThrow();
+
+    expect(scheduler.getState().isPlaying).toBe(false);
+    expect(scheduler.getState().sendError).toEqual({ error: boom });
   });
 });
