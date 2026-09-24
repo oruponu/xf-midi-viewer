@@ -42,6 +42,7 @@ describe('buildSong', () => {
       { tick: 0, signature: { sharps: -2, mode: 'major' } },
     ]);
     expect(song.sequence.midiMessages.map((m) => m.data)).toEqual([[0x90, 60, 100]]);
+    expect('timing' in song.xf).toBe(false);
   });
 
   test('parses lyrics and builds karaoke pages', () => {

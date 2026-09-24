@@ -249,10 +249,9 @@ function PlayerScope({
       </div>
       <InfoPanel
         file={file}
-        data={song.xf}
+        song={song}
         activeTab={activeTab}
         scheduler={scheduler}
-        sequence={song.sequence}
         autoScrollLeadSheet={settings.autoScrollLeadSheet}
         autoScrollLyrics={settings.autoScrollLyrics}
         keyShift={keyShift}

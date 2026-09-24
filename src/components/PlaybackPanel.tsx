@@ -17,7 +17,7 @@ import type { SmfTiming } from '../lib/smf/timing.ts';
 
 interface PlaybackPanelProps {
   sequence: PlaybackSequence;
-  timing: SmfTiming | null;
+  timing: SmfTiming;
   scheduler: MidiScheduler;
   isPlaying: boolean;
   playbackRate: number;
@@ -84,7 +84,7 @@ export function PlaybackPanel({
 
 interface PlaybackReadoutProps {
   sequence: PlaybackSequence;
-  timing: SmfTiming | null;
+  timing: SmfTiming;
   scheduler: MidiScheduler;
   playbackRate: number;
   keyShift: number;
@@ -137,7 +137,7 @@ function PlaybackReadout({
   const isRateModified = Math.abs(playbackRate - 1) > 1e-6;
   const playbackRateLabel = `×${playbackRate.toFixed(1)}`;
   const positionLabel = useMemo(() => {
-    if (!timing || timing.ppq <= 0) return null;
+    if (timing.ppq <= 0) return null;
     const tick = secondsToTick(positionSeconds, sequence);
     const bb = tickToBarBeat(tick, timing);
     if (!bb) return null;
@@ -147,7 +147,7 @@ function PlaybackReadout({
     )}.${String(bb.tickInBeat).padStart(4, '0')}`;
   }, [positionSeconds, sequence, timing]);
   const keyLabel = useMemo(() => {
-    if (!timing || timing.keySignatures.length === 0) return null;
+    if (timing.keySignatures.length === 0) return null;
     const tick = secondsToTick(positionSeconds, sequence);
     let current = timing.keySignatures[0]!;
     for (const change of timing.keySignatures) {
@@ -163,7 +163,7 @@ function PlaybackReadout({
   const isShiftModified = keyShift !== 0;
   const keyShiftLabel = keyShift > 0 ? `+${keyShift}` : String(keyShift);
   const timeSigLabel = useMemo(() => {
-    if (!timing || timing.timeSignatures.length === 0) return null;
+    if (timing.timeSignatures.length === 0) return null;
     const tick = secondsToTick(positionSeconds, sequence);
     let current = timing.timeSignatures[0]!;
     for (const change of timing.timeSignatures) {

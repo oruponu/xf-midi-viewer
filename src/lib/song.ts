@@ -22,8 +22,7 @@ export interface Song {
 }
 
 export function buildSong(smf: SmfFile): Song {
-  const timing = extractTiming(smf);
-  const { xf, xfError } = extractXfOrEmpty(smf, timing);
+  const { xf, xfError } = extractXfOrEmpty(smf);
   const karaoke = parseKaraoke(xf.karaoke);
   const chords: ChordMessage[] = [];
   const rehearsals: RehearsalMessage[] = [];
@@ -33,7 +32,7 @@ export function buildSong(smf: SmfFile): Song {
   }
   return {
     sequence: buildPlaybackSequence(smf),
-    timing,
+    timing: extractTiming(smf),
     xf,
     xfError,
     karaoke,
@@ -43,7 +42,7 @@ export function buildSong(smf: SmfFile): Song {
   };
 }
 
-function extractXfOrEmpty(smf: SmfFile, timing: SmfTiming): { xf: XfData; xfError: string | null } {
+function extractXfOrEmpty(smf: SmfFile): { xf: XfData; xfError: string | null } {
   try {
     return { xf: extractXf(smf), xfError: null };
   } catch (error) {
@@ -54,7 +53,6 @@ function extractXfOrEmpty(smf: SmfFile, timing: SmfTiming): { xf: XfData; xfErro
         languageHeaders: [],
         karaoke: { header: null, events: [] },
         style: { events: [] },
-        timing,
       },
       xfError: error instanceof Error ? error.message : String(error),
     };

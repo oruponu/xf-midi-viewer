@@ -1,5 +1,3 @@
-import type { SmfTiming } from '../smf/timing.ts';
-
 export interface XfFlags {
   hasInfoHeader: boolean;
   hasStyle: boolean;
@@ -167,5 +165,4 @@ export interface XfData {
   languageHeaders: XfInfoHeaderLanguageSpecific[];
   karaoke: XfKaraokeData;
   style: XfStyleData;
-  timing: SmfTiming;
 }

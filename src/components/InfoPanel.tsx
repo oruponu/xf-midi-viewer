@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
@@ -6,11 +6,14 @@ import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatTickAsBarBeat } from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
+import type { Song } from '../lib/song.ts';
+import type { FileSummary } from '../lib/songLoader.ts';
 import { formatChord } from '../lib/xf/format.ts';
-import { parseKaraoke } from '../lib/xf/lyrics.ts';
 import type { LyricRun, LyricSyllable, LyricToken, ParsedKaraoke } from '../lib/xf/lyrics.ts';
 import type {
+  ChordMessage,
   GuitarPart,
+  RehearsalMessage,
   StyleMessage,
   VocalPart,
   XfData,
@@ -25,43 +28,26 @@ import { LeadSheet } from './LeadSheet.tsx';
 
 export type InfoPanelTab = 'leadSheet' | 'lyrics' | 'karaoke' | 'details';
 
-type FileSummary = {
-  name: string;
-  size: number;
-  lastModified: number;
-};
-
 export function InfoPanel({
   file,
-  data,
+  song,
   activeTab,
   scheduler,
-  sequence = null,
   autoScrollLeadSheet = true,
   autoScrollLyrics = true,
   keyShift = 0,
 }: {
   file: FileSummary | null;
-  data: XfData;
+  song: Song;
   activeTab: InfoPanelTab;
   scheduler: MidiScheduler;
-  sequence?: PlaybackSequence | null;
   autoScrollLeadSheet?: boolean;
   autoScrollLyrics?: boolean;
   keyShift?: number;
 }) {
+  const { xf: data, karaoke: parsedKaraoke, chords, rehearsals, timing, sequence } = song;
   const hasKaraoke = data.karaoke.header !== null || data.karaoke.events.length > 0;
   const hasStyle = data.style.events.length > 0;
-  const parsedKaraoke = useMemo(() => parseKaraoke(data.karaoke), [data.karaoke]);
-  const { chordsForChart, rehearsalsForChart } = useMemo(() => {
-    const chordsForChart: ChordMsg[] = [];
-    const rehearsalsForChart: RehearsalMsg[] = [];
-    for (const ev of data.style.events) {
-      if (ev.kind === 'chord') chordsForChart.push(ev);
-      else if (ev.kind === 'rehearsal') rehearsalsForChart.push(ev);
-    }
-    return { chordsForChart, rehearsalsForChart };
-  }, [data.style.events]);
   const empty =
     data.version === null &&
     data.commonHeader === null &&
@@ -87,19 +73,17 @@ export function InfoPanel({
   }
 
   const showChart =
-    chordsForChart.length > 0 ||
-    rehearsalsForChart.length > 0 ||
-    parsedKaraoke.syllables.length > 0;
+    chords.length > 0 || rehearsals.length > 0 || parsedKaraoke.syllables.length > 0;
 
   return (
     <section className="info-panel">
       {activeTab === 'leadSheet' &&
         (showChart ? (
           <LeadSheet
-            chords={chordsForChart}
-            rehearsals={rehearsalsForChart}
+            chords={chords}
+            rehearsals={rehearsals}
             syllables={parsedKaraoke.syllables}
-            timing={data.timing}
+            timing={timing}
             sequence={sequence}
             scheduler={scheduler}
             autoScroll={autoScrollLeadSheet}
@@ -113,7 +97,7 @@ export function InfoPanel({
         (hasKaraoke && parsedKaraoke.tokens.length > 0 ? (
           <KaraokeSection
             parsed={parsedKaraoke}
-            rehearsals={rehearsalsForChart}
+            rehearsals={rehearsals}
             scheduler={scheduler}
             sequence={sequence}
             autoScroll={autoScrollLyrics}
@@ -124,13 +108,19 @@ export function InfoPanel({
 
       {activeTab === 'karaoke' &&
         (hasKaraoke && parsedKaraoke.syllables.length > 0 ? (
-          <KaraokeView parsed={parsedKaraoke} sequence={sequence} scheduler={scheduler} />
+          <KaraokeView pages={song.karaokePages} sequence={sequence} scheduler={scheduler} />
         ) : (
           <EmptyView title="歌詞情報はありません" />
         ))}
 
       {activeTab === 'details' && (
-        <DetailsView file={file} data={data} parsedKaraoke={parsedKaraoke} hasStyle={hasStyle} />
+        <DetailsView
+          file={file}
+          data={data}
+          timing={timing}
+          parsedKaraoke={parsedKaraoke}
+          hasStyle={hasStyle}
+        />
       )}
     </section>
   );
@@ -139,11 +129,13 @@ export function InfoPanel({
 function DetailsView({
   file,
   data,
+  timing,
   parsedKaraoke,
   hasStyle,
 }: {
   file: FileSummary | null;
   data: XfData;
+  timing: SmfTiming;
   parsedKaraoke: ParsedKaraoke;
   hasStyle: boolean;
 }) {
@@ -158,7 +150,7 @@ function DetailsView({
       {(data.karaoke.header || data.karaoke.events.length > 0) && (
         <KaraokeMetaSection parsed={parsedKaraoke} />
       )}
-      {hasStyle && <StyleSection data={data.style} timing={data.timing} />}
+      {hasStyle && <StyleSection data={data.style} timing={timing} />}
     </div>
   );
 }
@@ -283,9 +275,9 @@ function KaraokeSection({
   autoScroll,
 }: {
   parsed: ParsedKaraoke;
-  rehearsals: RehearsalMsg[];
+  rehearsals: RehearsalMessage[];
   scheduler: MidiScheduler;
-  sequence: PlaybackSequence | null;
+  sequence: PlaybackSequence;
   autoScroll: boolean;
 }) {
   const { replaceWithDivider, dividerBefore } = computeKaraokeSectionBreaks(
@@ -293,7 +285,7 @@ function KaraokeSection({
     rehearsals,
   );
   const activeSyllableIndex = usePlaybackPosition(scheduler, (seconds) =>
-    sequence ? findActiveSyllableIndex(parsed.syllables, secondsToTick(seconds, sequence)) : -1,
+    findActiveSyllableIndex(parsed.syllables, secondsToTick(seconds, sequence)),
   );
   const blocks = buildKaraokeBlocks(
     parsed.tokens,
@@ -419,7 +411,7 @@ function buildKaraokeBlocks(
 
 function computeKaraokeSectionBreaks(
   tokens: LyricToken[],
-  rehearsals: RehearsalMsg[],
+  rehearsals: RehearsalMessage[],
 ): { replaceWithDivider: Set<number>; dividerBefore: Set<number> } {
   const replaceWithDivider = new Set<number>();
   const dividerBefore = new Set<number>();
@@ -570,15 +562,13 @@ const GUITAR_PART_LABELS: Record<GuitarPart, string> = {
   reserved: '不明',
 };
 
-type ChordMsg = Extract<StyleMessage, { kind: 'chord' }>;
-type RehearsalMsg = Extract<StyleMessage, { kind: 'rehearsal' }>;
 type GuideTrackMsg = Extract<StyleMessage, { kind: 'guideTrack' }>;
 type GuitarInfoMsg = Extract<StyleMessage, { kind: 'guitarInfo' }>;
 type MaxPhraseMsg = Extract<StyleMessage, { kind: 'maxPhraseMark' }>;
 
 interface StyleGroups {
-  chords: ChordMsg[];
-  rehearsals: RehearsalMsg[];
+  chords: ChordMessage[];
+  rehearsals: RehearsalMessage[];
   phraseCount: number;
   maxPhrases: MaxPhraseMsg[];
   fingeringCount: number;
@@ -588,8 +578,8 @@ interface StyleGroups {
 }
 
 function partitionStyle(events: StyleMessage[]): StyleGroups {
-  const chords: ChordMsg[] = [];
-  const rehearsals: RehearsalMsg[] = [];
+  const chords: ChordMessage[] = [];
+  const rehearsals: RehearsalMessage[] = [];
   const maxPhrases: MaxPhraseMsg[] = [];
   const guideTracks: GuideTrackMsg[] = [];
   const guitarInfos: GuitarInfoMsg[] = [];

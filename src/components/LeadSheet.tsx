@@ -13,20 +13,17 @@ import type {
 import { formatChord } from '../lib/xf/format.ts';
 import type { LyricSyllable } from '../lib/xf/lyrics.ts';
 import { shiftChordBass, shiftChordRoot } from '../lib/xf/transpose.ts';
-import type { StyleMessage } from '../lib/xf/types.ts';
+import type { ChordMessage, RehearsalMessage } from '../lib/xf/types.ts';
 
 const BARS_PER_ROW = 4;
 
-type ChordMsg = Extract<StyleMessage, { kind: 'chord' }>;
-type RehearsalMsg = Extract<StyleMessage, { kind: 'rehearsal' }>;
-
 interface PlacedChord {
-  msg: ChordMsg;
+  msg: ChordMessage;
   xPercent: number;
 }
 
 interface PlacedRehearsal {
-  msg: RehearsalMsg;
+  msg: RehearsalMessage;
   xPercent: number;
 }
 
@@ -41,11 +38,11 @@ interface RowSpec {
 }
 
 interface LeadSheetProps {
-  chords: ChordMsg[];
-  rehearsals: RehearsalMsg[];
+  chords: ChordMessage[];
+  rehearsals: RehearsalMessage[];
   syllables: LyricSyllable[];
   timing: SmfTiming;
-  sequence: PlaybackSequence | null;
+  sequence: PlaybackSequence;
   scheduler: MidiScheduler;
   autoScroll: boolean;
   keyShift: number;
@@ -113,7 +110,6 @@ export const LeadSheet = memo(function LeadSheet({
   const scoreRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!sequence) return;
     const container = scoreRef.current;
     if (!container) return;
     const rowEls = Array.from(container.querySelectorAll<HTMLElement>(':scope > .score-row'));
@@ -227,8 +223,8 @@ function ScoreRow({
 }: {
   startBar: number;
   barCount: number;
-  chords: ChordMsg[];
-  rehearsals: RehearsalMsg[];
+  chords: ChordMessage[];
+  rehearsals: RehearsalMessage[];
   syllables: LyricSyllable[];
   timing: SmfTiming;
   barTimeSignatures: Map<number, TimeSignature>;
@@ -387,7 +383,7 @@ function preferFlatsForChord(tick: number, timing: SmfTiming, keyShift: number):
   return shifted.sharps < 0;
 }
 
-function formatTransposedChord(chord: ChordMsg, timing: SmfTiming, keyShift: number): string {
+function formatTransposedChord(chord: ChordMessage, timing: SmfTiming, keyShift: number): string {
   if (keyShift === 0) return formatChord(chord.root, chord.type, chord.bass);
   const preferFlats = preferFlatsForChord(chord.tick, timing, keyShift);
   return formatChord(

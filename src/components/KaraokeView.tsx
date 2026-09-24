@@ -1,25 +1,22 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
-import { buildKaraokePages } from '../lib/xf/karaokePages.ts';
 import type { KaraokePage } from '../lib/xf/karaokePages.ts';
-import type { LyricLine, LyricRun, ParsedKaraoke } from '../lib/xf/lyrics.ts';
+import type { LyricLine, LyricRun } from '../lib/xf/lyrics.ts';
 
 interface KaraokeViewProps {
-  parsed: ParsedKaraoke;
-  sequence: PlaybackSequence | null;
+  pages: KaraokePage[];
+  sequence: PlaybackSequence;
   scheduler: MidiScheduler;
 }
 
 export const KaraokeView = memo(function KaraokeView({
-  parsed,
+  pages,
   sequence,
   scheduler,
 }: KaraokeViewProps) {
-  const pages = useMemo(() => buildKaraokePages(parsed), [parsed]);
-
   const [activeState, setActiveState] = useState<{
     pageIdx: number;
     lineIdx: number;
@@ -50,10 +47,6 @@ export const KaraokeView = memo(function KaraokeView({
   }, [activeState]);
 
   useEffect(() => {
-    if (!sequence) {
-      setActiveState({ pageIdx: 0, lineIdx: 0 });
-      return;
-    }
     if (pages.length === 0) return;
 
     let raf = 0;
