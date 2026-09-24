@@ -1228,6 +1228,10 @@
   white-space: pre;
 }
 
+.karaoke-line-fill .karaoke-syl--speech {
+  visibility: hidden;
+}
+
 .karaoke-line ruby {
   display: inline-grid;
   justify-items: center;

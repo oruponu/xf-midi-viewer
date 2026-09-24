@@ -325,7 +325,11 @@ function samePairs(a: boolean[][], b: boolean[][]): boolean {
 
 function renderLineContent(line: LyricLine): ReactNode {
   return line.syllables.map((syl, i) => (
-    <span key={i} className="karaoke-syl" data-syl-idx={i}>
+    <span
+      key={i}
+      className={syl.vocalPart === 'speech' ? 'karaoke-syl karaoke-syl--speech' : 'karaoke-syl'}
+      data-syl-idx={i}
+    >
       {syl.runs.map((run, j) => renderRun(run, j))}
     </span>
   ));
@@ -368,7 +372,7 @@ function computeFillWidth(
   if (activeIdx < 0) return 0;
 
   const activeSyl = syls[activeIdx]!;
-  if (activeSyl.vocalPart === 'speech' || activeSyl.vocalPart === 'nonLyric') {
+  if (activeSyl.vocalPart === 'nonLyric') {
     return metrics.syllableLefts[activeIdx] ?? 0;
   }
 
