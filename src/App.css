@@ -1229,14 +1229,17 @@
 }
 
 .karaoke-line ruby {
-  position: relative;
+  display: inline-grid;
+  justify-items: center;
+}
+
+.karaoke-line ruby > * {
+  grid-area: 1 / 1;
 }
 
 .karaoke-line ruby rt {
-  position: absolute;
-  left: 50%;
-  bottom: 100%;
-  transform: translateX(-50%);
+  align-self: start;
+  transform: translateY(-100%);
   font-size: var(--karaoke-ruby-size);
   line-height: 1;
   color: var(--text);
