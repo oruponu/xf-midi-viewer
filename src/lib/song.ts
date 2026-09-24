@@ -23,7 +23,8 @@ export interface Song {
 
 export function buildSong(smf: SmfFile): Song {
   const { xf, xfError } = extractXfOrEmpty(smf);
-  const karaoke = parseKaraoke(xf.karaoke);
+  const sequence = buildPlaybackSequence(smf);
+  const karaoke = parseKaraoke(xf.karaoke, sequence.notes);
   const chords: ChordMessage[] = [];
   const rehearsals: RehearsalMessage[] = [];
   for (const event of xf.style.events) {
@@ -31,7 +32,7 @@ export function buildSong(smf: SmfFile): Song {
     else if (event.kind === 'rehearsal') rehearsals.push(event);
   }
   return {
-    sequence: buildPlaybackSequence(smf),
+    sequence,
     timing: extractTiming(smf),
     xf,
     xfError,

@@ -32,6 +32,12 @@ export interface LyricPage {
   lines: LyricLine[];
 }
 
+export interface MelodyNote {
+  channel: number;
+  startTick: number;
+  endTick: number;
+}
+
 export interface ParsedKaraoke {
   header: XfLyricsHeader | null;
   tokens: LyricToken[];
@@ -56,7 +62,10 @@ type RubyState =
       baseSyllable: SyllableToken;
     };
 
-export function parseKaraoke(data: XfKaraokeData): ParsedKaraoke {
+export function parseKaraoke(
+  data: XfKaraokeData,
+  notes: readonly MelodyNote[] = [],
+): ParsedKaraoke {
   const tokens: LyricToken[] = [];
   let ruby: RubyState | null = null;
 
@@ -82,6 +91,7 @@ export function parseKaraoke(data: XfKaraokeData): ParsedKaraoke {
   }
 
   const syllables = buildSyllables(tokens);
+  applyMelodyNoteEnds(syllables, notes, data.header?.melodyChannels ?? []);
   const lines = buildLines(tokens, syllables);
   const pages = buildPages(lines);
 
@@ -294,6 +304,34 @@ function buildSyllables(tokens: LyricToken[]): LyricSyllable[] {
   }
 
   return result;
+}
+
+function applyMelodyNoteEnds(
+  syllables: LyricSyllable[],
+  notes: readonly MelodyNote[],
+  melodyChannels: number[],
+): void {
+  const channels = new Set(melodyChannels.map((ch) => ch - 1));
+  const melody = notes
+    .filter((n) => channels.has(n.channel))
+    .sort((a, b) => a.startTick - b.startTick);
+  if (melody.length === 0) return;
+
+  for (const syl of syllables) {
+    const limit = syl.endTick ?? Infinity;
+    let lo = 0;
+    let hi = melody.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (melody[mid]!.startTick < syl.tick) lo = mid + 1;
+      else hi = mid;
+    }
+    let noteEnd = -Infinity;
+    for (let i = lo; i < melody.length && melody[i]!.startTick < limit; i += 1) {
+      noteEnd = Math.max(noteEnd, melody[i]!.endTick);
+    }
+    if (noteEnd !== -Infinity) syl.endTick = Math.min(noteEnd, limit);
+  }
 }
 
 function buildLines(tokens: LyricToken[], syllables: LyricSyllable[]): LyricLine[] {

@@ -55,6 +55,23 @@ describe('buildSong', () => {
     expect(song.karaokePages[0]!.lines[0]!.syllables).toHaveLength(2);
   });
 
+  test('ends syllables at the note-off of the melody channel', () => {
+    const song = buildSong(
+      makeSmf([
+        meta(0, 0x07, ascii('$Lyrc:1:0:')),
+        meta(0, 0x05, ascii('a/')),
+        noteOn(0, 60),
+        { deltaTime: 240, event: { kind: 'noteOff', channel: 0, note: 60, velocity: 0 } },
+        meta(720, 0x05, ascii('b')),
+      ]),
+    );
+
+    expect(song.karaoke.syllables.map((s) => [s.tick, s.endTick])).toEqual([
+      [0, 240],
+      [960, null],
+    ]);
+  });
+
   test('extracts chords and rehearsals in order and ignores other style messages', () => {
     const song = buildSong(
       makeSmf([

@@ -332,3 +332,98 @@ describe('parseKaraoke', () => {
     expect(r.pages[0]!.lines[0]!.syllables.map((s) => s.tick)).toEqual([1, 3]);
   });
 });
+
+describe('parseKaraoke with melody notes', () => {
+  const withMelody = (events: KaraokeEvent[], melodyChannels: number[]): XfKaraokeData => ({
+    header: { melodyChannels, displayOffset: 0, language: undefined },
+    events,
+  });
+  const note = (channel: number, startTick: number, endTick: number) => ({
+    channel,
+    startTick,
+    endTick,
+  });
+  const ends = (r: ReturnType<typeof parseKaraoke>) => r.syllables.map((s) => s.endTick);
+
+  test('last syllable of a line ends at its note-off, not at the next line', () => {
+    const r = parseKaraoke(
+      withMelody(
+        [
+          { kind: 'lyric', tick: 0, text: 'あ' },
+          { kind: 'lyric', tick: 480, text: 'い/' },
+          { kind: 'lyric', tick: 7680, text: 'う' },
+        ],
+        [1],
+      ),
+      [note(0, 0, 400), note(0, 480, 900), note(0, 7680, 8000)],
+    );
+    expect(ends(r)).toEqual([400, 900, 8000]);
+  });
+
+  test('syllable sung over several notes ends at the last note-off', () => {
+    const r = parseKaraoke(
+      withMelody(
+        [
+          { kind: 'lyric', tick: 0, text: 'あ' },
+          { kind: 'lyric', tick: 960, text: 'い' },
+        ],
+        [1],
+      ),
+      [note(0, 0, 240), note(0, 240, 720)],
+    );
+    expect(ends(r)[0]).toBe(720);
+  });
+
+  test('note-off after the next syllable is clamped to the next syllable', () => {
+    const r = parseKaraoke(
+      withMelody(
+        [
+          { kind: 'lyric', tick: 0, text: 'あ' },
+          { kind: 'lyric', tick: 480, text: 'い' },
+        ],
+        [1],
+      ),
+      [note(0, 0, 500)],
+    );
+    expect(ends(r)[0]).toBe(480);
+  });
+
+  test('ignores notes outside the melody channels', () => {
+    const r = parseKaraoke(
+      withMelody(
+        [
+          { kind: 'lyric', tick: 0, text: 'あ' },
+          { kind: 'lyric', tick: 960, text: 'い' },
+        ],
+        [2],
+      ),
+      [note(0, 0, 240), note(1, 0, 480)],
+    );
+    expect(ends(r)).toEqual([480, null]);
+  });
+
+  test('falls back to the next syllable when no melody note starts in the syllable', () => {
+    const r = parseKaraoke(
+      withMelody(
+        [
+          { kind: 'lyric', tick: 0, text: 'あ' },
+          { kind: 'lyric', tick: 960, text: 'い' },
+        ],
+        [1],
+      ),
+      [note(0, 1000, 1200)],
+    );
+    expect(ends(r)).toEqual([960, 1200]);
+  });
+
+  test('keeps next-syllable chaining without a lyrics header', () => {
+    const r = parseKaraoke(
+      karaoke([
+        { kind: 'lyric', tick: 0, text: 'あ' },
+        { kind: 'lyric', tick: 960, text: 'い' },
+      ]),
+      [note(0, 0, 240)],
+    );
+    expect(ends(r)).toEqual([960, null]);
+  });
+});
