@@ -336,7 +336,7 @@ describe('MidiScheduler playback', () => {
     expect(scheduler.getPosition()).toBeCloseTo(0.1, 6);
   });
 
-  test('setOutput(next) while playing panics the old output and keeps sending to the new one', () => {
+  test('setOutput(next) while playing silences the old output and restarts on the new one', () => {
     const { clock, scheduler, out } = setup([msg(0, [0xc0, 1]), msg(0.3, [0x90, 60, 100])], 10);
     scheduler.play();
     clock.advance(100);
@@ -349,7 +349,10 @@ describe('MidiScheduler playback', () => {
 
     expect(scheduler.getState().isPlaying).toBe(true);
     expect(scheduler.getState().sendError).toBeNull();
-    expect(playbackOnly(next.sent).map((m) => m.data)).toEqual([[0x90, 60, 100]]);
+    expect(playbackOnly(next.sent).map((m) => m.data)).toEqual([
+      [0xc0, 1],
+      [0x90, 60, 100],
+    ]);
     expect(out.sent.length).toBe(oldCount);
   });
 
@@ -845,5 +848,39 @@ describe('MidiScheduler fence', () => {
 
     expect(scheduler.getState().isPlaying).toBe(false);
     expect(scheduler.getState().sendError).toEqual({ error: boom });
+  });
+
+  test('setOutput(next) while playing fences the old output and chases the new one', () => {
+    const { clock, scheduler, out } = setup(queuedNote(), 10, 0, { clear: false });
+    scheduler.play();
+    clock.advance(5);
+    const before = out.sent.length;
+    const next = createOutput({ clear: false, now: () => clock.now });
+
+    scheduler.setOutput(next.output);
+
+    expectFenced(out.sent, before);
+    expect(next.sent.find((m) => !isPanic(m))!.data).toEqual([0xb0, 121, 0]);
+    clock.advance(50);
+    expect(playbackOnly(next.sent).map((m) => m.data)).toEqual([
+      [0xc0, 7],
+      [0xb0, 7, 90],
+      [0x90, 60, 100],
+    ]);
+    expect(scheduler.getState().isPlaying).toBe(true);
+  });
+
+  test('switching A -> B -> A while playing keeps the fence of A', () => {
+    const { clock, scheduler, out } = setup(queuedNote(), 10, 0, { clear: false });
+    const other = createOutput({ clear: false, now: () => clock.now });
+    scheduler.play();
+    clock.advance(5);
+    const before = out.sent.length;
+
+    scheduler.setOutput(other.output);
+    scheduler.setOutput(out.output);
+
+    expectFenced(out.sent, before);
+    expect(out.sent.slice(before).find((m) => !isPanic(m))!.data).toEqual([0xb0, 121, 0]);
   });
 });

@@ -150,9 +150,13 @@ export class MidiScheduler {
   setOutput(output: MidiOutputLike | null): void {
     if (output === this.output) return;
     const previous = this.output;
-    this.output = output;
+    const isPlaying = this.intervalHandle !== null;
+    const position = this.getPosition();
     if (previous) this.silence(previous);
-    if (output === null && this.intervalHandle !== null) this.pause();
+    this.output = output;
+    if (!isPlaying) return;
+    if (output === null) this.stopInternal(false);
+    else this.restart(position);
   }
 
   play(): void {
