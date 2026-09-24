@@ -3,7 +3,7 @@ import type { ReactNode, RefObject } from 'react';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
-import { resolveKaraokeDisplay } from '../lib/xf/karaokePages.ts';
+import { lineAlignment, resolveKaraokeDisplay } from '../lib/xf/karaokePages.ts';
 import type { KaraokeDisplay, KaraokePage } from '../lib/xf/karaokePages.ts';
 import type { LyricLine, LyricRun } from '../lib/xf/lyrics.ts';
 
@@ -116,6 +116,7 @@ export const KaraokeView = memo(function KaraokeView({
         <KaraokePageView
           page={activePage}
           previewLines={previewLines}
+          previewLineCount={nextPage?.lines.length ?? 0}
           activeLineIndex={activeLineIndex}
           activeLineRef={activeLineRef}
           fillRef={fillRef}
@@ -128,12 +129,14 @@ export const KaraokeView = memo(function KaraokeView({
 function KaraokePageView({
   page,
   previewLines,
+  previewLineCount,
   activeLineIndex,
   activeLineRef,
   fillRef,
 }: {
   page: KaraokePage;
   previewLines: LyricLine[];
+  previewLineCount: number;
   activeLineIndex: number;
   activeLineRef: RefObject<HTMLDivElement | null>;
   fillRef: RefObject<HTMLSpanElement | null>;
@@ -141,14 +144,17 @@ function KaraokePageView({
   return (
     <>
       {previewLines.map((line, i) => (
-        <div key={`preview-${i}`} className="karaoke-line">
+        <div
+          key={`preview-${i}`}
+          className={`karaoke-line karaoke-line--${lineAlignment(i, previewLineCount)}`}
+        >
           <span className="karaoke-line-base">{renderLineContent(line)}</span>
         </div>
       ))}
       {page.lines.map((line, i) => {
         const isPast = i < activeLineIndex;
         const isActive = i === activeLineIndex;
-        let className = 'karaoke-line';
+        let className = `karaoke-line karaoke-line--${lineAlignment(i, page.lines.length)}`;
         if (isPast) className += ' karaoke-line--past';
         if (isActive) className += ' karaoke-line--active';
         return (

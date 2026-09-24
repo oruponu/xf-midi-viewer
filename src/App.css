@@ -1157,6 +1157,19 @@
   letter-spacing: 0.04em;
   color: var(--text-h);
   white-space: nowrap;
+  width: fit-content;
+}
+
+.karaoke-line--left {
+  align-self: flex-start;
+}
+
+.karaoke-line--right {
+  align-self: flex-end;
+}
+
+.karaoke-line--center {
+  align-self: center;
 }
 
 .karaoke-line--past {

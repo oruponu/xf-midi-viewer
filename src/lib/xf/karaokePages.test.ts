@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { buildKaraokePages, resolveKaraokeDisplay } from './karaokePages.ts';
+import { buildKaraokePages, lineAlignment, resolveKaraokeDisplay } from './karaokePages.ts';
 import type { KaraokePage } from './karaokePages.ts';
 import type { ParsedKaraoke, LyricLine, LyricSyllable } from './lyrics.ts';
 
@@ -182,5 +182,24 @@ describe('resolveKaraokeDisplay', () => {
       lineIdx: 0,
       preview: true,
     });
+  });
+});
+
+describe('lineAlignment', () => {
+  const layout = (count: number) =>
+    Array.from({ length: count }, (_, i) => lineAlignment(i, count));
+
+  test('centers a single line', () => {
+    expect(layout(1)).toEqual(['center']);
+  });
+
+  test('alternates left and right on even line counts', () => {
+    expect(layout(2)).toEqual(['left', 'right']);
+    expect(layout(4)).toEqual(['left', 'right', 'left', 'right']);
+  });
+
+  test('centers the last line on odd line counts', () => {
+    expect(layout(3)).toEqual(['left', 'right', 'center']);
+    expect(layout(5)).toEqual(['left', 'right', 'left', 'right', 'center']);
   });
 });

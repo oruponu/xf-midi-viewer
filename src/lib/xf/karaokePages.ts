@@ -75,6 +75,13 @@ export function resolveKaraokeDisplay(
   return { pageIdx, lineIdx, preview };
 }
 
+export type LineAlignment = 'left' | 'right' | 'center';
+
+export function lineAlignment(index: number, lineCount: number): LineAlignment {
+  if (lineCount % 2 === 1 && index === lineCount - 1) return 'center';
+  return index % 2 === 0 ? 'left' : 'right';
+}
+
 function findActiveLineIndex(lines: LyricLine[], tick: number): number {
   let lo = 0;
   let hi = lines.length;
