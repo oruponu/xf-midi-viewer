@@ -276,15 +276,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.playback-meta {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  color: var(--text);
-  font-size: 12px;
-}
-
 .playback-position-group {
   display: inline-flex;
   align-items: center;
@@ -1251,12 +1242,6 @@
 
   .playback-position {
     flex: 1;
-  }
-
-  .playback-meta {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 8px;
   }
 
   .viewer-tab {

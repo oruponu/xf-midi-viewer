@@ -73,11 +73,6 @@ export function PlaybackPanel({
         keyShift={keyShift}
         canPlay={canPlay}
       />
-
-      <div className="playback-meta">
-        <span>{sequence.notes.length.toLocaleString()} notes</span>
-        <span>{sequence.midiMessages.length.toLocaleString()} MIDI events</span>
-      </div>
     </section>
   );
 }
