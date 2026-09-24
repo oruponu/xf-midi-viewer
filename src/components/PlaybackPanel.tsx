@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
 import {
@@ -99,7 +99,29 @@ function PlaybackReadout({
   keyShift,
   canPlay,
 }: PlaybackReadoutProps) {
-  const positionSeconds = usePlaybackPosition(scheduler, (seconds) => seconds);
+  const playbackSeconds = usePlaybackPosition(scheduler, (seconds) => seconds);
+  const [dragSeconds, setDragSeconds] = useState<number | null>(null);
+  const positionSeconds = dragSeconds ?? playbackSeconds;
+  const sliderRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const slider = sliderRef.current;
+    if (!slider) return;
+    const commit = () => {
+      scheduler.seek(slider.valueAsNumber);
+      setDragSeconds(null);
+    };
+    const cancel = () => setDragSeconds(null);
+    slider.addEventListener('change', commit);
+    slider.addEventListener('pointercancel', cancel);
+    slider.addEventListener('blur', cancel);
+    return () => {
+      slider.removeEventListener('change', commit);
+      slider.removeEventListener('pointercancel', cancel);
+      slider.removeEventListener('blur', cancel);
+    };
+  }, [scheduler]);
+
   const progress = sequence.durationSeconds > 0 ? positionSeconds / sequence.durationSeconds : 0;
   const tempoBpm = useMemo(() => {
     if (sequence.tempos.length === 0) return null;
@@ -258,6 +280,7 @@ function PlaybackReadout({
       <div className="playback-timeline">
         <span className="timecode">{formatTime(positionSeconds)}</span>
         <input
+          ref={sliderRef}
           aria-label="Playback position"
           type="range"
           min="0"
@@ -266,7 +289,7 @@ function PlaybackReadout({
           value={Math.min(positionSeconds, sequence.durationSeconds)}
           disabled={!canPlay}
           style={progressStyle(progress)}
-          onChange={(e) => scheduler.seek(e.currentTarget.valueAsNumber)}
+          onChange={(e) => setDragSeconds(e.currentTarget.valueAsNumber)}
         />
         <span className="timecode">{formatTime(sequence.durationSeconds)}</span>
       </div>
