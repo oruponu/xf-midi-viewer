@@ -47,15 +47,19 @@ export function buildKaraokePages(
   const sectionStarts = sectionStartSyllables(parsed.tokens, rehearsals);
   let syllableIdx = 0;
   return pages.map((page, i) => {
-    const wipeEnd = pages[i - 1]?.lines.at(-1)?.syllables.at(-1)?.endTick ?? null;
     const sectionStart = sectionStarts.has(syllableIdx);
     syllableIdx += page.lines.reduce((sum, line) => sum + line.syllables.length, 0);
     return {
       ...page,
-      displayTick: wipeEnd === null ? page.startTick : Math.min(wipeEnd, page.startTick),
+      displayTick: displayTickAfter(pages[i - 1]?.lines ?? [], page.startTick),
       sectionStart,
     };
   });
+}
+
+function displayTickAfter(prevLines: readonly LyricLine[], startTick: number): number {
+  const wipeEnd = prevLines.at(-1)?.syllables.at(-1)?.endTick ?? null;
+  return wipeEnd === null ? startTick : Math.min(wipeEnd, startTick);
 }
 
 function sectionStartSyllables(
@@ -185,6 +189,51 @@ export function mergeSingleRowPages(
     mergedPairs.push([...pagePairs[i]!]);
   });
   return { pages: mergedPages, pairs: mergedPairs };
+}
+
+const MAX_ROWS_PER_PAGE = 3;
+
+export function splitLongPages(
+  pages: readonly KaraokePage[],
+  pairs: readonly (readonly boolean[])[],
+): { pages: KaraokePage[]; pairs: boolean[][] } {
+  const splitPages: KaraokePage[] = [];
+  const splitPairs: boolean[][] = [];
+  pages.forEach((page, i) => {
+    const pagePairs = pairs[i] ?? page.lines.map(() => false);
+    const rows = buildKaraokeRows(pagePairs);
+    if (rows.length <= MAX_ROWS_PER_PAGE) {
+      splitPages.push(page);
+      splitPairs.push([...pagePairs]);
+      return;
+    }
+
+    const pageCount = Math.ceil(rows.length / MAX_ROWS_PER_PAGE);
+    const lineStarts: number[] = [];
+    let rowIdx = 0;
+    for (let p = 0; p < pageCount; p += 1) {
+      lineStarts.push(rows[rowIdx]!.lineIndices[0]);
+      rowIdx += Math.floor(rows.length / pageCount) + (p < rows.length % pageCount ? 1 : 0);
+    }
+    lineStarts.forEach((start, p) => {
+      const end = lineStarts[p + 1] ?? page.lines.length;
+      const lines = page.lines.slice(start, end);
+      const next = page.lines[end];
+      splitPages.push(
+        p === 0
+          ? { ...page, endTick: next!.tick, lines }
+          : {
+              startTick: lines[0]!.tick,
+              displayTick: displayTickAfter(page.lines.slice(0, start), lines[0]!.tick),
+              endTick: next?.tick ?? page.endTick,
+              sectionStart: false,
+              lines,
+            },
+      );
+      splitPairs.push(pagePairs.slice(start, end));
+    });
+  });
+  return { pages: splitPages, pairs: splitPairs };
 }
 
 function isNonLyricPage(page: KaraokePage): boolean {

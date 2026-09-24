@@ -8,6 +8,7 @@ import {
   chooseMergedPairs,
   mergeSingleRowPages,
   resolveKaraokeDisplay,
+  splitLongPages,
 } from '../lib/xf/karaokePages.ts';
 import type {
   KaraokeDisplay,
@@ -81,13 +82,13 @@ export const KaraokeView = memo(function KaraokeView({
     };
   }, [pages]);
 
-  const layout = useMemo(
-    () =>
-      mergeState.pages === pages
-        ? mergeSingleRowPages(pages, mergeState.pairs)
-        : { pages, pairs: pages.map((page) => page.lines.map(() => false)) },
-    [pages, mergeState],
-  );
+  const layout = useMemo(() => {
+    if (mergeState.pages !== pages) {
+      return { pages, pairs: pages.map((page) => page.lines.map(() => false)) };
+    }
+    const merged = mergeSingleRowPages(pages, mergeState.pairs);
+    return splitLongPages(merged.pages, merged.pairs);
+  }, [pages, mergeState]);
   const displayPages = layout.pages;
 
   const activeLineRef = useRef<HTMLDivElement | null>(null);

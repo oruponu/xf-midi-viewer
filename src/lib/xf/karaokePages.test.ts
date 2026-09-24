@@ -6,6 +6,7 @@ import {
   lineAlignment,
   mergeSingleRowPages,
   resolveKaraokeDisplay,
+  splitLongPages,
 } from './karaokePages.ts';
 import type { KaraokePage } from './karaokePages.ts';
 import { parseKaraoke } from './lyrics.ts';
@@ -404,6 +405,68 @@ describe('mergeSingleRowPages', () => {
       [[false, false], [false], [false], [false, false]],
     );
     expect(result.pages.map((p) => p.lines)).toEqual([a.lines, [...b.lines, ...c.lines], d.lines]);
+  });
+});
+
+describe('splitLongPages', () => {
+  const lines = (count: number) =>
+    Array.from({ length: count }, (_, i) => sungLine(syl(i * 100, i * 100 + 50)));
+  const page = (pageLines: LyricLine[], sectionStart = false): KaraokePage => ({
+    startTick: pageLines[0]!.tick,
+    displayTick: pageLines[0]!.tick,
+    endTick: 1000,
+    sectionStart,
+    lines: pageLines,
+  });
+  const unpaired = (count: number) => Array.from({ length: count }, () => false);
+
+  test('keeps pages with up to three rows', () => {
+    const pages = [page(lines(3))];
+    const pairs = [unpaired(3)];
+    expect(splitLongPages(pages, pairs)).toEqual({ pages, pairs });
+  });
+
+  test('splits four rows into two pages of two rows', () => {
+    const l = lines(4);
+    expect(splitLongPages([page(l, true)], [unpaired(4)])).toEqual({
+      pages: [
+        { startTick: 0, displayTick: 0, endTick: 200, sectionStart: true, lines: [l[0]!, l[1]!] },
+        {
+          startTick: 200,
+          displayTick: 150,
+          endTick: 1000,
+          sectionStart: false,
+          lines: [l[2]!, l[3]!],
+        },
+      ],
+      pairs: [unpaired(2), unpaired(2)],
+    });
+  });
+
+  test('puts the pages with more rows first', () => {
+    const rowCounts = (count: number) =>
+      splitLongPages([page(lines(count))], [unpaired(count)]).pages.map((p) => p.lines.length);
+    expect(rowCounts(5)).toEqual([3, 2]);
+    expect(rowCounts(6)).toEqual([3, 3]);
+    expect(rowCounts(7)).toEqual([3, 2, 2]);
+  });
+
+  test('counts rows after merging and keeps merged lines on the same page', () => {
+    const l = lines(5);
+    const result = splitLongPages([page(l)], [[true, false, false, false, false]]);
+    expect(result.pages.map((p) => p.lines)).toEqual([
+      [l[0]!, l[1]!, l[2]!],
+      [l[3]!, l[4]!],
+    ]);
+    expect(result.pairs).toEqual([[true, false, false], unpaired(2)]);
+  });
+
+  test('splits only the long pages', () => {
+    const short = page(lines(2));
+    const long = page(lines(4));
+    const result = splitLongPages([short, long], [unpaired(2), unpaired(4)]);
+    expect(result.pages.map((p) => p.lines.length)).toEqual([2, 2, 2]);
+    expect(result.pages[0]).toBe(short);
   });
 });
 
