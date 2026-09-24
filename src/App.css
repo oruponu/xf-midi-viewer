@@ -1135,24 +1135,30 @@
   font-size: 12px;
 }
 
+.karaoke-view {
+  container-type: inline-size;
+}
+
 .karaoke-view h3 {
   font-size: 17px;
   margin-bottom: 16px;
 }
 
 .karaoke-stage {
+  --karaoke-font-size: 5.2cqi;
+  --karaoke-ruby-size: 2.6cqi;
   aspect-ratio: 16 / 9;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 24px;
+  gap: 2.2cqi;
   overflow: hidden;
-  padding: 16px 0 4px;
+  padding: 1.5cqi var(--karaoke-font-size) 0.4cqi;
 }
 
 .karaoke-line {
   position: relative;
-  font-size: 48px;
+  font-size: var(--karaoke-font-size);
   line-height: 1.45;
   letter-spacing: 0.04em;
   color: var(--text-h);
@@ -1207,7 +1213,7 @@
   left: 50%;
   bottom: 100%;
   transform: translateX(-50%);
-  font-size: 0.55em;
+  font-size: var(--karaoke-ruby-size);
   line-height: 1;
   color: var(--text);
   white-space: nowrap;
@@ -1264,10 +1270,6 @@
 
   .viewer-tab-label {
     font-size: 13px;
-  }
-
-  .karaoke-line {
-    font-size: 32px;
   }
 
   .style-event-row {

@@ -43,11 +43,17 @@ export const KaraokeView = memo(function KaraokeView({
     const sylEls = Array.from(
       lineEl.querySelectorAll<HTMLSpanElement>('.karaoke-line-base .karaoke-syl'),
     );
-    lineMetricsRef.current = {
-      width: lineEl.offsetWidth,
-      syllableLefts: sylEls.map((el) => el.offsetLeft),
-      syllableWidths: sylEls.map((el) => el.offsetWidth),
+    const measure = () => {
+      lineMetricsRef.current = {
+        width: lineEl.offsetWidth,
+        syllableLefts: sylEls.map((el) => el.offsetLeft),
+        syllableWidths: sylEls.map((el) => el.offsetWidth),
+      };
     };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(lineEl);
+    return () => observer.disconnect();
   }, [activeState]);
 
   useEffect(() => {
