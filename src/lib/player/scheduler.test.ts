@@ -154,19 +154,27 @@ interface SentMessage {
   timestamp: number;
 }
 
-function createOutput() {
+interface OutputOptions {
+  clear?: boolean;
+  now?: () => number;
+}
+
+function createOutput(options: OutputOptions = {}) {
   const sent: SentMessage[] = [];
+  const sendTimes: number[] = [];
   let failure: { error: unknown } | null = null;
   const output: MidiOutputLike = {
     send(data, timestamp) {
       if (failure) throw failure.error;
       sent.push({ data: Array.from(data), timestamp: timestamp ?? 0 });
+      sendTimes.push(options.now?.() ?? 0);
     },
-    clear() {},
   };
+  if (options.clear !== false) output.clear = () => {};
   return {
     output,
     sent,
+    sendTimes,
     failWith(error: unknown) {
       failure = { error };
     },
@@ -204,7 +212,12 @@ function makeSequence(
   };
 }
 
-function setup(messages: PlaybackMidiMessage[], durationSeconds: number, driftPerReadMs = 0) {
+function setup(
+  messages: PlaybackMidiMessage[],
+  durationSeconds: number,
+  driftPerReadMs = 0,
+  outputOptions: OutputOptions = {},
+) {
   const clock = new FakeClock();
   const scheduler = new MidiScheduler({
     now: () => {
@@ -213,7 +226,7 @@ function setup(messages: PlaybackMidiMessage[], durationSeconds: number, driftPe
     },
     timers: clock.timers,
   });
-  const out = createOutput();
+  const out = createOutput({ now: () => clock.now, ...outputOptions });
   scheduler.setSequence(makeSequence(messages, durationSeconds));
   scheduler.setOutput(out.output);
   return { clock, scheduler, out };
@@ -590,5 +603,39 @@ describe('MidiScheduler key shift', () => {
 
     scheduler.setKeyShift(6);
     expect(calls).toBe(1);
+  });
+});
+
+describe('MidiScheduler lookahead', () => {
+  for (const rate of [0.5, 1, 2]) {
+    test(`never sends a message more than 50ms ahead of the current time at rate ${rate}`, () => {
+      const messages = Array.from({ length: 100 }, (_, i) => msg(i * 0.01, [0xb0, 7, i]));
+      const { clock, scheduler, out } = setup(messages, 2);
+      scheduler.setPlaybackRate(rate);
+
+      scheduler.play();
+      clock.advance(1500);
+
+      expect(out.sent.length).toBeGreaterThan(0);
+      out.sent.forEach((m, i) => {
+        expect(m.timestamp).toBeLessThanOrEqual(out.sendTimes[i]! + 50 + 1e-6);
+      });
+    });
+  }
+
+  test('schedules 100ms of the song ahead at double speed', () => {
+    const { scheduler, out } = setup(
+      [msg(0, [0xc0, 1]), msg(0.09, [0x90, 60, 100]), msg(0.11, [0x90, 62, 100])],
+      1,
+    );
+    scheduler.setPlaybackRate(2);
+
+    scheduler.play();
+
+    expect(playbackOnly(out.sent).map((m) => m.data)).toEqual([
+      [0xc0, 1],
+      [0x90, 60, 100],
+    ]);
+    expect(playbackOnly(out.sent)[1]!.timestamp).toBeCloseTo(1045, 6);
   });
 });

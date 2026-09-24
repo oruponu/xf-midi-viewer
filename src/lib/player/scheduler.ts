@@ -14,6 +14,8 @@ export const KEY_SHIFT_MIN = -6;
 export const KEY_SHIFT_MAX = 6;
 export const KEY_SHIFT_STEP = 1;
 
+const LOOKAHEAD_MS = LOOKAHEAD_SECONDS * 1000;
+
 export interface MidiScheduleWindowResult {
   nextIndex: number;
   failed: boolean;
@@ -169,20 +171,17 @@ export class MidiScheduler {
     this.setState({ sendError: null });
     this.cleanupScheduled(false);
     this.startOffset = Math.min(this.position, Math.max(0, sequence.durationSeconds - 0.01));
+    this.startedAtMs = this.now();
     this.nextMessageIndex = firstMidiMessageIndexAtOrAfter(sequence.midiMessages, this.startOffset);
     for (const message of collectChaseMessages(sequence.midiMessages, this.nextMessageIndex)) {
-      this.scheduleMessage(output, message, this.startOffset);
+      this.scheduleMessage(output, message);
     }
-    this.startedAtMs = this.now();
     this.lastNotifyAtMs = this.startedAtMs;
     this.positionSnapshot = this.startOffset;
-    this.intervalHandle = this.timers.setInterval(
-      () => this.scheduleWindow(this.playingPosition(this.now())),
-      SCHEDULER_MS,
-    );
+    this.intervalHandle = this.timers.setInterval(() => this.tick(), SCHEDULER_MS);
     this.setState({ isPlaying: true });
     this.notify();
-    this.scheduleWindow(this.startOffset);
+    this.scheduleWindow(this.startOffset, this.now());
   }
 
   pause(): void {
@@ -248,7 +247,12 @@ export class MidiScheduler {
     this.notify();
   }
 
-  private scheduleWindow(position: number): void {
+  private tick(): void {
+    const nowMs = this.now();
+    this.scheduleWindow(this.playingPosition(nowMs), nowMs);
+  }
+
+  private scheduleWindow(position: number, nowMs: number): void {
     const { sequence, output } = this;
     if (!sequence) return;
     if (!output) {
@@ -259,8 +263,8 @@ export class MidiScheduler {
       sequence.midiMessages,
       this.nextMessageIndex,
       position,
-      position + LOOKAHEAD_SECONDS,
-      (message) => this.scheduleMessage(output, message, position),
+      this.playingPosition(nowMs + LOOKAHEAD_MS),
+      (message) => this.scheduleMessage(output, message),
     );
     this.nextMessageIndex = result.nextIndex;
     if (result.failed) {
@@ -268,7 +272,6 @@ export class MidiScheduler {
       return;
     }
     this.position = position;
-    const nowMs = this.now();
     if (nowMs - this.lastNotifyAtMs >= UI_UPDATE_INTERVAL_MS) {
       this.lastNotifyAtMs = nowMs;
       this.positionSnapshot = position;
@@ -277,15 +280,11 @@ export class MidiScheduler {
     if (position >= sequence.durationSeconds) this.stopInternal(true, true);
   }
 
-  private scheduleMessage(
-    output: MidiOutputLike,
-    message: PlaybackMidiMessage,
-    position: number,
-  ): boolean {
+  private scheduleMessage(output: MidiOutputLike, message: PlaybackMidiMessage): boolean {
     const data = transposeMidiData(message.data, this.state.keyShift, this.drumChannels);
     if (!data) return true;
-    const offsetSeconds = Math.max(0, message.seconds - position);
-    const sendAt = this.now() + (offsetSeconds / this.state.playbackRate) * 1000;
+    const offsetSeconds = Math.max(0, message.seconds - this.startOffset);
+    const sendAt = this.startedAtMs + (offsetSeconds / this.state.playbackRate) * 1000;
     return trySendMidiMessage(output, data, sendAt, this.reportSendFailure);
   }
 
