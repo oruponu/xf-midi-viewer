@@ -1147,6 +1147,7 @@
 .karaoke-stage {
   --karaoke-font-size: 5.2cqi;
   --karaoke-ruby-size: 2.6cqi;
+  position: relative;
   aspect-ratio: 16 / 9;
   display: flex;
   flex-direction: column;
@@ -1166,20 +1167,43 @@
   width: fit-content;
 }
 
-.karaoke-line--left {
+.karaoke-line--left,
+.karaoke-row--left {
   align-self: flex-start;
 }
 
-.karaoke-line--right {
+.karaoke-line--right,
+.karaoke-row--right {
   align-self: flex-end;
 }
 
-.karaoke-line--center {
+.karaoke-line--center,
+.karaoke-row--center {
   align-self: center;
 }
 
 .karaoke-line--past {
   display: none;
+}
+
+.karaoke-row {
+  display: flex;
+}
+
+.karaoke-row--past {
+  display: none;
+}
+
+.karaoke-gap {
+  white-space: pre;
+}
+
+.karaoke-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .karaoke-line-base {
@@ -1220,7 +1244,7 @@
   pointer-events: none;
 }
 
-.karaoke-line--active .karaoke-line-fill ruby rt {
+.karaoke-line-fill ruby rt {
   color: var(--accent);
   opacity: 0.7;
 }

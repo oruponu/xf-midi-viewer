@@ -82,6 +82,49 @@ export function lineAlignment(index: number, lineCount: number): LineAlignment {
   return index % 2 === 0 ? 'left' : 'right';
 }
 
+export interface KaraokeRow {
+  lineIndices: [number] | [number, number];
+  alignment: LineAlignment;
+}
+
+export function chooseMergedPairs(
+  lineWidths: readonly number[],
+  gapWidth: number,
+  availableWidth: number,
+): boolean[] {
+  const candidates = lineWidths
+    .slice(0, -1)
+    .map((width, i) => ({ index: i, width: width + gapWidth + lineWidths[i + 1]! }))
+    .filter((pair) => pair.width <= availableWidth)
+    .sort((a, b) => a.width - b.width || a.index - b.index);
+
+  const merged = lineWidths.map(() => false);
+  const used = new Set<number>();
+  for (const { index } of candidates) {
+    if (used.has(index) || used.has(index + 1)) continue;
+    merged[index] = true;
+    used.add(index);
+    used.add(index + 1);
+  }
+  return merged;
+}
+
+export function buildKaraokeRows(merged: readonly boolean[]): KaraokeRow[] {
+  const groups: KaraokeRow['lineIndices'][] = [];
+  for (let i = 0; i < merged.length; i += 1) {
+    if (merged[i] && i + 1 < merged.length) {
+      groups.push([i, i + 1]);
+      i += 1;
+    } else {
+      groups.push([i]);
+    }
+  }
+  return groups.map((lineIndices, i) => ({
+    lineIndices,
+    alignment: lineAlignment(i, groups.length),
+  }));
+}
+
 function findActiveLineIndex(lines: LyricLine[], tick: number): number {
   let lo = 0;
   let hi = lines.length;

@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { buildKaraokePages, lineAlignment, resolveKaraokeDisplay } from './karaokePages.ts';
+import {
+  buildKaraokePages,
+  buildKaraokeRows,
+  chooseMergedPairs,
+  lineAlignment,
+  resolveKaraokeDisplay,
+} from './karaokePages.ts';
 import type { KaraokePage } from './karaokePages.ts';
 import type { ParsedKaraoke, LyricLine, LyricSyllable } from './lyrics.ts';
 
@@ -201,5 +207,45 @@ describe('lineAlignment', () => {
   test('centers the last line on odd line counts', () => {
     expect(layout(3)).toEqual(['left', 'right', 'center']);
     expect(layout(5)).toEqual(['left', 'right', 'left', 'right', 'center']);
+  });
+});
+
+describe('chooseMergedPairs', () => {
+  test('merges the narrowest adjacent pair first', () => {
+    expect(chooseMergedPairs([100, 30, 30, 100], 5, 200)).toEqual([false, true, false, false]);
+  });
+
+  test('keeps merging remaining pairs that do not share a line', () => {
+    expect(chooseMergedPairs([10, 10, 50, 50], 0, 100)).toEqual([true, false, true, false]);
+  });
+
+  test('prefers the upper pair on equal widths', () => {
+    expect(chooseMergedPairs([30, 30, 30], 0, 100)).toEqual([true, false, false]);
+  });
+
+  test('skips pairs wider than the available width', () => {
+    expect(chooseMergedPairs([60, 60], 5, 100)).toEqual([false, false]);
+  });
+});
+
+describe('buildKaraokeRows', () => {
+  test('keeps alternating lines when nothing is merged', () => {
+    expect(buildKaraokeRows([false, false, false])).toEqual([
+      { lineIndices: [0], alignment: 'left' },
+      { lineIndices: [1], alignment: 'right' },
+      { lineIndices: [2], alignment: 'center' },
+    ]);
+  });
+
+  test('aligns rows by their position after merging', () => {
+    expect(buildKaraokeRows([false, true, false, false])).toEqual([
+      { lineIndices: [0], alignment: 'left' },
+      { lineIndices: [1, 2], alignment: 'right' },
+      { lineIndices: [3], alignment: 'center' },
+    ]);
+    expect(buildKaraokeRows([true, false, true, false])).toEqual([
+      { lineIndices: [0, 1], alignment: 'left' },
+      { lineIndices: [2, 3], alignment: 'right' },
+    ]);
   });
 });
