@@ -3,8 +3,11 @@ import type { ReactNode, RefObject } from 'react';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
-import type { KaraokePage } from '../lib/xf/karaokePages.ts';
+import { resolveKaraokeDisplay } from '../lib/xf/karaokePages.ts';
+import type { KaraokeDisplay, KaraokePage } from '../lib/xf/karaokePages.ts';
 import type { LyricLine, LyricRun } from '../lib/xf/lyrics.ts';
+
+const PREVIEW_LEAD_SECONDS = 1;
 
 interface KaraokeViewProps {
   pages: KaraokePage[];
@@ -17,10 +20,11 @@ export const KaraokeView = memo(function KaraokeView({
   sequence,
   scheduler,
 }: KaraokeViewProps) {
-  const [activeState, setActiveState] = useState<{
-    pageIdx: number;
-    lineIdx: number;
-  }>({ pageIdx: 0, lineIdx: 0 });
+  const [activeState, setActiveState] = useState<KaraokeDisplay>({
+    pageIdx: 0,
+    lineIdx: 0,
+    preview: false,
+  });
 
   const activeLineRef = useRef<HTMLDivElement | null>(null);
   const lineMetricsRef = useRef<{
@@ -51,20 +55,27 @@ export const KaraokeView = memo(function KaraokeView({
 
     let raf = 0;
     let cancelled = false;
-    let lastPageIdx = -1;
-    let lastLineIdx = -1;
+    let last: KaraokeDisplay | null = null;
 
     const loop = () => {
       if (cancelled) return;
-      const tick = secondsToTick(scheduler.getPosition(), sequence);
-      const pageIdx = findActivePageIndex(pages, tick);
+      const position = scheduler.getPosition();
+      const tick = secondsToTick(position, sequence);
+      const lookaheadTick = secondsToTick(
+        position + PREVIEW_LEAD_SECONDS * scheduler.getState().playbackRate,
+        sequence,
+      );
+      const display = resolveKaraokeDisplay(pages, tick, lookaheadTick);
+      const { pageIdx, lineIdx } = display;
       const page = pages[pageIdx]!;
-      const lineIdx = findActiveLineIndex(page.lines, tick);
-      const switched = pageIdx !== lastPageIdx || lineIdx !== lastLineIdx;
+      const switched =
+        last === null ||
+        pageIdx !== last.pageIdx ||
+        lineIdx !== last.lineIdx ||
+        display.preview !== last.preview;
       if (switched) {
-        lastPageIdx = pageIdx;
-        lastLineIdx = lineIdx;
-        setActiveState({ pageIdx, lineIdx });
+        last = display;
+        setActiveState(display);
       }
 
       if (!switched) {
@@ -95,6 +106,8 @@ export const KaraokeView = memo(function KaraokeView({
   if (pages.length === 0) return null;
   const activePage = pages[Math.min(activeState.pageIdx, pages.length - 1)]!;
   const activeLineIndex = Math.min(activeState.lineIdx, activePage.lines.length - 1);
+  const nextPage = activeState.preview ? pages[activeState.pageIdx + 1] : undefined;
+  const previewLines = nextPage ? nextPage.lines.slice(0, -1) : [];
 
   return (
     <div className="card karaoke-view">
@@ -102,6 +115,7 @@ export const KaraokeView = memo(function KaraokeView({
       <div className="karaoke-stage">
         <KaraokePageView
           page={activePage}
+          previewLines={previewLines}
           activeLineIndex={activeLineIndex}
           activeLineRef={activeLineRef}
           fillRef={fillRef}
@@ -113,17 +127,24 @@ export const KaraokeView = memo(function KaraokeView({
 
 function KaraokePageView({
   page,
+  previewLines,
   activeLineIndex,
   activeLineRef,
   fillRef,
 }: {
   page: KaraokePage;
+  previewLines: LyricLine[];
   activeLineIndex: number;
   activeLineRef: RefObject<HTMLDivElement | null>;
   fillRef: RefObject<HTMLSpanElement | null>;
 }) {
   return (
     <>
+      {previewLines.map((line, i) => (
+        <div key={`preview-${i}`} className="karaoke-line">
+          <span className="karaoke-line-base">{renderLineContent(line)}</span>
+        </div>
+      ))}
       {page.lines.map((line, i) => {
         const isPast = i < activeLineIndex;
         const isActive = i === activeLineIndex;
@@ -163,30 +184,6 @@ function renderRun(run: LyricRun, index: number): ReactNode {
       <rt>{run.reading}</rt>
     </ruby>
   );
-}
-
-function findActivePageIndex(pages: KaraokePage[], tick: number): number {
-  if (pages.length === 0) return 0;
-  let lo = 0;
-  let hi = pages.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    if (pages[mid]!.startTick <= tick) lo = mid + 1;
-    else hi = mid;
-  }
-  return Math.max(0, lo - 1);
-}
-
-function findActiveLineIndex(lines: LyricLine[], tick: number): number {
-  if (lines.length === 0) return 0;
-  let lo = 0;
-  let hi = lines.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    if (lines[mid]!.tick <= tick) lo = mid + 1;
-    else hi = mid;
-  }
-  return Math.max(0, lo - 1);
 }
 
 function computeFillWidth(
