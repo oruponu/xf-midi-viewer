@@ -1152,7 +1152,7 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 2.2cqi;
+  gap: 4cqi;
   overflow: hidden;
   padding: 1.5cqi var(--karaoke-font-size) 0.4cqi;
 }
@@ -1247,7 +1247,7 @@
 
 .karaoke-line ruby rt {
   align-self: start;
-  transform: translateY(-100%);
+  transform: translateY(calc(-100% + 0.5cqi));
   font-size: var(--karaoke-ruby-size);
   line-height: 1;
   color: inherit;
