@@ -90,6 +90,17 @@ describe('BuiltinSynthOutput', () => {
     expect(output.isActive).toBe(false);
   });
 
+  test('mutes the output as soon as a stall is detected', () => {
+    const { output, gainCalls, clock } = setupOutput();
+    output.activate();
+    gainCalls.length = 0;
+    clock.state = 'suspended';
+
+    output.send([0x80, 60, 0], 1010);
+
+    expect(gainCalls).toEqual(['cancel 10', 'set 0 10']);
+  });
+
   test('detects a frozen audio clock even while the state still says running', () => {
     const { output, calls, stalls, stallTimes, setNow } = setupOutput();
     output.activate();

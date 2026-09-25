@@ -104,6 +104,9 @@ export class BuiltinSynthOutput implements MidiOutputLike {
 
   private stall(): void {
     this.active = false;
+    const current = this.clock.currentTime;
+    this.gain.cancelScheduledValues(current);
+    this.gain.setValueAtTime(0, current);
     this.onStall((this.clock.currentTime - this.anchor) * 1000);
   }
 }
