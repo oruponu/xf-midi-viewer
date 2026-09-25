@@ -937,7 +937,6 @@
 .score-chord {
   position: absolute;
   top: 0;
-  margin-left: 2px;
   padding: 1px 4px;
   border-radius: var(--radius-sm);
   font-family: var(--mono);
@@ -968,7 +967,6 @@
 .score-lyric {
   position: absolute;
   bottom: 0;
-  margin-left: 6px;
   display: inline-flex;
   align-items: flex-end;
   font-size: 13px;

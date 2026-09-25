@@ -1,5 +1,7 @@
-import { memo, useEffect, useMemo, useRef } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useMediaQuery } from '../hooks/useMediaQuery.ts';
+import { labelSpan, spreadLabels } from '../lib/layout/spread.ts';
+import type { SpreadItem } from '../lib/layout/spread.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
@@ -19,19 +21,26 @@ import type { ChordMessage, RehearsalMessage } from '../lib/xf/types.ts';
 const BARS_PER_ROW = 4;
 const NARROW_BARS_PER_ROW = 2;
 
-interface PlacedChord {
+const CHORD_PAD = 2;
+const CHORD_GAP = 8;
+const LYRIC_PAD = 6;
+const LYRIC_GAP = 2;
+
+interface Placement {
+  xPercent: number;
+  barIndex: number;
+}
+
+interface PlacedChord extends Placement {
   msg: ChordMessage;
-  xPercent: number;
 }
 
-interface PlacedRehearsal {
+interface PlacedRehearsal extends Placement {
   msg: RehearsalMessage;
-  xPercent: number;
 }
 
-interface PlacedSyllable {
+interface PlacedSyllable extends Placement {
   syllable: LyricSyllable;
-  xPercent: number;
 }
 
 interface RowSpec {
@@ -251,8 +260,8 @@ function ScoreRow({
   const placedChords = useMemo<PlacedChord[]>(() => {
     const out: PlacedChord[] = [];
     for (const c of chords) {
-      const x = placeIfInRow(c.tick, timing, startPos, endPos, barCount);
-      if (x !== null) out.push({ msg: c, xPercent: x });
+      const p = placeIfInRow(c.tick, timing, startPos, endPos, barCount);
+      if (p !== null) out.push({ msg: c, ...p });
     }
     return out;
   }, [chords, timing, startPos, endPos, barCount]);
@@ -260,8 +269,8 @@ function ScoreRow({
   const placedRehearsals = useMemo<PlacedRehearsal[]>(() => {
     const out: PlacedRehearsal[] = [];
     for (const r of rehearsals) {
-      const x = placeIfInRow(r.tick, timing, startPos, endPos, barCount);
-      if (x !== null) out.push({ msg: r, xPercent: x });
+      const p = placeIfInRow(r.tick, timing, startPos, endPos, barCount);
+      if (p !== null) out.push({ msg: r, ...p });
     }
     return out;
   }, [rehearsals, timing, startPos, endPos, barCount]);
@@ -269,11 +278,35 @@ function ScoreRow({
   const placedSyllables = useMemo<PlacedSyllable[]>(() => {
     const out: PlacedSyllable[] = [];
     for (const s of syllables) {
-      const x = placeIfInRow(s.tick, timing, startPos, endPos, barCount);
-      if (x !== null) out.push({ syllable: s, xPercent: x });
+      const p = placeIfInRow(s.tick, timing, startPos, endPos, barCount);
+      if (p !== null) out.push({ syllable: s, ...p });
     }
     return out;
   }, [syllables, timing, startPos, endPos, barCount]);
+
+  const staffRef = useRef<HTMLDivElement | null>(null);
+  const chordsRef = useRef<HTMLDivElement | null>(null);
+  const lyricsRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const staff = staffRef.current;
+    if (!staff) return;
+    const layout = () => {
+      spreadLayer(chordsRef.current, barCount, CHORD_PAD, CHORD_GAP);
+      spreadLayer(lyricsRef.current, barCount, LYRIC_PAD, LYRIC_GAP);
+    };
+    layout();
+    let cancelled = false;
+    void document.fonts.ready.then(() => {
+      if (!cancelled) layout();
+    });
+    const observer = new ResizeObserver(layout);
+    observer.observe(staff);
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [placedChords, placedSyllables, barCount, keyShift]);
 
   const bars = useMemo(
     () => Array.from({ length: barCount }, (_, i) => startBar + i),
@@ -292,7 +325,7 @@ function ScoreRow({
         ))}
       </div>
 
-      <div className="score-staff">
+      <div className="score-staff" ref={staffRef}>
         <div className="score-bars">
           {bars.map((bar) => {
             const sig = barTimeSignatures.get(bar);
@@ -326,12 +359,13 @@ function ScoreRow({
           })}
         </div>
 
-        <div className="score-chords">
+        <div className="score-chords" ref={chordsRef}>
           {placedChords.map((p, i) => (
             <span
               key={i}
               className="score-chord"
               data-tick={p.msg.tick}
+              data-bar={p.barIndex}
               style={{ left: `${p.xPercent}%` }}
             >
               {formatTransposedChord(p.msg, timing, keyShift)}
@@ -340,12 +374,13 @@ function ScoreRow({
         </div>
 
         {placedSyllables.length > 0 && (
-          <div className="score-lyrics">
+          <div className="score-lyrics" ref={lyricsRef}>
             {placedSyllables.map((p, i) => (
               <span
                 key={i}
                 className="score-lyric"
                 data-tick={p.syllable.tick}
+                data-bar={p.barIndex}
                 style={{ left: `${p.xPercent}%` }}
               >
                 {p.syllable.runs.map((run, j) => {
@@ -420,8 +455,57 @@ function placeIfInRow(
   startPos: number,
   endPos: number,
   barCount: number,
-): number | null {
+): Placement | null {
   const pos = barPositionAt(tick, timing);
   if (pos < startPos || pos >= endPos) return null;
-  return ((pos - startPos) / barCount) * 100;
+  return { xPercent: ((pos - startPos) / barCount) * 100, barIndex: Math.floor(pos - startPos) };
+}
+
+function spreadLayer(layer: HTMLElement | null, barCount: number, pad: number, gap: number): void {
+  if (!layer) return;
+  const els = Array.from(layer.children) as HTMLElement[];
+  const anchors = els.map((el) => el.offsetLeft);
+  const items = els.map((el, i) => measureLabel(el, anchors[i]! + pad));
+  const width = layer.clientWidth;
+  const barWidth = width / barCount;
+
+  const order = els.map((_, i) => i).sort((a, b) => anchors[a]! - anchors[b]!);
+  const bars = new Map<number, number[]>();
+  for (const i of order) {
+    const barIndex = Number(els[i]!.dataset.bar ?? '0');
+    const group = bars.get(barIndex);
+    if (group) group.push(i);
+    else bars.set(barIndex, [i]);
+  }
+
+  const itemsOf = (indices: number[]) => indices.map((i) => items[i]!);
+  const xs = new Array<number>(els.length);
+  const place = (indices: number[], lo: number, hi: number) => {
+    const placed = spreadLabels(itemsOf(indices), lo, hi, gap);
+    indices.forEach((i, k) => (xs[i] = placed[k]!));
+  };
+  const barsFit = Array.from(bars.values()).every(
+    (group) => labelSpan(itemsOf(group), gap) <= barWidth - pad * 2,
+  );
+  if (barsFit) {
+    for (const [barIndex, group] of bars) {
+      place(group, barIndex * barWidth + pad, (barIndex + 1) * barWidth - pad);
+    }
+  } else {
+    place(order, pad, width - pad);
+  }
+
+  els.forEach((el, i) => (el.style.transform = `translateX(${xs[i]! - anchors[i]!}px)`));
+}
+
+function measureLabel(el: HTMLElement, x: number): SpreadItem {
+  const rect = el.getBoundingClientRect();
+  let left = 0;
+  let right = rect.width;
+  for (const rt of el.querySelectorAll('rt')) {
+    const r = rt.getBoundingClientRect();
+    left = Math.min(left, r.left - rect.left);
+    right = Math.max(right, r.right - rect.left);
+  }
+  return { x, left, right };
 }
