@@ -13,10 +13,14 @@ import type { MidiScheduler } from './lib/player/scheduler.ts';
 import type { Song } from './lib/song.ts';
 import type { FileSummary } from './lib/songLoader.ts';
 
+const MIDI_EXTENSIONS = ['.mid', '.midi', '.kar', '.xih', '.xkm'];
+const FILE_ACCEPT = [...MIDI_EXTENSIONS, 'audio/midi'].join(',');
+
 function App() {
   const { state: songState, loadFile } = useSongLoader();
   const [isDragging, setIsDragging] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { settings, updateSettings } = useSettings();
   const song = songState.status === 'loaded' ? songState.song : null;
   const file = songState.status === 'empty' ? null : songState.file;
@@ -101,11 +105,7 @@ function App() {
           <h1 className="app-bar-title">XF MIDI Viewer</h1>
           <div className="app-bar-actions">
             <label className="icon-button" title="ファイルを開く" aria-label="ファイルを開く">
-              <input
-                type="file"
-                accept=".mid,.midi,.kar,.xih,.xkm,audio/midi"
-                onChange={onChange}
-              />
+              <input type="file" accept={FILE_ACCEPT} onChange={onChange} ref={fileInputRef} />
               <FolderOpenIcon />
             </label>
             <button
@@ -124,10 +124,21 @@ function App() {
       <main className={`app${isDragging ? ' app--dragging' : ''}`}>
         {(songState.status === 'empty' || songState.status === 'loading') && (
           <section className="empty-state">
-            <p className="empty-state-headline">
-              YAMAHA XF フォーマットの MIDI ファイルを解析・表示します
-            </p>
-            <p className="muted">上部のアイコンから開くか、ウィンドウへドラッグ&ドロップ</p>
+            <div className="drop-zone">
+              <span className="drop-zone-icon">
+                <FolderOpenIcon size={36} />
+              </span>
+              <p className="empty-state-headline">MIDI ファイルをここにドロップ</p>
+              <p className="muted">YAMAHA XF フォーマットの歌詞とコードを表示します</p>
+              <button
+                type="button"
+                className="file-select-button"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                ファイルを選択
+              </button>
+              <p className="drop-zone-formats">対応形式: {MIDI_EXTENSIONS.join(' ')}</p>
+            </div>
           </section>
         )}
 
@@ -161,11 +172,11 @@ function App() {
   );
 }
 
-function FolderOpenIcon() {
+function FolderOpenIcon({ size = 20 }: { size?: number }) {
   return (
     <svg
-      width="20"
-      height="20"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
