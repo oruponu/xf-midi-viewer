@@ -12,6 +12,11 @@
   --success: #15803d;
   --danger: #dc2626;
 
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
   --sans: 'Noto Sans JP', sans-serif;
   --mono: 'Roboto Mono', monospace;
 
