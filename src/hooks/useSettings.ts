@@ -5,11 +5,13 @@ const STORAGE_KEY = 'xf-midi-viewer:settings';
 export interface Settings {
   autoScrollLeadSheet: boolean;
   autoScrollLyrics: boolean;
+  showPitchBar: boolean;
 }
 
 const DEFAULT_SETTINGS: Settings = {
   autoScrollLeadSheet: true,
   autoScrollLyrics: true,
+  showPitchBar: true,
 };
 
 function loadSettings(): Settings {
@@ -20,18 +22,18 @@ function loadSettings(): Settings {
     const parsed = JSON.parse(raw) as Partial<Settings> | null;
     if (!parsed || typeof parsed !== 'object') return DEFAULT_SETTINGS;
     return {
-      autoScrollLeadSheet:
-        typeof parsed.autoScrollLeadSheet === 'boolean'
-          ? parsed.autoScrollLeadSheet
-          : DEFAULT_SETTINGS.autoScrollLeadSheet,
-      autoScrollLyrics:
-        typeof parsed.autoScrollLyrics === 'boolean'
-          ? parsed.autoScrollLyrics
-          : DEFAULT_SETTINGS.autoScrollLyrics,
+      autoScrollLeadSheet: readBoolean(parsed, 'autoScrollLeadSheet'),
+      autoScrollLyrics: readBoolean(parsed, 'autoScrollLyrics'),
+      showPitchBar: readBoolean(parsed, 'showPitchBar'),
     };
   } catch {
     return DEFAULT_SETTINGS;
   }
+}
+
+function readBoolean(parsed: Partial<Settings>, key: keyof Settings): boolean {
+  const value = parsed[key];
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS[key];
 }
 
 export function useSettings(): {

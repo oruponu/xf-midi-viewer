@@ -265,6 +265,7 @@ function PlayerScope({
         scheduler={scheduler}
         autoScrollLeadSheet={settings.autoScrollLeadSheet}
         autoScrollLyrics={settings.autoScrollLyrics}
+        showPitchBar={settings.showPitchBar}
         keyShift={keyShift}
       />
       <div className="player-dock" ref={dockRef}>

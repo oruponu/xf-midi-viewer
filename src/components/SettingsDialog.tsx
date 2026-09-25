@@ -81,6 +81,16 @@ export function SettingsDialog({
           </section>
 
           <section className="settings-section">
+            <h3>カラオケビュー</h3>
+            <p className="settings-section-desc">カラオケビューの表示内容を切り替えます</p>
+            <ToggleRow
+              label="音程バー"
+              checked={settings.showPitchBar}
+              onChange={(v) => onChange({ showPitchBar: v })}
+            />
+          </section>
+
+          <section className="settings-section">
             <h3>MIDI出力</h3>
             <p className="settings-section-desc">再生に使用する MIDI 出力ポートを選択します</p>
             <MidiOutputControl midi={midi} />

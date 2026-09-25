@@ -36,6 +36,7 @@ export function InfoPanel({
   scheduler,
   autoScrollLeadSheet = true,
   autoScrollLyrics = true,
+  showPitchBar = true,
   keyShift = 0,
 }: {
   file: FileSummary | null;
@@ -44,6 +45,7 @@ export function InfoPanel({
   scheduler: MidiScheduler;
   autoScrollLeadSheet?: boolean;
   autoScrollLyrics?: boolean;
+  showPitchBar?: boolean;
   keyShift?: number;
 }) {
   const { xf: data, karaoke: parsedKaraoke, chords, rehearsals, timing, sequence } = song;
@@ -111,7 +113,7 @@ export function InfoPanel({
         (hasKaraoke && parsedKaraoke.syllables.length > 0 ? (
           <KaraokeView
             pages={song.karaokePages}
-            pitchLane={song.pitchLane}
+            pitchLane={showPitchBar ? song.pitchLane : null}
             sequence={sequence}
             scheduler={scheduler}
           />
