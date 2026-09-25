@@ -74,8 +74,7 @@ function noteRange(notes: readonly PitchBarNote[]): { lowNote: number; highNote:
   return { lowNote: low, highNote: high };
 }
 
-// Bar start ticks followed by the end of the last bar. A time signature change
-// always starts a new bar, as in tickToBarBeat.
+// A time signature change always starts a new bar, as in tickToBarBeat.
 function barBoundaries(timing: SmfTiming, durationTicks: number): number[] {
   const segments = signatureSegments(timing);
   const end = Math.max(durationTicks, 1);
