@@ -27,7 +27,7 @@ const STANDARD_KIT: XgKit = {
     31: { name: 'Snare L', from: gs(32, 38) },
     32: { name: 'Sticks', from: gs(0, 31) },
     33: { name: 'Bass Drum L', from: gs(32, 36) },
-    34: { name: 'Open Rim Shot', from: gs(0, 37) },
+    34: { name: 'Open Rim Shot', from: gs(16, 38) },
     35: { name: 'Bass Drum M', from: gs(0, 35) },
     36: { name: 'Bass Drum H', from: gs(0, 36) },
     37: { name: 'Side Stick', from: gs(0, 37) },
@@ -89,7 +89,7 @@ const STANDARD2_KIT: XgKit = {
   notes: {
     29: { name: 'Snare Roll 2', from: gs(1, 38) },
     31: { name: 'Snare L2', from: gs(2, 38) },
-    34: { name: 'Open Rim Shot 2', from: gs(0, 37) },
+    34: { name: 'Open Rim Shot 2', from: gs(16, 38) },
     35: { name: 'Bass Drum M2', from: gs(0, 35) },
     36: { name: 'Bass Drum H2', from: gs(1, 36) },
     38: { name: 'Snare M2', from: gs(1, 38) },
