@@ -1279,11 +1279,8 @@
   }
 
   .playback-panel {
-    grid-template-columns: 1fr;
-  }
-
-  .playback-controls {
-    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .transport-button {
@@ -1291,20 +1288,41 @@
   }
 
   .playback-position-group {
-    width: 100%;
+    display: contents;
   }
 
   .playback-position {
-    flex: 1;
+    grid-column: 2 / -1;
+  }
+
+  .playback-tempo,
+  .playback-key {
+    min-width: 0;
+  }
+
+  .playback-time-sig {
+    align-self: stretch;
+    height: auto;
+    min-width: 0;
+  }
+
+  .playback-timeline {
+    grid-column: 1 / -1;
+  }
+
+  .viewer-tabs {
+    gap: 4px;
+    padding: 3px;
   }
 
   .viewer-tab {
     min-height: 38px;
-    padding: 5px 6px;
+    padding: 5px 4px;
   }
 
   .viewer-tab-label {
-    font-size: 13px;
+    font-size: 12px;
+    white-space: nowrap;
   }
 
   .style-event-row {

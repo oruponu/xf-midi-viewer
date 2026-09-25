@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef } from 'react';
+import { useMediaQuery } from '../hooks/useMediaQuery.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
@@ -16,6 +17,7 @@ import { shiftChordBass, shiftChordRoot } from '../lib/xf/transpose.ts';
 import type { ChordMessage, RehearsalMessage } from '../lib/xf/types.ts';
 
 const BARS_PER_ROW = 4;
+const NARROW_BARS_PER_ROW = 2;
 
 interface PlacedChord {
   msg: ChordMessage;
@@ -70,14 +72,17 @@ export const LeadSheet = memo(function LeadSheet({
     return bb ? bb.bar : 1;
   }, [chords, rehearsals, syllables, timing]);
 
+  const isNarrow = useMediaQuery('(max-width: 720px)');
+  const barsPerRow = isNarrow ? NARROW_BARS_PER_ROW : BARS_PER_ROW;
+
   const rows = useMemo<RowSpec[]>(() => {
     const out: RowSpec[] = [];
-    for (let s = 1; s <= totalBars; s += BARS_PER_ROW) {
+    for (let s = 1; s <= totalBars; s += barsPerRow) {
       const remaining = totalBars - s + 1;
-      out.push({ startBar: s, barCount: Math.min(BARS_PER_ROW, remaining) });
+      out.push({ startBar: s, barCount: Math.min(barsPerRow, remaining) });
     }
     return out;
-  }, [totalBars]);
+  }, [totalBars, barsPerRow]);
 
   const barTimeSignatures = useMemo(() => {
     const map = new Map<number, TimeSignature>();
