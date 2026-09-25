@@ -15,7 +15,7 @@ import type {
   GenericRange,
 } from 'spessasynth_core';
 import { describeSource, resolveKitNotes } from './mapping.ts';
-import type { SourceNote, XgKit } from './mapping.ts';
+import type { SourceNote, XgKit, XgSfxVoice } from './mapping.ts';
 
 const KEY_NUMBER_ENVELOPES: readonly (readonly [GeneratorType, GeneratorType])[] = [
   [GeneratorTypes.keyNumToVolEnvHold, GeneratorTypes.holdVolEnv],
@@ -79,6 +79,16 @@ export function buildKitPreset(bank: BasicSoundBank, kit: XgKit): BasicPreset {
         `${kit.name} のノート ${note}: ${describeSource(mapped.from)} に音がありません`,
       );
   }
+  return preset;
+}
+
+export function buildSfxVoicePreset(bank: BasicSoundBank, sfx: XgSfxVoice): BasicPreset {
+  const preset = createPreset(bank, `XG ${sfx.name}`, 64, sfx.program);
+  if (!sfx.from) return preset;
+  const source = findSourcePreset(bank, sfx.from);
+  preset.globalZone.copyFrom(source.globalZone);
+  for (const sourceZone of source.zones)
+    preset.createZone(sourceZone.instrument).copyFrom(sourceZone);
   return preset;
 }
 

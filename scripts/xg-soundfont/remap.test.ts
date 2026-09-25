@@ -12,7 +12,7 @@ import type { BasicPreset, BasicSoundBank, VoiceParameters } from 'spessasynth_c
 import { gs, voice } from './mapping.ts';
 import type { XgKit } from './mapping.ts';
 import { SOURCE_SOUND_BANK_PATH } from './paths.ts';
-import { buildKitPreset, findSourcePreset } from './remap.ts';
+import { buildKitPreset, buildSfxVoicePreset, findSourcePreset } from './remap.ts';
 
 SpessaLog.setLogLevel(false, false, false);
 
@@ -267,5 +267,32 @@ describe('buildKitPreset', () => {
     expect(() =>
       buildKitPreset(bank, kit({ 38: { name: 'Snare M', from: gs(0, 38) } })),
     ).not.toThrow();
+  });
+});
+
+describe('buildSfxVoicePreset', () => {
+  test('sounds the same as the source preset', () => {
+    const preset = buildSfxVoicePreset(bank, { program: 32, name: 'Rain', from: voice(1, 122) });
+    expect([preset.bankMSB, preset.bankLSB, preset.program, preset.isGMGSDrum]).toEqual([
+      64,
+      0,
+      32,
+      false,
+    ]);
+    expect(preset.name).toBe('XG Rain');
+    const source = findSourcePreset(bank, voice(1, 122));
+    for (const key of [36, 60, 84]) expectSameSound(preset, key, source, key);
+  });
+
+  test('creates an empty preset when there is no source', () => {
+    const preset = buildSfxVoicePreset(bank, {
+      program: 54,
+      name: 'Ghost',
+      from: null,
+      reason: 'no-substitute',
+    });
+    expect(preset.program).toBe(54);
+    expect(preset.zones).toEqual([]);
+    expect(preset.getVoiceParameters(60, 100)).toEqual([]);
   });
 });
