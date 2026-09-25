@@ -304,7 +304,6 @@ function KaraokeSection({
 
   return (
     <div className="card">
-      {parsed.header && <KaraokeHeaderInfo header={parsed.header} />}
       {blocks.length > 0 && (
         <div className="karaoke-stream" ref={streamRef}>
           {blocks.flatMap((block, idx) => {
