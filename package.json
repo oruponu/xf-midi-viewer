@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun run licenses && vite",
+    "dev:https": "bun run licenses && vite --mode https --host",
     "build": "bun run licenses && tsc -b && vite build",
     "licenses": "bun scripts/third-party-licenses.ts",
     "lint": "eslint .",
