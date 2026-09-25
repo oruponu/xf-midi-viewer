@@ -27,7 +27,8 @@ function App() {
   const errorMessage = songState.status === 'error' ? songState.message : (song?.xfError ?? null);
   const player = useMidiPlayer(song?.sequence ?? null);
   const { scheduler, isPlaying } = player;
-  const midiReady = player.midiAccessState === 'ready' && player.selectedMidiOutputId.length > 0;
+  const outputReady = player.outputReady && !player.isPreparing;
+  const { play } = player;
 
   const openFile = useCallback(
     (f: File) => {
@@ -92,11 +93,11 @@ function App() {
       if (isEditableTarget(e.target)) return;
       e.preventDefault();
       if (isPlaying) scheduler.pause();
-      else scheduler.play();
+      else play();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isPlaying, isSettingsOpen, song, scheduler]);
+  }, [isPlaying, isSettingsOpen, song, scheduler, play]);
 
   return (
     <>
@@ -157,7 +158,8 @@ function App() {
           isPlaying={isPlaying}
           playbackRate={player.playbackRate}
           keyShift={player.keyShift}
-          midiReady={midiReady}
+          outputReady={outputReady}
+          onPlay={play}
         />
       </main>
 
@@ -165,7 +167,7 @@ function App() {
         open={isSettingsOpen}
         settings={settings}
         onChange={updateSettings}
-        midi={player}
+        player={player}
         onClose={() => setIsSettingsOpen(false)}
       />
     </>
@@ -218,7 +220,8 @@ function PlayerScope({
   isPlaying,
   playbackRate,
   keyShift,
-  midiReady,
+  outputReady,
+  onPlay,
 }: {
   file: FileSummary | null;
   song: Song | null;
@@ -227,7 +230,8 @@ function PlayerScope({
   isPlaying: boolean;
   playbackRate: number;
   keyShift: number;
-  midiReady: boolean;
+  outputReady: boolean;
+  onPlay: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
   const dockRef = useRef<HTMLDivElement | null>(null);
@@ -277,7 +281,8 @@ function PlayerScope({
             isPlaying={isPlaying}
             playbackRate={playbackRate}
             keyShift={keyShift}
-            midiReady={midiReady}
+            outputReady={outputReady}
+            onPlay={onPlay}
           />
         </div>
       </div>

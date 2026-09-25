@@ -1,29 +1,31 @@
 import { useEffect, useRef } from 'react';
 import type { MidiPlayer } from '../hooks/useMidiPlayer.ts';
 import type { Settings } from '../hooks/useSettings.ts';
+import { BUILTIN_OUTPUT_ID } from '../lib/player/outputSelection.ts';
 
-export type MidiPortProps = Pick<
+export type PlayerOutputProps = Pick<
   MidiPlayer,
   | 'midiAccessState'
-  | 'midiError'
+  | 'playerError'
   | 'midiOutputs'
-  | 'selectedMidiOutputId'
+  | 'selectedOutputId'
   | 'isPlaying'
+  | 'builtin'
   | 'requestMidiAccess'
-  | 'selectMidiOutput'
+  | 'selectOutput'
 >;
 
 export function SettingsDialog({
   open,
   settings,
   onChange,
-  midi,
+  player,
   onClose,
 }: {
   open: boolean;
   settings: Settings;
   onChange: (patch: Partial<Settings>) => void;
-  midi: MidiPortProps;
+  player: PlayerOutputProps;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
@@ -91,9 +93,9 @@ export function SettingsDialog({
           </section>
 
           <section className="settings-section">
-            <h3>MIDI出力</h3>
-            <p className="settings-section-desc">再生に使用する MIDI 出力ポートを選択します</p>
-            <MidiOutputControl midi={midi} />
+            <h3>出力</h3>
+            <p className="settings-section-desc">再生に使う音源を選択します</p>
+            <OutputControl player={player} />
           </section>
         </div>
       </div>
@@ -124,44 +126,73 @@ function ToggleRow({
   );
 }
 
-function MidiOutputControl({ midi }: { midi: MidiPortProps }) {
+function OutputControl({ player }: { player: PlayerOutputProps }) {
+  const { builtin } = player;
+  const canRequestMidi =
+    player.midiAccessState !== 'ready' && player.midiAccessState !== 'unsupported';
   return (
     <div className="settings-midi">
       <div className="settings-midi-row">
-        {midi.midiAccessState === 'ready' ? (
-          <select
-            aria-label="MIDI output port"
-            className="midi-output-select"
-            value={midi.selectedMidiOutputId}
-            disabled={midi.isPlaying}
-            onChange={(e) => midi.selectMidiOutput(e.currentTarget.value)}
-          >
-            {midi.midiOutputs.length === 0 ? (
-              <option value="">MIDIポートなし</option>
-            ) : (
-              midi.midiOutputs.map((output) => (
-                <option key={output.id} value={output.id}>
-                  {formatOutputName(output)}
-                </option>
-              ))
-            )}
-          </select>
-        ) : (
+        <select
+          aria-label="出力先"
+          className="midi-output-select"
+          value={player.selectedOutputId}
+          disabled={player.isPlaying}
+          onChange={(e) => player.selectOutput(e.currentTarget.value)}
+        >
+          {player.selectedOutputId === '' && (
+            <option value="" disabled>
+              未接続
+            </option>
+          )}
+          <option value={BUILTIN_OUTPUT_ID} disabled={builtin.status === 'unsupported'}>
+            内蔵音源（GeneralUser GS）
+          </option>
+          {player.midiOutputs.map((output) => (
+            <option key={output.id} value={output.id}>
+              {formatOutputName(output)}
+            </option>
+          ))}
+        </select>
+        {canRequestMidi && (
           <button
             className="midi-request-button"
             type="button"
-            disabled={
-              midi.midiAccessState === 'unsupported' || midi.midiAccessState === 'requesting'
-            }
-            onClick={() => void midi.requestMidiAccess()}
+            disabled={player.midiAccessState === 'requesting'}
+            onClick={() => void player.requestMidiAccess()}
           >
-            {midi.midiAccessState === 'requesting' ? '確認中' : 'MIDI許可'}
+            {player.midiAccessState === 'requesting' ? '確認中' : 'MIDI許可'}
+          </button>
+        )}
+        {player.selectedOutputId === BUILTIN_OUTPUT_ID && builtin.status === 'error' && (
+          <button className="midi-request-button" type="button" onClick={builtin.retry}>
+            再読み込み
           </button>
         )}
       </div>
-      <p className="settings-midi-status">{midiStatusText(midi)}</p>
+      <p className="settings-midi-status">{outputStatusText(player)}</p>
     </div>
   );
+}
+
+function outputStatusText(player: PlayerOutputProps): string {
+  if (player.playerError) return player.playerError;
+  const { builtin } = player;
+  if (player.selectedOutputId === BUILTIN_OUTPUT_ID) {
+    switch (builtin.status) {
+      case 'unsupported':
+      case 'error':
+        return builtin.error ?? '内蔵音源を使用できません';
+      case 'idle':
+      case 'loading':
+        return '音源を読み込み中';
+      case 'ready':
+        return '内蔵音源を使用中';
+    }
+  }
+  if (player.selectedOutputId !== '') return '接続済み';
+  if (builtin.status === 'unsupported' && builtin.error) return builtin.error;
+  return player.midiAccessState === 'denied' ? 'MIDI権限なし' : '未接続';
 }
 
 function formatOutputName(output: {
@@ -171,22 +202,6 @@ function formatOutputName(output: {
 }): string {
   const label = output.manufacturer ? `${output.manufacturer} ${output.name}` : output.name;
   return output.connection === 'open' ? `${label} (open)` : label;
-}
-
-function midiStatusText(midi: MidiPortProps): string {
-  if (midi.midiError) return midi.midiError;
-  switch (midi.midiAccessState) {
-    case 'unsupported':
-      return 'Web MIDI未対応';
-    case 'requesting':
-      return '権限確認中';
-    case 'denied':
-      return 'MIDI権限なし';
-    case 'ready':
-      return midi.midiOutputs.length > 0 ? '接続済み' : '出力なし';
-    case 'idle':
-      return '未接続';
-  }
 }
 
 function CloseIcon() {

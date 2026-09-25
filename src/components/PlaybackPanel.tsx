@@ -22,7 +22,8 @@ interface PlaybackPanelProps {
   isPlaying: boolean;
   playbackRate: number;
   keyShift: number;
-  midiReady: boolean;
+  outputReady: boolean;
+  onPlay: () => void;
 }
 
 export function PlaybackPanel({
@@ -32,10 +33,11 @@ export function PlaybackPanel({
   isPlaying,
   playbackRate,
   keyShift,
-  midiReady,
+  outputReady,
+  onPlay,
 }: PlaybackPanelProps) {
   const hasMidiMessages = sequence.midiMessages.length > 0 && sequence.durationSeconds > 0;
-  const canPlay = hasMidiMessages && midiReady;
+  const canPlay = hasMidiMessages && outputReady;
 
   return (
     <section className="playback-panel" aria-label="MIDI playback">
@@ -48,7 +50,7 @@ export function PlaybackPanel({
           title={isPlaying ? '一時停止' : '再生'}
           onClick={() => {
             if (isPlaying) scheduler.pause();
-            else scheduler.play();
+            else onPlay();
           }}
         >
           {isPlaying ? <PauseIcon /> : <PlayIcon />}
