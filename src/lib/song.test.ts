@@ -85,14 +85,11 @@ describe('buildSong', () => {
     expect(song.pitchLane).toEqual({
       lowNote: 55,
       highNote: 66,
-      sections: [
-        {
-          startTick: 0,
-          endTick: 1920,
-          barTicks: [],
-          notes: [{ note: 60, startTick: 0, endTick: 240 }],
-        },
-      ],
+      notes: [{ note: 60, startTick: 0, endTick: 240 }],
+      barTicks: [0],
+      rehearsals: [],
+      endTick: 1920,
+      viewTicks: 7680,
     });
   });
 

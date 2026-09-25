@@ -1273,14 +1273,38 @@
 }
 
 .pitch-lane {
+  --pitch-lane-cursor: 25%;
   position: absolute;
   top: 1.5cqi;
   left: var(--karaoke-font-size);
   width: calc(100% - 2 * var(--karaoke-font-size));
   height: 30%;
+  overflow: hidden;
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--surface) 70%, transparent);
   pointer-events: none;
+}
+
+.pitch-lane-track {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--pitch-lane-cursor);
+  transform: translateX(calc(var(--pitch-lane-progress, 0) * -100%));
+  will-change: transform;
+}
+
+.pitch-lane-layer {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.pitch-lane-sung {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(0 calc(100% - var(--pitch-lane-cursor)) 0 0);
 }
 
 .pitch-lane-bar-line {
@@ -1288,18 +1312,34 @@
   stroke-width: 1;
 }
 
+.pitch-lane-rehearsal line {
+  stroke: var(--rehearsal-color);
+  stroke-width: 1.5;
+}
+
+.pitch-lane-rehearsal text {
+  fill: var(--rehearsal-color);
+  font-size: 1.6cqi;
+  font-weight: 600;
+}
+
 .pitch-lane-note {
   fill: color-mix(in srgb, var(--text) 45%, transparent);
   rx: 0.4cqi;
 }
 
-.pitch-lane-notes--sung .pitch-lane-note {
+.pitch-lane-sung .pitch-lane-note {
   fill: var(--accent);
 }
 
 .pitch-lane-cursor {
-  stroke: var(--text-h);
-  stroke-width: 2;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--pitch-lane-cursor);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text-h);
 }
 
 @media (max-width: 720px) {

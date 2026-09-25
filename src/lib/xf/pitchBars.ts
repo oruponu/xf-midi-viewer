@@ -2,7 +2,7 @@ import type { PlaybackNote } from '../smf/playback.ts';
 import type { SmfTiming } from '../smf/timing.ts';
 import type { RehearsalMessage } from './types.ts';
 
-const BARS_PER_SECTION = 4;
+const VIEW_QUARTER_NOTES = 16;
 const MIN_ROWS = 12;
 
 export interface PitchBarNote {
@@ -11,17 +11,19 @@ export interface PitchBarNote {
   endTick: number;
 }
 
-export interface PitchBarSection {
-  startTick: number;
-  endTick: number;
-  barTicks: number[];
-  notes: PitchBarNote[];
+export interface PitchBarRehearsal {
+  tick: number;
+  label: string;
 }
 
 export interface PitchLane {
   lowNote: number;
   highNote: number;
-  sections: PitchBarSection[];
+  notes: PitchBarNote[];
+  barTicks: number[];
+  rehearsals: PitchBarRehearsal[];
+  endTick: number;
+  viewTicks: number;
 }
 
 export function buildPitchLane(
@@ -40,21 +42,17 @@ export function buildPitchLane(
   if (melody.length === 0) return null;
 
   const bars = barBoundaries(timing, durationTicks);
-  const sections = sectionRanges(bars, rehearsals).map(([start, end]) => {
-    const startTick = bars[start]!;
-    const endTick = bars[end]!;
-    return {
-      startTick,
-      endTick,
-      barTicks: bars.slice(start + 1, end),
-      notes: melody.filter((n) => n.startTick < endTick && n.endTick > startTick),
-    };
-  });
-  return { ...noteRange(melody), sections };
-}
-
-export function findPitchBarSection(sections: readonly PitchBarSection[], tick: number): number {
-  return lastIndexAtOrBefore(sections.length, (i) => sections[i]!.startTick, tick);
+  const endTick = bars.pop()!;
+  return {
+    ...noteRange(melody),
+    notes: melody,
+    barTicks: bars,
+    rehearsals: rehearsals
+      .filter((r) => r.tick >= 0 && r.tick < endTick)
+      .map((r) => ({ tick: r.tick, label: r.letter + "'".repeat(r.variation) })),
+    endTick,
+    viewTicks: timing.ppq * VIEW_QUARTER_NOTES,
+  };
 }
 
 function noteRange(notes: readonly PitchBarNote[]): { lowNote: number; highNote: number } {
@@ -100,38 +98,4 @@ function signatureSegments(timing: SmfTiming): { tick: number; barTicks: number 
     else segments.push(segment);
   }
   return segments;
-}
-
-function sectionRanges(
-  bars: readonly number[],
-  rehearsals: readonly RehearsalMessage[],
-): [number, number][] {
-  const barCount = bars.length - 1;
-  const marks = new Set<number>();
-  for (const r of rehearsals) {
-    if (r.tick >= 0 && r.tick < bars[barCount]!) {
-      marks.add(lastIndexAtOrBefore(barCount, (i) => bars[i]!, r.tick));
-    }
-  }
-  const ranges: [number, number][] = [];
-  let start = 0;
-  for (let i = 1; i < barCount; i += 1) {
-    if (i - start === BARS_PER_SECTION || marks.has(i)) {
-      ranges.push([start, i]);
-      start = i;
-    }
-  }
-  ranges.push([start, barCount]);
-  return ranges;
-}
-
-function lastIndexAtOrBefore(length: number, tickAt: (i: number) => number, tick: number): number {
-  let lo = 0;
-  let hi = length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >>> 1;
-    if (tickAt(mid) <= tick) lo = mid;
-    else hi = mid - 1;
-  }
-  return lo;
 }
