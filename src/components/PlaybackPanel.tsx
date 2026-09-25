@@ -44,8 +44,8 @@ export function PlaybackPanel({
           className="transport-button primary"
           type="button"
           disabled={!canPlay}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
-          title={isPlaying ? 'Pause' : 'Play'}
+          aria-label={isPlaying ? '一時停止' : '再生'}
+          title={isPlaying ? '一時停止' : '再生'}
           onClick={() => {
             if (isPlaying) scheduler.pause();
             else scheduler.play();
@@ -57,8 +57,8 @@ export function PlaybackPanel({
           className="transport-button"
           type="button"
           disabled={!canPlay}
-          aria-label="Stop"
-          title="Stop"
+          aria-label="停止"
+          title="停止"
           onClick={() => scheduler.stop()}
         >
           <StopIcon />

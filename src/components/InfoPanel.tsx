@@ -170,9 +170,9 @@ function FileSection({ file }: { file: FileSummary }) {
     <div className="card">
       <h3>ファイル情報</h3>
       <FieldList>
-        <Field label="File name" value={file.name} />
-        <Field label="Size" value={`${file.size.toLocaleString()} bytes`} />
-        <Field label="Last modified" value={new Date(file.lastModified).toLocaleString()} />
+        <Field label="ファイル名" value={file.name} />
+        <Field label="サイズ" value={`${file.size.toLocaleString()} bytes`} />
+        <Field label="更新日時" value={new Date(file.lastModified).toLocaleString()} />
       </FieldList>
     </div>
   );
