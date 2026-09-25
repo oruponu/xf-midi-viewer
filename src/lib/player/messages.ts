@@ -1,5 +1,6 @@
 export type MidiOutputLike = Pick<MIDIOutput, 'send'> & {
   clear?: () => void;
+  latencyMs?: () => number;
 };
 
 export interface MidiSendFailure {
@@ -108,16 +109,16 @@ export function sendMidiPanic(
   }
 }
 
+export const GM_SYSTEM_ON: readonly number[] = [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7];
+export const XG_SYSTEM_ON: readonly number[] = [
+  0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7,
+];
+
 export function sendMidiReset(
   output: MidiOutputLike,
   timestamp: number,
   onFailure?: (failure: MidiSendFailure) => void,
 ): void {
-  trySendMidiMessage(output, [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7], timestamp, onFailure);
-  trySendMidiMessage(
-    output,
-    [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7],
-    timestamp,
-    onFailure,
-  );
+  trySendMidiMessage(output, [...GM_SYSTEM_ON], timestamp, onFailure);
+  trySendMidiMessage(output, [...XG_SYSTEM_ON], timestamp, onFailure);
 }

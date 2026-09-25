@@ -499,6 +499,8 @@
   color: var(--text-h);
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
   cursor: pointer;
 }
 
@@ -1138,6 +1140,15 @@
   margin: 0;
   color: var(--text);
   font-size: 12px;
+}
+
+.settings-license-list {
+  margin: 0;
+  padding-left: 1.2em;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text);
 }
 
 .karaoke-screen {

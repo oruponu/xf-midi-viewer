@@ -4,7 +4,7 @@
     "target": "es2023",
     "lib": ["ES2023", "DOM"],
     "module": "esnext",
-    "types": ["bun"],
+    "types": ["bun", "vite/client"],
     "skipLibCheck": true,
 
     "moduleResolution": "bundler",

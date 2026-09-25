@@ -140,6 +140,7 @@ interface SentMessage {
 interface OutputOptions {
   clear?: boolean;
   now?: () => number;
+  latencyMs?: () => number;
 }
 
 function createOutput(options: OutputOptions = {}) {
@@ -154,6 +155,7 @@ function createOutput(options: OutputOptions = {}) {
     },
   };
   if (options.clear !== false) output.clear = () => {};
+  if (options.latencyMs) output.latencyMs = options.latencyMs;
   return {
     output,
     sent,
@@ -560,6 +562,36 @@ describe('MidiScheduler playback rate', () => {
     scheduler.setPlaybackRate(2);
     expect(calls).toBe(1);
   });
+
+  test('setPlaybackRate() while notes are queued switches the rate after the queued notes', () => {
+    const { clock, scheduler, out } = setup(
+      [msg(0.04, [0x90, 60, 100]), msg(0.06, [0x80, 60, 0]), msg(0.1, [0x90, 62, 100])],
+      10,
+      0,
+      { clear: false },
+    );
+    scheduler.play();
+    clock.advance(5);
+
+    scheduler.setPlaybackRate(2);
+
+    expect(scheduler.getPosition()).toBeCloseTo(0.005, 6);
+    clock.advance(35);
+    expect(scheduler.getPosition()).toBeCloseTo(0.04, 6);
+    clock.advance(10);
+    expect(scheduler.getPosition()).toBeCloseTo(0.06, 6);
+    clock.advance(100);
+
+    const played = playbackOnly(out.sent);
+    expect(played.map((m) => m.data)).toEqual([
+      [0x90, 60, 100],
+      [0x80, 60, 0],
+      [0x90, 62, 100],
+    ]);
+    expect(played[0]!.timestamp).toBeCloseTo(1040, 6);
+    expect(played[1]!.timestamp).toBeCloseTo(1050, 6);
+    expect(played[2]!.timestamp).toBeCloseTo(1070, 6);
+  });
 });
 
 describe('MidiScheduler key shift', () => {
@@ -882,5 +914,168 @@ describe('MidiScheduler fence', () => {
 
     expectFenced(out.sent, before);
     expect(out.sent.slice(before).find((m) => !isPanic(m))!.data).toEqual([0xb0, 121, 0]);
+  });
+});
+
+describe('MidiScheduler output latency', () => {
+  const far = () => [msg(5, [0x90, 60, 100])];
+
+  test('holds the display at the start position for the output latency', () => {
+    const { clock, scheduler } = setup(far(), 10, 0, { latencyMs: () => 100 });
+    scheduler.play();
+
+    expect(scheduler.getPosition()).toBe(0);
+    clock.advance(100);
+    expect(scheduler.getPosition()).toBe(0);
+    clock.advance(50);
+    expect(scheduler.getPosition()).toBeCloseTo(0.05, 6);
+  });
+
+  test('keeps the old rate on screen until the latency has passed after a rate change', () => {
+    const { clock, scheduler } = setup(far(), 10, 0, { latencyMs: () => 100 });
+    scheduler.play();
+    clock.advance(500);
+    expect(scheduler.getPosition()).toBeCloseTo(0.4, 6);
+
+    scheduler.setPlaybackRate(2);
+
+    expect(scheduler.getPosition()).toBeCloseTo(0.4, 6);
+    clock.advance(100);
+    expect(scheduler.getPosition()).toBeCloseTo(0.5, 6);
+    clock.advance(50);
+    expect(scheduler.getPosition()).toBeCloseTo(0.6, 6);
+  });
+
+  test('never moves the display backwards when the latency grows', () => {
+    let latency = 0;
+    const { clock, scheduler } = setup(far(), 10, 0, { latencyMs: () => latency });
+    scheduler.play();
+    clock.advance(500);
+    expect(scheduler.getPosition()).toBeCloseTo(0.5, 6);
+
+    latency = 200;
+
+    expect(scheduler.getPosition()).toBeCloseTo(0.5, 6);
+    clock.advance(100);
+    expect(scheduler.getPosition()).toBeCloseTo(0.5, 6);
+    clock.advance(150);
+    expect(scheduler.getPosition()).toBeCloseTo(0.55, 6);
+  });
+
+  test('jumps forward when the latency shrinks', () => {
+    let latency = 200;
+    const { clock, scheduler } = setup(far(), 10, 0, { latencyMs: () => latency });
+    scheduler.play();
+    clock.advance(500);
+    expect(scheduler.getPosition()).toBeCloseTo(0.3, 6);
+
+    latency = 0;
+
+    expect(scheduler.getPosition()).toBeCloseTo(0.5, 6);
+  });
+
+  test('handles a rate change and a latency change together', () => {
+    let latency = 100;
+    const { clock, scheduler } = setup(far(), 10, 0, { latencyMs: () => latency });
+    scheduler.play();
+    clock.advance(500);
+    expect(scheduler.getPosition()).toBeCloseTo(0.4, 6);
+
+    scheduler.setPlaybackRate(2);
+    latency = 300;
+
+    expect(scheduler.getPosition()).toBeCloseTo(0.4, 6);
+    clock.advance(200);
+    expect(scheduler.getPosition()).toBeCloseTo(0.4, 6);
+    clock.advance(100);
+    expect(scheduler.getPosition()).toBeCloseTo(0.5, 6);
+    clock.advance(100);
+    expect(scheduler.getPosition()).toBeCloseTo(0.7, 6);
+  });
+
+  test('seek() resets the display floor', () => {
+    const { clock, scheduler } = setup(far(), 10, 0, { latencyMs: () => 100 });
+    scheduler.play();
+    clock.advance(500);
+    expect(scheduler.getPosition()).toBeCloseTo(0.4, 6);
+
+    scheduler.seek(0.1);
+
+    expect(scheduler.getPosition()).toBeCloseTo(0.1, 6);
+  });
+
+  test('a send failure during a backward seek stops at the seek target', () => {
+    const { clock, scheduler, out } = setup(far(), 10);
+    scheduler.play();
+    clock.advance(4900);
+    out.failWith(new Error('boom'));
+
+    scheduler.seek(1);
+
+    expect(scheduler.getState().isPlaying).toBe(false);
+    expect(scheduler.getPosition()).toBeCloseTo(1, 6);
+  });
+
+  test('pause() keeps the audible position', () => {
+    const { clock, scheduler } = setup(far(), 10, 0, { latencyMs: () => 100 });
+    scheduler.play();
+    clock.advance(500);
+
+    scheduler.pause();
+
+    expect(scheduler.getState().isPlaying).toBe(false);
+    expect(scheduler.getPosition()).toBeCloseTo(0.4, 6);
+  });
+
+  test('setOutput(null) while playing keeps the audible position', () => {
+    const { clock, scheduler } = setup(far(), 10, 0, { latencyMs: () => 100 });
+    scheduler.play();
+    clock.advance(500);
+
+    scheduler.setOutput(null);
+
+    expect(scheduler.getState().isPlaying).toBe(false);
+    expect(scheduler.getPosition()).toBeCloseTo(0.4, 6);
+  });
+
+  test('pauseAt() keeps the position at the given time when it is earlier than the audible one', () => {
+    const { clock, scheduler } = setup(far(), 10, 0, { latencyMs: () => 100 });
+    scheduler.play();
+    clock.advance(1000);
+
+    scheduler.pauseAt(1300);
+
+    expect(scheduler.getState().isPlaying).toBe(false);
+    expect(scheduler.getPosition()).toBeCloseTo(0.3, 6);
+  });
+
+  test('pauseAt() uses the audible position when the given time is later', () => {
+    const { clock, scheduler } = setup(far(), 10, 0, { latencyMs: () => 100 });
+    scheduler.play();
+    clock.advance(500);
+
+    scheduler.pauseAt(1500);
+
+    expect(scheduler.getPosition()).toBeCloseTo(0.4, 6);
+  });
+
+  test('pauseAt() does nothing while stopped', () => {
+    const { scheduler } = setup(far(), 10, 0, { latencyMs: () => 100 });
+    scheduler.seek(2);
+
+    scheduler.pauseAt(1000);
+
+    expect(scheduler.getPosition()).toBe(2);
+  });
+
+  test('reaches the end only after the latency has passed', () => {
+    const { clock, scheduler } = setup([msg(0, [0xc0, 1])], 1, 0, { latencyMs: () => 200 });
+    scheduler.play();
+
+    clock.advance(1000);
+    expect(scheduler.getState().isPlaying).toBe(true);
+    clock.advance(200);
+    expect(scheduler.getState().isPlaying).toBe(false);
+    expect(scheduler.getPosition()).toBe(0);
   });
 });
