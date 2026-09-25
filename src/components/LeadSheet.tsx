@@ -182,7 +182,6 @@ export const LeadSheet = memo(function LeadSheet({
 
   return (
     <div className="card lead-sheet">
-      <h3>コード進行</h3>
       <div className="score" ref={scoreRef}>
         {rows.map((row) => (
           <ScoreRow

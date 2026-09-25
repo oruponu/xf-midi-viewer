@@ -196,7 +196,6 @@ export const KaraokeView = memo(function KaraokeView({
 
   return (
     <div className="card karaoke-view">
-      <h3>カラオケ</h3>
       <div className="karaoke-screen" ref={screenRef}>
         <div className="karaoke-stage" ref={stageRef}>
           <KaraokeMeasureLayer pages={pages} layerRef={measureLayerRef} />
