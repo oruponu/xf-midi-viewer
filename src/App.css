@@ -5,7 +5,7 @@
 .app {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 24px 24px calc(var(--dock-height, 0px) + 32px);
+  padding: 14px 24px calc(var(--dock-height, 0px) + 32px);
 }
 
 .app--dragging::after {
@@ -115,7 +115,7 @@
 }
 
 .error {
-  margin-top: 24px;
+  margin-top: 10px;
   border: 1px solid var(--danger);
   background: color-mix(in srgb, var(--danger) 10%, transparent);
   color: var(--danger);
@@ -128,7 +128,6 @@
   position: sticky;
   top: var(--app-bar-height);
   z-index: 30;
-  margin-top: 24px;
   padding: 10px 0 12px;
   background: linear-gradient(
     180deg,
@@ -1226,7 +1225,7 @@
 
 @media (max-width: 720px) {
   .app {
-    padding: 18px 14px calc(var(--dock-height, 0px) + 24px);
+    padding: 12px 14px calc(var(--dock-height, 0px) + 24px);
   }
 
   .app-bar-inner {
@@ -1234,7 +1233,6 @@
   }
 
   .viewer-chrome {
-    margin-top: 18px;
     padding-top: 8px;
   }
 
