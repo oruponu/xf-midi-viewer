@@ -347,7 +347,12 @@ describe('detectDrumChannels', () => {
     expect(detectDrumChannels(smf)).toEqual(new Set([9, 10]));
   });
 
-  test('ignores Bank Select MSB values other than 127', () => {
+  test('adds a channel when Bank Select MSB is 126 (XG SFX kit)', () => {
+    const smf = makeSmf([track([cc(0, 0, 126, 2)])]);
+    expect(detectDrumChannels(smf)).toEqual(new Set([2, 9]));
+  });
+
+  test('ignores Bank Select MSB values other than 126 and 127', () => {
     const smf = makeSmf([track([cc(0, 0, 0, 3), cc(0, 0, 64, 4), cc(0, 0, 120, 5)])]);
     expect(detectDrumChannels(smf)).toEqual(new Set([9]));
   });
