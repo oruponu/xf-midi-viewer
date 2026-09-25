@@ -1,14 +1,16 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
+  --text: #6b7280;
+  --text-h: #111827;
   --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
+  --border: #e5e7eb;
+  --surface: #f3f4f6;
   --accent: #aa3bff;
   --rehearsal-color: #be123c;
   --key-color: #0f766e;
   --timesig-color: #b45309;
-  --warning: #ca8a04;
+  --warning: #a16207;
+  --success: #15803d;
+  --danger: #dc2626;
 
   --sans: 'Noto Sans JP', sans-serif;
   --mono: 'Roboto Mono', monospace;
@@ -27,12 +29,14 @@
     --text-h: #f3f4f6;
     --bg: #16171d;
     --border: #2e303a;
-    --code-bg: #1f2028;
+    --surface: #1f2028;
     --accent: #c084fc;
     --rehearsal-color: #fb7185;
     --key-color: #2dd4bf;
     --timesig-color: #fbbf24;
     --warning: #facc15;
+    --success: #4ade80;
+    --danger: #f87171;
   }
 }
 
