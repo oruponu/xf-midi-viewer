@@ -12,6 +12,7 @@ import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { isBuiltinSynthSupported } from '../lib/synth/engine.ts';
 import { useBuiltinSynth } from './useBuiltinSynth.ts';
 import type { BuiltinSynth } from './useBuiltinSynth.ts';
+import { useMediaQuery } from './useMediaQuery.ts';
 
 export interface MidiOutputOption {
   id: string;
@@ -54,6 +55,7 @@ export function useMidiPlayer(sequence: PlaybackSequence | null): MidiPlayer {
   const [preferredOutputId, setPreferredOutputId] = useState(loadPreferredOutputId);
   const [builtinSupported] = useState(isBuiltinSynthSupported);
   const [isPreparing, setIsPreparing] = useState(false);
+  const isTouchPrimary = useMediaQuery('(pointer: coarse)');
   const midiAccessRef = useRef<MIDIAccess | null>(null);
   const preparingRef = useRef(false);
   const playRequestRef = useRef(0);
@@ -162,7 +164,7 @@ export function useMidiPlayer(sequence: PlaybackSequence | null): MidiPlayer {
   }, [sequence, selectedOutputId]);
 
   useEffect(() => {
-    if (!isBuiltinSelected) return;
+    if (!isBuiltinSelected || !isTouchPrimary) return;
     const onVisibilityChange = () => {
       if (document.visibilityState !== 'hidden') return;
       playRequestRef.current += 1;
@@ -170,7 +172,7 @@ export function useMidiPlayer(sequence: PlaybackSequence | null): MidiPlayer {
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => document.removeEventListener('visibilitychange', onVisibilityChange);
-  }, [scheduler, isBuiltinSelected]);
+  }, [scheduler, isBuiltinSelected, isTouchPrimary]);
 
   useEffect(() => {
     return () => {
