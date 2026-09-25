@@ -4,10 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "bun run licenses && vite",
-    "dev:https": "bun run licenses && vite --mode https --host",
-    "build": "bun run licenses && tsc -b && vite build",
+    "dev": "bun run licenses && bun run soundfont && vite",
+    "dev:https": "bun run licenses && bun run soundfont && vite --mode https --host",
+    "build": "bun run licenses && bun run soundfont && tsc -b && vite build",
     "licenses": "bun scripts/third-party-licenses.ts",
+    "soundfont": "bun scripts/xg-soundfont/build.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "bun test"
@@ -29,6 +30,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
+    "spessasynth_core": "4.3.22",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.10"

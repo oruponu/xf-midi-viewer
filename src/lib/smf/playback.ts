@@ -115,7 +115,7 @@ export function buildPlaybackSequence(smf: SmfFile): PlaybackSequence {
 }
 
 const GM_PERCUSSION_CHANNEL = 9;
-const XG_DRUM_BANK_MSB = 127;
+const XG_DRUM_BANK_MSBS: ReadonlySet<number> = new Set([126, 127]);
 
 export function transposeMidiData(
   data: number[],
@@ -138,7 +138,7 @@ export function detectDrumChannels(smf: SmfFile): Set<number> {
     for (const tev of track.events) {
       const ev = tev.event;
       if (ev.kind === 'controlChange' && ev.controller === 0) {
-        if (ev.value === XG_DRUM_BANK_MSB) drums.add(ev.channel);
+        if (XG_DRUM_BANK_MSBS.has(ev.value)) drums.add(ev.channel);
       } else if (ev.kind === 'sysex') {
         const change = xgPartModeChange(ev.data);
         if (change) {

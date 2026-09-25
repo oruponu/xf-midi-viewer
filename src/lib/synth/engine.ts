@@ -15,7 +15,7 @@ export interface BuiltinSynthEngine {
   destroy(): void;
 }
 
-export const BUNDLED_SOUND_BANK_URL = `${import.meta.env.BASE_URL}soundfonts/GeneralUser-GS.sf3`;
+export const BUNDLED_SOUND_BANK_URL = `${import.meta.env.BASE_URL}soundfonts/GeneralUser-GS-XG.sf3`;
 
 const MAIN_SOUND_BANK_ID = 'main';
 
