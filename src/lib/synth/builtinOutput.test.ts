@@ -133,9 +133,9 @@ describe('BuiltinSynthOutput', () => {
     output.activate();
 
     expect(gainCalls).toEqual(['cancel 10.01', 'set 0 10.01', 'set 1 10.04']);
-    const panics = calls.slice(before);
+    const panics = calls.slice(before).filter(isPanic);
     expect(panics).toHaveLength(32);
-    expect(panics.every((c) => isPanic(c) && Math.abs(c.time - 10.04) < 1e-9)).toBe(true);
+    expect(panics.every((c) => Math.abs(c.time - 10.04) < 1e-9)).toBe(true);
     output.send([0x90, 62, 100], 5000);
     expect(calls.at(-1)!.time).toBeCloseTo(10.04, 9);
     expect(output.latencyMs()).toBeCloseTo(50, 6);
@@ -162,6 +162,35 @@ describe('BuiltinSynthOutput', () => {
     setNow(5300);
     output.checkClock();
     expect(stalls()).toBe(2);
+  });
+
+  test('resets the synth on the next activate() after a stall', () => {
+    const { output, calls, clock } = setupOutput();
+    output.activate();
+    clock.state = 'suspended';
+    output.notifyStateChange();
+    clock.state = 'running';
+    const before = calls.length;
+
+    output.activate();
+
+    expect(
+      calls
+        .slice(before)
+        .filter((c) => c.data[0] === 0xf0)
+        .map((c) => c.data),
+    ).toEqual([
+      [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7],
+      [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7],
+    ]);
+  });
+
+  test('does not reset the synth on activate() without a stall', () => {
+    const { output, calls } = setupOutput();
+    output.activate();
+    output.activate();
+
+    expect(calls.some((c) => c.data[0] === 0xf0)).toBe(false);
   });
 
   test('checkClock() detects a frozen audio clock without any message', () => {

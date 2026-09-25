@@ -1,3 +1,4 @@
+import { GM_SYSTEM_ON, XG_SYSTEM_ON } from '../player/messages.ts';
 import type { MidiOutputLike } from '../player/messages.ts';
 
 export const STALL_THRESHOLD_SECONDS = 0.25;
@@ -44,6 +45,7 @@ export class BuiltinSynthOutput implements MidiOutputLike {
   private anchorLead = 0;
   private lastQueuedTime = 0;
   private active = false;
+  private resetPending = false;
 
   constructor(options: BuiltinSynthOutputOptions) {
     this.synth = options.synth;
@@ -90,6 +92,11 @@ export class BuiltinSynthOutput implements MidiOutputLike {
       this.synth.sendMessage([0xb0 | channel, 120, 0], 0, { time: drainUntil });
       this.synth.sendMessage([0xb0 | channel, 123, 0], 0, { time: drainUntil });
     }
+    if (this.resetPending) {
+      this.synth.sendMessage(GM_SYSTEM_ON, 0, { time: drainUntil });
+      this.synth.sendMessage(XG_SYSTEM_ON, 0, { time: drainUntil });
+      this.resetPending = false;
+    }
     this.lastQueuedTime = drainUntil;
     this.anchor = drainUntil - this.now() / 1000;
     this.anchorLead = drainUntil - current;
@@ -104,6 +111,7 @@ export class BuiltinSynthOutput implements MidiOutputLike {
 
   private stall(): void {
     this.active = false;
+    this.resetPending = true;
     const current = this.clock.currentTime;
     this.gain.cancelScheduledValues(current);
     this.gain.setValueAtTime(0, current);
