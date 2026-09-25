@@ -11,6 +11,11 @@ SHA-256: e2ed326ff44d15f78f2fdc72403b6fa6b77ee7266d3aad0d2198bc95797bc66c
 The original SF2 is available from:
 https://github.com/mrbumpy409/GeneralUser-GS
 
+This project adds presets for Yamaha XG drum kits, SFX kits and SFX voices to
+this SF3 at build time (scripts/xg-soundfont/). The added presets reuse the
+original instruments and samples; the original presets are left unchanged.
+The file served by the application is GeneralUser-GS-XG.sf3.
+
 ----------------------------------------------------------------------
 
 *** GeneralUser GS v2.0.3 ***
