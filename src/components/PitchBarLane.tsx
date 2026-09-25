@@ -15,7 +15,9 @@ export const PitchBarLane = memo(function PitchBarLane({
   sequence: PlaybackSequence;
   scheduler: MidiScheduler;
 }) {
-  const [sectionIdx, setSectionIdx] = useState(0);
+  const [sectionIdx, setSectionIdx] = useState(() =>
+    findPitchBarSection(lane.sections, secondsToTick(scheduler.getPosition(), sequence)),
+  );
   const renderedIdxRef = useRef(-1);
   const cursorRef = useRef<SVGLineElement | null>(null);
   const clipRectRef = useRef<SVGRectElement | null>(null);
