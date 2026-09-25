@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { resolveKitNotes } from './mapping.ts';
 import { XG_KITS } from './xgDrumKits.ts';
+import { XG_SFX_VOICES } from './xgSfxVoices.ts';
 
 describe('XG kit tables', () => {
   test('Standard Kit covers notes 13 to 84', () => {
@@ -22,5 +23,13 @@ describe('XG kit tables', () => {
       [0, undefined],
       [1, undefined],
     ]);
+  });
+});
+
+describe('XG SFX voice table', () => {
+  test('has the 42 MU50 voices with unique programs', () => {
+    const programs = XG_SFX_VOICES.map((sfx) => sfx.program);
+    expect(programs.length).toBe(42);
+    expect(new Set(programs).size).toBe(42);
   });
 });
