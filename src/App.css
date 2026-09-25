@@ -723,6 +723,10 @@
   color: var(--text);
 }
 
+.lyric--active ruby rt {
+  color: inherit;
+}
+
 .part-badge {
   display: inline-block;
   padding: 0 6px;
