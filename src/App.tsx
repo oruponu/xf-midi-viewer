@@ -9,6 +9,7 @@ import { useMidiPlayer } from './hooks/useMidiPlayer.ts';
 import { useSettings } from './hooks/useSettings.ts';
 import type { Settings } from './hooks/useSettings.ts';
 import { useSongLoader } from './hooks/useSongLoader.ts';
+import { useWakeLock } from './hooks/useWakeLock.ts';
 import type { MidiScheduler } from './lib/player/scheduler.ts';
 import type { Song } from './lib/song.ts';
 import type { FileSummary } from './lib/songLoader.ts';
@@ -29,6 +30,7 @@ function App() {
   const { scheduler, isPlaying } = player;
   const outputReady = player.outputReady && !player.isPreparing;
   const { play } = player;
+  useWakeLock(isPlaying);
 
   const openFile = useCallback(
     (f: File) => {
