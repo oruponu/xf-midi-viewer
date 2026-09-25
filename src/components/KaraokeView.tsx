@@ -46,8 +46,21 @@ export const KaraokeView = memo(function KaraokeView({
   });
   const [mergeState, setMergeState] = useState<MergeState>({ pages: [], pairs: [] });
 
+  const screenRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const measureLayerRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const screen = screenRef.current;
+    if (!screen) return;
+    const update = () => {
+      const top = screen.getBoundingClientRect().top + window.scrollY;
+      screen.style.setProperty('--karaoke-top', `${top}px`);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -184,33 +197,35 @@ export const KaraokeView = memo(function KaraokeView({
   return (
     <div className="card karaoke-view">
       <h3>カラオケ</h3>
-      <div className="karaoke-stage" ref={stageRef}>
-        <KaraokeMeasureLayer pages={pages} layerRef={measureLayerRef} />
-        {nextPage &&
-          rowsOf(activePageIdx + 1)
-            .slice(0, -1)
-            .map((row) => (
-              <KaraokeRowView
-                key={`preview-${rowKey(row)}`}
-                row={row}
-                lines={nextPage.lines}
-                statusOf={() => 'upcoming'}
-                activeLineRef={activeLineRef}
-                fillRef={fillRef}
-              />
-            ))}
-        {rowsOf(activePageIdx).map((row) => (
-          <KaraokeRowView
-            key={rowKey(row)}
-            row={row}
-            lines={activePage.lines}
-            statusOf={(i) =>
-              i < activeLineIndex ? 'past' : i === activeLineIndex ? 'active' : 'upcoming'
-            }
-            activeLineRef={activeLineRef}
-            fillRef={fillRef}
-          />
-        ))}
+      <div className="karaoke-screen" ref={screenRef}>
+        <div className="karaoke-stage" ref={stageRef}>
+          <KaraokeMeasureLayer pages={pages} layerRef={measureLayerRef} />
+          {nextPage &&
+            rowsOf(activePageIdx + 1)
+              .slice(0, -1)
+              .map((row) => (
+                <KaraokeRowView
+                  key={`preview-${rowKey(row)}`}
+                  row={row}
+                  lines={nextPage.lines}
+                  statusOf={() => 'upcoming'}
+                  activeLineRef={activeLineRef}
+                  fillRef={fillRef}
+                />
+              ))}
+          {rowsOf(activePageIdx).map((row) => (
+            <KaraokeRowView
+              key={rowKey(row)}
+              row={row}
+              lines={activePage.lines}
+              statusOf={(i) =>
+                i < activeLineIndex ? 'past' : i === activeLineIndex ? 'active' : 'upcoming'
+              }
+              activeLineRef={activeLineRef}
+              fillRef={fillRef}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -1135,19 +1135,31 @@
   font-size: 12px;
 }
 
-.karaoke-view {
-  container-type: inline-size;
-}
-
 .karaoke-view h3 {
   font-size: 17px;
   margin-bottom: 16px;
+}
+
+.karaoke-screen {
+  container-type: inline-size;
+  width: min(
+    100%,
+    max(
+      280px,
+      calc(
+        (100dvh - var(--karaoke-top, 0px) - var(--dock-height, 0px) - 32px) *
+          16 / 9
+      )
+    )
+  );
+  margin-inline: auto;
 }
 
 .karaoke-stage {
   --karaoke-font-size: 5.2cqi;
   --karaoke-ruby-size: 2.6cqi;
   position: relative;
+  box-sizing: border-box;
   aspect-ratio: 16 / 9;
   display: flex;
   flex-direction: column;
