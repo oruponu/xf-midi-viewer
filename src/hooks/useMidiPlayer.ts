@@ -85,7 +85,9 @@ export function useMidiPlayer(sequence: PlaybackSequence | null): MidiPlayer {
   );
   const isBuiltinSelected = selectedOutputId === BUILTIN_OUTPUT_ID;
   const builtinOutput = builtin.status === 'ready' ? builtin.output : null;
-  const outputReady = isBuiltinSelected ? builtinOutput !== null : selectedOutputId !== '';
+  const outputReady = isBuiltinSelected
+    ? builtinOutput !== null && !builtin.isBusy
+    : selectedOutputId !== '';
 
   const selectOutput = useCallback((id: string) => {
     savePreferredOutputId(id);
@@ -195,13 +197,13 @@ export function useMidiPlayer(sequence: PlaybackSequence | null): MidiPlayer {
     };
   }, [midiAccessState, requestMidiAccess]);
 
-  const { prepare } = builtin;
+  const { prepare, isBusy: isSoundBankBusy } = builtin;
   const play = useCallback(() => {
     if (!isBuiltinSelected) {
       scheduler.play();
       return;
     }
-    if (preparingRef.current) return;
+    if (preparingRef.current || isSoundBankBusy) return;
     preparingRef.current = true;
     playRequestRef.current += 1;
     const request = playRequestRef.current;
@@ -222,7 +224,7 @@ export function useMidiPlayer(sequence: PlaybackSequence | null): MidiPlayer {
         preparingRef.current = false;
         setIsPreparing(false);
       });
-  }, [scheduler, isBuiltinSelected, prepare]);
+  }, [scheduler, isBuiltinSelected, prepare, isSoundBankBusy]);
 
   const sendError = schedulerState.sendError;
   const playerError =

@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import type { MidiPlayer } from '../hooks/useMidiPlayer.ts';
 import type { Settings } from '../hooks/useSettings.ts';
 import { BUILTIN_OUTPUT_ID } from '../lib/player/outputSelection.ts';
+import { BUNDLED_SOUND_BANK } from '../lib/synth/soundBank.ts';
+import type { BuiltinSynth } from '../hooks/useBuiltinSynth.ts';
 
 export type PlayerOutputProps = Pick<
   MidiPlayer,
@@ -146,7 +148,7 @@ function OutputControl({ player }: { player: PlayerOutputProps }) {
             </option>
           )}
           <option value={BUILTIN_OUTPUT_ID} disabled={builtin.status === 'unsupported'}>
-            内蔵音源（GeneralUser GS）
+            内蔵音源（{(builtin.soundBank ?? BUNDLED_SOUND_BANK).name}）
           </option>
           {player.midiOutputs.map((output) => (
             <option key={output.id} value={output.id}>
@@ -171,6 +173,9 @@ function OutputControl({ player }: { player: PlayerOutputProps }) {
         )}
       </div>
       <p className="settings-midi-status">{outputStatusText(player)}</p>
+      {player.selectedOutputId === BUILTIN_OUTPUT_ID && builtin.status === 'ready' && (
+        <SoundBankControl builtin={builtin} disabled={player.isPlaying || builtin.isBusy} />
+      )}
     </div>
   );
 }
@@ -193,6 +198,58 @@ function outputStatusText(player: PlayerOutputProps): string {
   if (player.selectedOutputId !== '') return '接続済み';
   if (builtin.status === 'unsupported' && builtin.error) return builtin.error;
   return player.midiAccessState === 'denied' ? 'MIDI権限なし' : '未接続';
+}
+
+function SoundBankControl({ builtin, disabled }: { builtin: BuiltinSynth; disabled: boolean }) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const current = builtin.soundBank ?? BUNDLED_SOUND_BANK;
+  const next = builtin.nextSoundBank;
+  const showNext = next.name !== current.name || next.bundled !== current.bundled;
+  return (
+    <div className="settings-midi">
+      <p className="settings-midi-status">使用中の SoundFont: {current.name}</p>
+      {showNext && <p className="settings-midi-status">次回読み込む SoundFont: {next.name}</p>}
+      <div className="settings-midi-row">
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".sf2,.sf3,.dls"
+          hidden
+          onChange={(e) => {
+            const file = e.currentTarget.files?.[0];
+            e.currentTarget.value = '';
+            if (file) void builtin.loadUserSoundBank(file);
+          }}
+        />
+        <button
+          className="midi-request-button"
+          type="button"
+          disabled={disabled}
+          onClick={() => {
+            builtin.unlockAudio();
+            inputRef.current?.click();
+          }}
+        >
+          読み込み
+        </button>
+        <button
+          className="midi-request-button"
+          type="button"
+          disabled={disabled || (current.bundled && next.bundled)}
+          onClick={() => void builtin.resetSoundBank()}
+        >
+          標準に戻す
+        </button>
+      </div>
+      {builtin.isBusy && <p className="settings-midi-status">読み込み中</p>}
+      {builtin.notice && (
+        <p className="settings-midi-status" role="status">
+          {builtin.notice}
+        </p>
+      )}
+      <p className="settings-section-desc">スマホでは大きな SoundFont は避けてください</p>
+    </div>
+  );
 }
 
 function formatOutputName(output: {
