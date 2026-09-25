@@ -13,6 +13,7 @@ import { gs, voice } from './mapping.ts';
 import type { XgKit } from './mapping.ts';
 import { SOURCE_SOUND_BANK_PATH } from './paths.ts';
 import { buildKitPreset, buildSfxVoicePreset, findSourcePreset } from './remap.ts';
+import { XG_KITS } from './xgDrumKits.ts';
 
 SpessaLog.setLogLevel(false, false, false);
 
@@ -294,5 +295,11 @@ describe('buildSfxVoicePreset', () => {
     expect(preset.program).toBe(54);
     expect(preset.zones).toEqual([]);
     expect(preset.getVoiceParameters(60, 100)).toEqual([]);
+  });
+});
+
+describe('XG_KITS', () => {
+  test('builds every kit', () => {
+    for (const xgKit of XG_KITS) expect(() => buildKitPreset(bank, xgKit)).not.toThrow();
   });
 });
