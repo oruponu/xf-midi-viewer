@@ -99,6 +99,39 @@ export function SettingsDialog({
             <p className="settings-section-desc">再生に使う音源を選択します</p>
             <OutputControl player={player} />
           </section>
+
+          <section className="settings-section">
+            <h3>ライセンス</h3>
+            <ul className="settings-license-list">
+              <li>
+                <a
+                  href={`${import.meta.env.BASE_URL}third-party-licenses.txt`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  使用しているライブラリのライセンス
+                </a>
+              </li>
+              <li>
+                内蔵音源 GeneralUser GS（S. Christian Collins）:{' '}
+                <a
+                  href="https://schristiancollins.com/generaluser.php"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  配布サイト
+                </a>
+                {' / '}
+                <a
+                  href={`${import.meta.env.BASE_URL}soundfonts/GeneralUser-GS-LICENSE.txt`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  ライセンス
+                </a>
+              </li>
+            </ul>
+          </section>
         </div>
       </div>
     </dialog>

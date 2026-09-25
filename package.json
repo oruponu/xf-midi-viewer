@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "bun run licenses && vite",
+    "build": "bun run licenses && tsc -b && vite build",
+    "licenses": "bun scripts/third-party-licenses.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "bun test"
