@@ -1,5 +1,6 @@
 export type MidiOutputLike = Pick<MIDIOutput, 'send'> & {
   clear?: () => void;
+  latencyMs?: () => number;
 };
 
 export interface MidiSendFailure {

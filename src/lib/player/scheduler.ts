@@ -112,6 +112,7 @@ export class MidiScheduler {
   private nextMessageIndex = 0;
   private intervalHandle: TimerHandle | null = null;
   private timeline: TimelineSegment[] = [];
+  private displayFloor = 0;
   private position = 0;
   private positionSnapshot = 0;
   private lastNotifyAtMs = 0;
@@ -134,7 +135,7 @@ export class MidiScheduler {
   getPositionSnapshot = (): number => this.positionSnapshot;
 
   getPosition = (): number =>
-    this.intervalHandle === null ? this.position : this.playingPosition(this.now());
+    this.intervalHandle === null ? this.position : this.audiblePosition(this.now());
 
   setSequence(sequence: PlaybackSequence | null): void {
     if (this.intervalHandle !== null) {
@@ -150,14 +151,17 @@ export class MidiScheduler {
 
   setOutput(output: MidiOutputLike | null): void {
     if (output === this.output) return;
+    if (output === null && this.intervalHandle !== null) {
+      this.stopInternal(false);
+      this.output = null;
+      return;
+    }
     const previous = this.output;
     const isPlaying = this.intervalHandle !== null;
     const position = this.getPosition();
     if (previous) this.silence(previous);
     this.output = output;
-    if (!isPlaying) return;
-    if (output === null) this.stopInternal(false);
-    else this.restart(position);
+    if (isPlaying && output !== null) this.restart(position);
   }
 
   play(): void {
@@ -174,6 +178,11 @@ export class MidiScheduler {
 
   pause(): void {
     this.stopInternal(false);
+  }
+
+  pauseAt(timeMs: number): void {
+    if (this.intervalHandle === null) return;
+    this.stopInternal(false, Math.min(this.getPosition(), this.playingPosition(timeMs)));
   }
 
   stop(): void {
@@ -233,6 +242,7 @@ export class MidiScheduler {
     const resumeAtMs = this.silence(output, this.reportSendFailure);
     const startOffset = Math.min(position, Math.max(0, sequence.durationSeconds - 0.01));
     this.timeline = [{ atMs: resumeAtMs, position: startOffset, rate: this.state.playbackRate }];
+    this.displayFloor = startOffset;
     this.nextMessageIndex = firstMidiMessageIndexAtOrAfter(sequence.midiMessages, startOffset);
     for (const message of collectChaseMessages(sequence.midiMessages, this.nextMessageIndex)) {
       this.scheduleMessage(output, message);
@@ -262,8 +272,8 @@ export class MidiScheduler {
     return pendingUntil;
   }
 
-  private stopInternal(resetPosition: boolean): void {
-    const position = resetPosition ? 0 : this.getPosition();
+  private stopInternal(resetPosition: boolean, at?: number): void {
+    const position = resetPosition ? 0 : (at ?? this.getPosition());
     this.clearTimer();
     if (this.output) this.silence(this.output, this.reportSendFailure);
     this.position = position;
@@ -297,13 +307,14 @@ export class MidiScheduler {
       this.stopInternal(false);
       return;
     }
-    this.position = position;
+    const audible = this.audiblePosition(nowMs);
+    this.position = audible;
     if (nowMs - this.lastNotifyAtMs >= UI_UPDATE_INTERVAL_MS) {
       this.lastNotifyAtMs = nowMs;
-      this.positionSnapshot = position;
+      this.positionSnapshot = audible;
       this.notify();
     }
-    if (position >= sequence.durationSeconds) this.stopInternal(true);
+    if (audible >= sequence.durationSeconds) this.stopInternal(true);
   }
 
   private scheduleMessage(output: MidiOutputLike, message: PlaybackMidiMessage): boolean {
@@ -344,6 +355,16 @@ export class MidiScheduler {
 
   private playingPosition(nowMs: number): number {
     return Math.min(this.sequence?.durationSeconds ?? 0, positionAt(this.timeline, nowMs));
+  }
+
+  private audiblePosition(nowMs: number): number {
+    const latencyMs = Math.max(0, this.output?.latencyMs?.() ?? 0);
+    const position = Math.min(
+      this.sequence?.durationSeconds ?? 0,
+      positionAt(this.timeline, nowMs - latencyMs),
+    );
+    this.displayFloor = Math.max(this.displayFloor, position);
+    return this.displayFloor;
   }
 
   private setState(patch: Partial<SchedulerState>): void {
