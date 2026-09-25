@@ -193,6 +193,7 @@ export const LeadSheet = memo(function LeadSheet({
             key={row.startBar}
             startBar={row.startBar}
             barCount={row.barCount}
+            barsPerRow={barsPerRow}
             chords={chords}
             rehearsals={rehearsals}
             syllables={renderable}
@@ -218,6 +219,7 @@ function sameKeyDisplay(a: KeySignature, b: KeySignature): boolean {
 function ScoreRow({
   startBar,
   barCount,
+  barsPerRow,
   chords,
   rehearsals,
   syllables,
@@ -228,6 +230,7 @@ function ScoreRow({
 }: {
   startBar: number;
   barCount: number;
+  barsPerRow: number;
   chords: ChordMessage[];
   rehearsals: RehearsalMessage[];
   syllables: LyricSyllable[];
@@ -272,7 +275,7 @@ function ScoreRow({
   );
 
   return (
-    <div className="score-row">
+    <div className="score-row" style={{ width: `${(barCount / barsPerRow) * 100}%` }}>
       <span className="score-playhead" aria-hidden="true" style={{ opacity: 0 }} />
       <div className="score-rehearsals">
         {placedRehearsals.map((p, i) => (
@@ -283,16 +286,15 @@ function ScoreRow({
         ))}
       </div>
 
-      <div className="score-bars">
-        {bars.map((bar) => {
-          const sig = barTimeSignatures.get(bar);
-          const key = barKeySignatures.get(bar);
-          const hasMeta = sig !== undefined || key !== undefined;
-          return (
-            <div key={bar} className="score-bar-cell">
-              <span className="score-bar-num">{bar}</span>
-              {hasMeta && (
-                <div className="score-bar-meta">
+      <div className="score-staff">
+        <div className="score-bars">
+          {bars.map((bar) => {
+            const sig = barTimeSignatures.get(bar);
+            const key = barKeySignatures.get(bar);
+            return (
+              <div key={bar} className="score-bar-cell">
+                <div className="score-bar-head">
+                  <span className="score-bar-num">{bar}</span>
                   {key &&
                     (() => {
                       const shifted = keyShift === 0 ? key : shiftKeySignature(key, keyShift);
@@ -309,54 +311,53 @@ function ScoreRow({
                       className="score-timesig"
                       aria-label={`Time signature ${sig.numerator}/${sig.denominator}`}
                     >
-                      <span className="score-timesig-num">{sig.numerator}</span>
-                      <span className="score-timesig-den">{sig.denominator}</span>
+                      {sig.numerator}/{sig.denominator}
                     </span>
                   )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              </div>
+            );
+          })}
+        </div>
 
-      <div className="score-chords">
-        {placedChords.map((p, i) => (
-          <span
-            key={i}
-            className="score-chord"
-            data-tick={p.msg.tick}
-            style={{ left: `${p.xPercent}%` }}
-          >
-            {formatTransposedChord(p.msg, timing, keyShift)}
-          </span>
-        ))}
-      </div>
-
-      {placedSyllables.length > 0 && (
-        <div className="score-lyrics">
-          {placedSyllables.map((p, i) => (
+        <div className="score-chords">
+          {placedChords.map((p, i) => (
             <span
               key={i}
-              className="score-lyric"
-              data-tick={p.syllable.tick}
+              className="score-chord"
+              data-tick={p.msg.tick}
               style={{ left: `${p.xPercent}%` }}
             >
-              {p.syllable.runs.map((run, j) => {
-                if (run.kind === 'text') {
-                  return <span key={j}>{run.text}</span>;
-                }
-                return (
-                  <ruby key={j}>
-                    {run.base}
-                    <rt>{run.reading}</rt>
-                  </ruby>
-                );
-              })}
+              {formatTransposedChord(p.msg, timing, keyShift)}
             </span>
           ))}
         </div>
-      )}
+
+        {placedSyllables.length > 0 && (
+          <div className="score-lyrics">
+            {placedSyllables.map((p, i) => (
+              <span
+                key={i}
+                className="score-lyric"
+                data-tick={p.syllable.tick}
+                style={{ left: `${p.xPercent}%` }}
+              >
+                {p.syllable.runs.map((run, j) => {
+                  if (run.kind === 'text') {
+                    return <span key={j}>{run.text}</span>;
+                  }
+                  return (
+                    <ruby key={j}>
+                      {run.base}
+                      <rt>{run.reading}</rt>
+                    </ruby>
+                  );
+                })}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
