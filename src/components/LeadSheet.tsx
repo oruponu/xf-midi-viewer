@@ -163,12 +163,8 @@ export const LeadSheet = memo(function LeadSheet({
       }
       if (tickValue !== lastTick) {
         lastTick = tickValue;
-        for (let i = 0; i < chordEls.length; i += 1) {
-          chordEls[i]!.classList.toggle('score-chord--passed', chordTicks[i]! <= tickValue);
-        }
-        for (let i = 0; i < lyricEls.length; i += 1) {
-          lyricEls[i]!.classList.toggle('score-lyric--passed', lyricTicks[i]! <= tickValue);
-        }
+        markProgress(chordEls, chordTicks, tickValue, 'score-chord');
+        markProgress(lyricEls, lyricTicks, tickValue, 'score-lyric');
       }
       raf = requestAnimationFrame(tick);
     };
@@ -176,8 +172,8 @@ export const LeadSheet = memo(function LeadSheet({
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
-      for (const el of chordEls) el.classList.remove('score-chord--passed');
-      for (const el of lyricEls) el.classList.remove('score-lyric--passed');
+      markProgress(chordEls, chordTicks, -1, 'score-chord');
+      markProgress(lyricEls, lyricTicks, -1, 'score-lyric');
     };
   }, [sequence, scheduler, rows, timing, autoScroll]);
 
@@ -207,6 +203,17 @@ export const LeadSheet = memo(function LeadSheet({
     </div>
   );
 });
+
+function markProgress(els: HTMLElement[], ticks: number[], tick: number, block: string): void {
+  let current = -1;
+  for (let i = 0; i < ticks.length; i += 1) {
+    if (ticks[i]! <= tick) current = i;
+  }
+  for (let i = 0; i < els.length; i += 1) {
+    els[i]!.classList.toggle(`${block}--passed`, i < current);
+    els[i]!.classList.toggle(`${block}--current`, i === current);
+  }
+}
 
 function sameSignatureDisplay(a: TimeSignature, b: TimeSignature): boolean {
   return a.numerator === b.numerator && a.denominator === b.denominator;

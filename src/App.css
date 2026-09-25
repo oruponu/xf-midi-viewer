@@ -645,7 +645,7 @@
 }
 
 .lyric--passed {
-  color: var(--accent);
+  color: var(--text);
 }
 
 .lyric--active {
@@ -905,11 +905,18 @@
   font-weight: 600;
   color: var(--text-h);
   white-space: nowrap;
-  transition: color 0.12s linear;
+  transition:
+    color 0.12s linear,
+    background 0.12s linear;
 }
 
 .score-chord--passed {
+  color: var(--text);
+}
+
+.score-chord--current {
   color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .score-lyrics {
@@ -932,6 +939,10 @@
 }
 
 .score-lyric--passed {
+  color: var(--text);
+}
+
+.score-lyric--current {
   color: var(--accent);
 }
 
