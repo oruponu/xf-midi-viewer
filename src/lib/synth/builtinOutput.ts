@@ -60,7 +60,7 @@ export class BuiltinSynthOutput implements MidiOutputLike {
   send(data: number[], timestamp?: number): void {
     if (!this.active) return;
     const time = toContextTime(timestamp ?? this.now(), this.anchor);
-    if (this.isClockStalled(time)) {
+    if (this.isClockStalled()) {
       this.stall();
       return;
     }
@@ -77,7 +77,7 @@ export class BuiltinSynthOutput implements MidiOutputLike {
   }
 
   checkClock(): void {
-    if (this.active && this.isClockStalled(toContextTime(this.now(), this.anchor))) this.stall();
+    if (this.active && this.isClockStalled()) this.stall();
   }
 
   activate(): void {
@@ -96,10 +96,10 @@ export class BuiltinSynthOutput implements MidiOutputLike {
     this.active = true;
   }
 
-  private isClockStalled(time: number): boolean {
-    return (
-      this.clock.state !== 'running' || time - this.clock.currentTime >= STALL_THRESHOLD_SECONDS
-    );
+  private isClockStalled(): boolean {
+    if (this.clock.state !== 'running') return true;
+    const expected = toContextTime(this.now(), this.anchor) - this.anchorLead;
+    return expected - this.clock.currentTime >= STALL_THRESHOLD_SECONDS;
   }
 
   private stall(): void {

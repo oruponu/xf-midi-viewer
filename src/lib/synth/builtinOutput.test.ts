@@ -141,6 +141,29 @@ describe('BuiltinSynthOutput', () => {
     expect(output.latencyMs()).toBeCloseTo(50, 6);
   });
 
+  test('does not treat the anchor lead after a resume as a frozen clock', () => {
+    const { output, clock, stalls, setNow } = setupOutput();
+    output.activate();
+    output.send([0x90, 60, 100], 1240);
+    clock.state = 'suspended';
+    output.notifyStateChange();
+    clock.state = 'running';
+    clock.currentTime = 10.005;
+    setNow(5000);
+    output.activate();
+
+    output.send([0x90, 62, 100], 5000);
+    output.send([0x80, 62, 0], 5045);
+    output.checkClock();
+
+    expect(stalls()).toBe(1);
+    expect(output.isActive).toBe(true);
+
+    setNow(5300);
+    output.checkClock();
+    expect(stalls()).toBe(2);
+  });
+
   test('checkClock() detects a frozen audio clock without any message', () => {
     const { output, stalls, stallTimes, setNow } = setupOutput();
     output.checkClock();
