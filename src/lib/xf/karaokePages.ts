@@ -101,6 +101,9 @@ export function resolveKaraokeDisplay(
     lastLine.tick <= tick &&
     next.displayTick <= lookaheadTick;
 
+  if (preview && isNonLyricPage(page)) {
+    return { pageIdx: pageIdx + 1, lineIdx: 0, preview: false };
+  }
   return { pageIdx, lineIdx, preview };
 }
 

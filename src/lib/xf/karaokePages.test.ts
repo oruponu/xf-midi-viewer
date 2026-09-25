@@ -233,6 +233,19 @@ describe('resolveKaraokeDisplay', () => {
       preview: true,
     });
   });
+
+  test('switches from a non-lyric page to the next page when the preview would start', () => {
+    const nonLyric = [
+      page(0, [sungLine({ ...syl(0, 500), vocalPart: 'nonLyric' })]),
+      page(1000, [sungLine(syl(1000, 1100)), sungLine(syl(1100, null))]),
+    ];
+    expect(resolveKaraokeDisplay(nonLyric, 500, 999).preview).toBe(false);
+    expect(resolveKaraokeDisplay(nonLyric, 500, 1000)).toEqual({
+      pageIdx: 1,
+      lineIdx: 0,
+      preview: false,
+    });
+  });
 });
 
 describe('mergeSingleRowPages', () => {
