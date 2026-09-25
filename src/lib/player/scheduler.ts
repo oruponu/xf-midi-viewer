@@ -3,6 +3,8 @@ import type { PlaybackMidiMessage, PlaybackSequence } from '../smf/playback.ts';
 import { collectChaseMessages } from './chase.ts';
 import { isLiveNoteOn, sendMidiPanic, sendMidiReset, trySendMidiMessage } from './messages.ts';
 import type { MidiOutputLike, MidiSendFailure } from './messages.ts';
+import { positionAt, pruneTimeline, timeAtPosition, withRateChange } from './timeline.ts';
+import type { TimelineSegment } from './timeline.ts';
 
 export const LOOKAHEAD_SECONDS = 0.05;
 export const SCHEDULER_MS = 10;
@@ -109,8 +111,7 @@ export class MidiScheduler {
   private drumChannels: ReadonlySet<number> = new Set();
   private nextMessageIndex = 0;
   private intervalHandle: TimerHandle | null = null;
-  private startedAtMs = 0;
-  private startOffset = 0;
+  private timeline: TimelineSegment[] = [];
   private position = 0;
   private positionSnapshot = 0;
   private lastNotifyAtMs = 0;
@@ -195,9 +196,10 @@ export class MidiScheduler {
     if (clamped === this.state.playbackRate) return;
     if (this.intervalHandle !== null) {
       const nowMs = this.now();
-      this.startOffset = this.playingPosition(nowMs);
-      this.startedAtMs = Math.max(nowMs, this.startedAtMs);
-      this.position = this.startOffset;
+      const fence = this.output ? (this.fences.get(this.output) ?? 0) : 0;
+      const switchAtMs = Math.max(nowMs, fence, this.timeline.at(-1)?.atMs ?? nowMs);
+      this.timeline = pruneTimeline(withRateChange(this.timeline, switchAtMs, clamped), nowMs);
+      this.position = this.playingPosition(nowMs);
     }
     this.setState({ playbackRate: clamped });
     this.notify();
@@ -229,9 +231,9 @@ export class MidiScheduler {
     const { sequence, output } = this;
     if (!sequence || !output) return;
     const resumeAtMs = this.silence(output, this.reportSendFailure);
-    this.startOffset = Math.min(position, Math.max(0, sequence.durationSeconds - 0.01));
-    this.startedAtMs = resumeAtMs;
-    this.nextMessageIndex = firstMidiMessageIndexAtOrAfter(sequence.midiMessages, this.startOffset);
+    const startOffset = Math.min(position, Math.max(0, sequence.durationSeconds - 0.01));
+    this.timeline = [{ atMs: resumeAtMs, position: startOffset, rate: this.state.playbackRate }];
+    this.nextMessageIndex = firstMidiMessageIndexAtOrAfter(sequence.midiMessages, startOffset);
     for (const message of collectChaseMessages(sequence.midiMessages, this.nextMessageIndex)) {
       this.scheduleMessage(output, message);
     }
@@ -240,11 +242,11 @@ export class MidiScheduler {
       return;
     }
     const nowMs = this.now();
-    this.position = this.startOffset;
-    this.positionSnapshot = this.startOffset;
+    this.position = startOffset;
+    this.positionSnapshot = startOffset;
     this.lastNotifyAtMs = nowMs;
     this.notify();
-    this.scheduleWindow(this.startOffset, nowMs);
+    this.scheduleWindow(startOffset, nowMs);
   }
 
   private silence(output: MidiOutputLike, onFailure?: (failure: MidiSendFailure) => void): number {
@@ -272,6 +274,7 @@ export class MidiScheduler {
 
   private tick(): void {
     const nowMs = this.now();
+    this.timeline = pruneTimeline(this.timeline, nowMs);
     this.scheduleWindow(this.playingPosition(nowMs), nowMs);
   }
 
@@ -306,8 +309,8 @@ export class MidiScheduler {
   private scheduleMessage(output: MidiOutputLike, message: PlaybackMidiMessage): boolean {
     const data = transposeMidiData(message.data, this.state.keyShift, this.drumChannels);
     if (!data) return true;
-    const offsetSeconds = Math.max(0, message.seconds - this.startOffset);
-    const scheduledAt = this.startedAtMs + (offsetSeconds / this.state.playbackRate) * 1000;
+    const segment = this.timeline.at(-1)!;
+    const scheduledAt = timeAtPosition(segment, Math.max(message.seconds, segment.position));
     const sendAt = Math.max(scheduledAt, this.fences.get(output) ?? 0);
     return this.send(output, data, sendAt, this.reportSendFailure);
   }
@@ -340,11 +343,7 @@ export class MidiScheduler {
   }
 
   private playingPosition(nowMs: number): number {
-    const elapsedMs = Math.max(0, nowMs - this.startedAtMs);
-    return Math.min(
-      this.sequence?.durationSeconds ?? 0,
-      this.startOffset + (elapsedMs / 1000) * this.state.playbackRate,
-    );
+    return Math.min(this.sequence?.durationSeconds ?? 0, positionAt(this.timeline, nowMs));
   }
 
   private setState(patch: Partial<SchedulerState>): void {

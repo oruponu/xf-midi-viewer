@@ -560,6 +560,36 @@ describe('MidiScheduler playback rate', () => {
     scheduler.setPlaybackRate(2);
     expect(calls).toBe(1);
   });
+
+  test('setPlaybackRate() while notes are queued switches the rate after the queued notes', () => {
+    const { clock, scheduler, out } = setup(
+      [msg(0.04, [0x90, 60, 100]), msg(0.06, [0x80, 60, 0]), msg(0.1, [0x90, 62, 100])],
+      10,
+      0,
+      { clear: false },
+    );
+    scheduler.play();
+    clock.advance(5);
+
+    scheduler.setPlaybackRate(2);
+
+    expect(scheduler.getPosition()).toBeCloseTo(0.005, 6);
+    clock.advance(35);
+    expect(scheduler.getPosition()).toBeCloseTo(0.04, 6);
+    clock.advance(10);
+    expect(scheduler.getPosition()).toBeCloseTo(0.06, 6);
+    clock.advance(100);
+
+    const played = playbackOnly(out.sent);
+    expect(played.map((m) => m.data)).toEqual([
+      [0x90, 60, 100],
+      [0x80, 60, 0],
+      [0x90, 62, 100],
+    ]);
+    expect(played[0]!.timestamp).toBeCloseTo(1040, 6);
+    expect(played[1]!.timestamp).toBeCloseTo(1050, 6);
+    expect(played[2]!.timestamp).toBeCloseTo(1070, 6);
+  });
 });
 
 describe('MidiScheduler key shift', () => {
