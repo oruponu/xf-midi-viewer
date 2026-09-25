@@ -1272,6 +1272,36 @@
   opacity: 0.7;
 }
 
+.pitch-lane {
+  position: absolute;
+  top: 1.5cqi;
+  left: var(--karaoke-font-size);
+  width: calc(100% - 2 * var(--karaoke-font-size));
+  height: 30%;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  pointer-events: none;
+}
+
+.pitch-lane-bar-line {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.pitch-lane-note {
+  fill: color-mix(in srgb, var(--text) 45%, transparent);
+  rx: 0.4cqi;
+}
+
+.pitch-lane-notes--sung .pitch-lane-note {
+  fill: var(--accent);
+}
+
+.pitch-lane-cursor {
+  stroke: var(--text-h);
+  stroke-width: 2;
+}
+
 @media (max-width: 720px) {
   .app {
     padding: 12px 14px calc(var(--dock-height, 0px) + 24px);

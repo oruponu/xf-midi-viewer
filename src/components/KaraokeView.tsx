@@ -17,7 +17,9 @@ import type {
   LineAlignment,
 } from '../lib/xf/karaokePages.ts';
 import type { LyricLine, LyricRun } from '../lib/xf/lyrics.ts';
+import type { PitchLane } from '../lib/xf/pitchBars.ts';
 import type { VocalPart } from '../lib/xf/types.ts';
+import { PitchBarLane } from './PitchBarLane.tsx';
 
 const PREVIEW_LEAD_SECONDS = 1;
 
@@ -30,12 +32,14 @@ interface MergeState {
 
 interface KaraokeViewProps {
   pages: KaraokePage[];
+  pitchLane: PitchLane | null;
   sequence: PlaybackSequence;
   scheduler: MidiScheduler;
 }
 
 export const KaraokeView = memo(function KaraokeView({
   pages,
+  pitchLane,
   sequence,
   scheduler,
 }: KaraokeViewProps) {
@@ -199,6 +203,7 @@ export const KaraokeView = memo(function KaraokeView({
       <div className="karaoke-screen" ref={screenRef}>
         <div className="karaoke-stage" ref={stageRef}>
           <KaraokeMeasureLayer pages={pages} layerRef={measureLayerRef} />
+          {pitchLane && <PitchBarLane lane={pitchLane} sequence={sequence} scheduler={scheduler} />}
           {nextPage &&
             rowsOf(activePageIdx + 1)
               .slice(0, -1)

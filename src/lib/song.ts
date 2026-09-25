@@ -8,6 +8,8 @@ import type { KaraokePage } from './xf/karaokePages.ts';
 import { parseKaraoke } from './xf/lyrics.ts';
 import type { ParsedKaraoke } from './xf/lyrics.ts';
 import { extractXf } from './xf/parser.ts';
+import { buildPitchLane } from './xf/pitchBars.ts';
+import type { PitchLane } from './xf/pitchBars.ts';
 import type { ChordMessage, RehearsalMessage, XfData } from './xf/types.ts';
 
 export interface Song {
@@ -19,11 +21,13 @@ export interface Song {
   chords: ChordMessage[];
   rehearsals: RehearsalMessage[];
   karaokePages: KaraokePage[];
+  pitchLane: PitchLane | null;
 }
 
 export function buildSong(smf: SmfFile): Song {
   const { xf, xfError } = extractXfOrEmpty(smf);
   const sequence = buildPlaybackSequence(smf);
+  const timing = extractTiming(smf);
   const karaoke = parseKaraoke(xf.karaoke, sequence.notes);
   const chords: ChordMessage[] = [];
   const rehearsals: RehearsalMessage[] = [];
@@ -33,13 +37,20 @@ export function buildSong(smf: SmfFile): Song {
   }
   return {
     sequence,
-    timing: extractTiming(smf),
+    timing,
     xf,
     xfError,
     karaoke,
     chords,
     rehearsals,
     karaokePages: buildKaraokePages(karaoke, rehearsals),
+    pitchLane: buildPitchLane(
+      sequence.notes,
+      xf.karaoke.header?.melodyChannels ?? [],
+      timing,
+      rehearsals,
+      sequence.durationTicks,
+    ),
   };
 }
 

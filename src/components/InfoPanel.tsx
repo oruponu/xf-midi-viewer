@@ -109,7 +109,12 @@ export function InfoPanel({
 
       {activeTab === 'karaoke' &&
         (hasKaraoke && parsedKaraoke.syllables.length > 0 ? (
-          <KaraokeView pages={song.karaokePages} sequence={sequence} scheduler={scheduler} />
+          <KaraokeView
+            pages={song.karaokePages}
+            pitchLane={song.pitchLane}
+            sequence={sequence}
+            scheduler={scheduler}
+          />
         ) : (
           <EmptyView title="歌詞情報はありません" />
         ))}

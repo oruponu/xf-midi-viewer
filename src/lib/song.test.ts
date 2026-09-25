@@ -72,6 +72,30 @@ describe('buildSong', () => {
     ]);
   });
 
+  test('builds the pitch lane from the melody channel', () => {
+    const song = buildSong(
+      makeSmf([
+        meta(0, 0x07, ascii('$Lyrc:1:0:')),
+        meta(0, 0x05, ascii('a')),
+        noteOn(0, 60),
+        { deltaTime: 240, event: { kind: 'noteOff', channel: 0, note: 60, velocity: 0 } },
+      ]),
+    );
+
+    expect(song.pitchLane).toEqual({
+      lowNote: 55,
+      highNote: 66,
+      sections: [
+        {
+          startTick: 0,
+          endTick: 1920,
+          barTicks: [],
+          notes: [{ note: 60, startTick: 0, endTick: 240 }],
+        },
+      ],
+    });
+  });
+
   test('extracts chords and rehearsals in order and ignores other style messages', () => {
     const song = buildSong(
       makeSmf([
@@ -98,6 +122,7 @@ describe('buildSong', () => {
     expect(song.xf.style.events).toEqual([]);
     expect(song.chords).toEqual([]);
     expect(song.karaokePages).toEqual([]);
+    expect(song.pitchLane).toBeNull();
     expect(song.sequence.midiMessages).toHaveLength(1);
   });
 
