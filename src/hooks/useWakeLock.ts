@@ -7,11 +7,15 @@ export function useWakeLock(enabled: boolean): void {
     let cancelled = false;
 
     const acquire = () => {
-      if (document.visibilityState !== 'visible') return;
+      if (cancelled || document.visibilityState !== 'visible') return;
       navigator.wakeLock.request('screen').then(
         (acquired) => {
-          if (cancelled) void acquired.release();
-          else sentinel = acquired;
+          if (cancelled) {
+            void acquired.release();
+            return;
+          }
+          sentinel = acquired;
+          acquired.addEventListener('release', acquire);
         },
         () => {},
       );
