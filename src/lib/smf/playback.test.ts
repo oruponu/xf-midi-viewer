@@ -302,6 +302,18 @@ describe('tickToSeconds', () => {
     expect(tickToSeconds(1440, sequence)).toBe(2);
   });
 
+  test('spends no time in a zero tempo segment like the playback timeline', () => {
+    const sequence = buildPlaybackSequence(
+      makeSmf([
+        track([tempo(0, 500_000), tempo(480, 0), tempo(480, 500_000)]),
+        track([noteOn(0, 64), noteOff(1920, 64)]),
+      ]),
+    );
+
+    expect(tickToSeconds(720, sequence)).toBe(0.5);
+    expect(tickToSeconds(1440, sequence)).toBe(1);
+  });
+
   test('returns 0 for ticks at or before the start', () => {
     const sequence = buildPlaybackSequence(makeSmf([track([noteOn(0, 64), noteOff(480, 64)])]));
 

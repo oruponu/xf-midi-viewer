@@ -193,7 +193,7 @@ export function tickToSeconds(tick: number, sequence: PlaybackSequence): number 
     if (t.tick <= tick) segment = t;
     else break;
   }
-  const secondsPerTick = 60 / (segment.bpm * ticksPerQuarter);
+  const secondsPerTick = segment.bpm > 0 ? 60 / (segment.bpm * ticksPerQuarter) : 0;
   return segment.seconds + (tick - segment.tick) * secondsPerTick;
 }
 
