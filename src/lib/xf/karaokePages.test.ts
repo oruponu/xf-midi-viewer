@@ -165,6 +165,21 @@ describe('buildKaraokePages display tick', () => {
     );
     expect(result.map((p) => p.displayTick)).toEqual([0, 1000]);
   });
+
+  test('shows a non-lyric page at its start tick', () => {
+    const a1 = sungLine(syl(0, 300));
+    const interlude = sungLine({ ...syl(1000, null), vocalPart: 'nonLyric' });
+    const result = buildKaraokePages(
+      parsed({
+        lines: [a1, interlude],
+        pages: [
+          { tick: 0, endTick: 1000, lines: [a1] },
+          { tick: 1000, endTick: null, lines: [interlude] },
+        ],
+      }),
+    );
+    expect(result.map((p) => p.displayTick)).toEqual([0, 1000]);
+  });
 });
 
 describe('resolveKaraokeDisplay', () => {
@@ -185,6 +200,7 @@ describe('resolveKaraokeDisplay', () => {
       pageIdx: 0,
       lineIdx: 1,
       preview: false,
+      hidden: false,
     });
   });
 
@@ -193,6 +209,7 @@ describe('resolveKaraokeDisplay', () => {
       pageIdx: 0,
       lineIdx: 2,
       preview: true,
+      hidden: false,
     });
   });
 
@@ -205,6 +222,7 @@ describe('resolveKaraokeDisplay', () => {
       pageIdx: 0,
       lineIdx: 1,
       preview: false,
+      hidden: false,
     });
   });
 
@@ -213,6 +231,7 @@ describe('resolveKaraokeDisplay', () => {
       pageIdx: 1,
       lineIdx: 0,
       preview: false,
+      hidden: false,
     });
   });
 
@@ -231,6 +250,7 @@ describe('resolveKaraokeDisplay', () => {
       pageIdx: 1,
       lineIdx: 0,
       preview: true,
+      hidden: false,
     });
   });
 
@@ -244,7 +264,23 @@ describe('resolveKaraokeDisplay', () => {
       pageIdx: 1,
       lineIdx: 0,
       preview: false,
+      hidden: false,
     });
+  });
+
+  test('hides a leading non-lyric page until it starts', () => {
+    const nonLyric = [
+      page(480, [sungLine({ ...syl(480, 500), vocalPart: 'nonLyric' })]),
+      page(1000, [sungLine(syl(1000, 1100))]),
+    ];
+    expect(resolveKaraokeDisplay(nonLyric, 479, 479).hidden).toBe(true);
+    expect(resolveKaraokeDisplay(nonLyric, 480, 480).hidden).toBe(false);
+  });
+
+  test('shows a leading lyric page once the lookahead reaches it', () => {
+    const lyric = [page(480, [sungLine(syl(480, 500))])];
+    expect(resolveKaraokeDisplay(lyric, 0, 479).hidden).toBe(true);
+    expect(resolveKaraokeDisplay(lyric, 0, 480).hidden).toBe(false);
   });
 });
 

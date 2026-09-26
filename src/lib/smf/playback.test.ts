@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { buildPlaybackSequence, detectDrumChannels, transposeMidiData } from './playback.ts';
+import {
+  buildPlaybackSequence,
+  detectDrumChannels,
+  tickToSeconds,
+  transposeMidiData,
+} from './playback.ts';
 import type { SmfFile, SmfTrack, TrackEvent } from './types.ts';
 
 const makeSmf = (tracks: SmfTrack[], ppq = 480): SmfFile => ({
@@ -280,6 +285,54 @@ describe('buildPlaybackSequence', () => {
         data: [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7],
       },
     ]);
+  });
+});
+
+describe('tickToSeconds', () => {
+  test('converts ticks across tempo changes', () => {
+    const sequence = buildPlaybackSequence(
+      makeSmf([
+        track([tempo(0, 500_000), tempo(960, 1_000_000)]),
+        track([noteOn(0, 64), noteOff(1920, 64)]),
+      ]),
+    );
+
+    expect(tickToSeconds(480, sequence)).toBe(0.5);
+    expect(tickToSeconds(960, sequence)).toBe(1);
+    expect(tickToSeconds(1440, sequence)).toBe(2);
+  });
+
+  test('spends no time in a zero tempo segment like the playback timeline', () => {
+    const sequence = buildPlaybackSequence(
+      makeSmf([
+        track([tempo(0, 500_000), tempo(480, 0), tempo(480, 500_000)]),
+        track([noteOn(0, 64), noteOff(1920, 64)]),
+      ]),
+    );
+
+    expect(tickToSeconds(720, sequence)).toBe(0.5);
+    expect(tickToSeconds(1440, sequence)).toBe(1);
+  });
+
+  test('returns 0 for ticks at or before the start', () => {
+    const sequence = buildPlaybackSequence(makeSmf([track([noteOn(0, 64), noteOff(480, 64)])]));
+
+    expect(tickToSeconds(0, sequence)).toBe(0);
+    expect(tickToSeconds(-10, sequence)).toBe(0);
+  });
+
+  test('scales ticks by the duration when there is no tempo map', () => {
+    const sequence = buildPlaybackSequence({
+      header: {
+        format: 0,
+        trackCount: 1,
+        division: { kind: 'smpte', framesPerSecond: 25, ticksPerFrame: 40 },
+      },
+      tracks: [track([noteOn(0, 64), noteOff(2000, 64)])],
+      extraChunks: [],
+    });
+
+    expect(tickToSeconds(1000, sequence)).toBe(1);
   });
 });
 

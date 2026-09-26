@@ -39,6 +39,7 @@ export function InfoPanel({
   autoScrollLyrics = true,
   showPitchBar = true,
   keyShift = 0,
+  playbackRate = 1,
 }: {
   file: FileSummary | null;
   song: Song;
@@ -48,6 +49,7 @@ export function InfoPanel({
   autoScrollLyrics?: boolean;
   showPitchBar?: boolean;
   keyShift?: number;
+  playbackRate?: number;
 }) {
   const { xf: data, karaoke: parsedKaraoke, chords, rehearsals, timing, sequence } = song;
   const hasKaraoke = data.karaoke.header !== null || data.karaoke.events.length > 0;
@@ -115,6 +117,8 @@ export function InfoPanel({
           <KaraokeView
             pages={song.karaokePages}
             pitchLane={showPitchBar ? song.pitchLane : null}
+            nonLyricDurations={song.nonLyricDurations}
+            playbackRate={playbackRate}
             sequence={sequence}
             scheduler={scheduler}
           />

@@ -55,6 +55,20 @@ describe('buildSong', () => {
     expect(song.karaokePages[0]!.lines[0]!.syllables).toHaveLength(2);
   });
 
+  test('measures non-lyric markers up to the next lyric in seconds', () => {
+    const song = buildSong(
+      makeSmf([
+        meta(0, 0x07, ascii('&x')),
+        meta(0, 0x05, ascii('Intro')),
+        meta(0, 0x07, ascii('&s')),
+        meta(1920, 0x05, ascii('a')),
+      ]),
+    );
+
+    const intro = song.karaoke.syllables[0]!;
+    expect([...song.nonLyricDurations]).toEqual([[intro, 2]]);
+  });
+
   test('ends syllables at the note-off of the melody channel', () => {
     const song = buildSong(
       makeSmf([
