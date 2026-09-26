@@ -19,6 +19,7 @@ import type {
 import type { LyricLine, LyricRun } from '../lib/xf/lyrics.ts';
 import type { PitchLane } from '../lib/xf/pitchBars.ts';
 import type { VocalPart } from '../lib/xf/types.ts';
+import { partColorOf } from '../lib/xf/vocalPart.ts';
 import { PitchBarLane } from './PitchBarLane.tsx';
 
 const PREVIEW_LEAD_SECONDS = 1;
@@ -361,9 +362,10 @@ function renderLineContent(line: LyricLine): ReactNode {
 }
 
 function syllableClassName(vocalPart: VocalPart | null): string {
-  if (vocalPart === 'speech') return 'karaoke-syl karaoke-syl--speech';
-  if (vocalPart === 'nonLyric') return 'karaoke-syl karaoke-syl--non-lyric';
-  return 'karaoke-syl';
+  const className = `karaoke-syl karaoke-syl--part-${partColorOf(vocalPart)}`;
+  if (vocalPart === 'speech') return `${className} karaoke-syl--speech`;
+  if (vocalPart === 'nonLyric') return `${className} karaoke-syl--non-lyric`;
+  return className;
 }
 
 function renderRun(run: LyricRun, index: number): ReactNode {

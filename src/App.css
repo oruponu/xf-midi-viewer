@@ -1265,7 +1265,6 @@
   top: -0.7em;
   bottom: 0;
   padding-top: 0.7em;
-  color: var(--accent-vivid);
   overflow: hidden;
   white-space: nowrap;
   pointer-events: none;
@@ -1275,6 +1274,22 @@
 .karaoke-syl {
   display: inline-block;
   white-space: pre;
+}
+
+.karaoke-line-fill .karaoke-syl--part-base {
+  color: var(--part-base);
+}
+
+.karaoke-line-fill .karaoke-syl--part-female {
+  color: var(--part-female);
+}
+
+.karaoke-line-fill .karaoke-syl--part-mixed {
+  color: var(--part-mixed);
+}
+
+.karaoke-line-fill .karaoke-syl--part-other {
+  color: var(--part-other);
 }
 
 .karaoke-line-fill .karaoke-syl--speech {
@@ -1302,10 +1317,6 @@
   color: inherit;
   white-space: nowrap;
   pointer-events: none;
-}
-
-.karaoke-line-fill ruby rt {
-  color: var(--accent-vivid);
 }
 
 .pitch-lane {
