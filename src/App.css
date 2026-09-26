@@ -909,16 +909,13 @@
   align-items: baseline;
   gap: 4px;
   padding: 2px 5px;
+  background: color-mix(in srgb, var(--meta-color) 14%, transparent);
+  color: var(--meta-color);
+  border: 1px solid color-mix(in srgb, var(--meta-color) 40%, transparent);
   border-radius: var(--radius-sm);
   font-family: var(--mono);
   font-size: 11px;
   font-weight: 700;
-}
-
-.score-key {
-  background: color-mix(in srgb, var(--key-color) 14%, transparent);
-  color: var(--key-color);
-  border: 1px solid color-mix(in srgb, var(--key-color) 40%, transparent);
 }
 
 .score-key-label {
@@ -928,9 +925,6 @@
 }
 
 .score-timesig {
-  background: color-mix(in srgb, var(--timesig-color) 14%, transparent);
-  color: var(--timesig-color);
-  border: 1px solid color-mix(in srgb, var(--timesig-color) 40%, transparent);
   font-variant-numeric: lining-nums tabular-nums;
 }
 

@@ -6,8 +6,7 @@
   --surface: #f3f5f8;
   --accent: #2851a3;
   --accent-vivid: #3563d4;
-  --key-color: #115e59;
-  --timesig-color: #92400e;
+  --meta-color: #115e59;
   --warning: #a16207;
   --success: #166534;
   --danger: #b91c1c;
@@ -38,8 +37,7 @@
     --surface: #1b2029;
     --accent: #86a8ff;
     --accent-vivid: #6f95ff;
-    --key-color: #2dd4bf;
-    --timesig-color: #fbbf24;
+    --meta-color: #2dd4bf;
     --warning: #facc15;
     --success: #4ade80;
     --danger: #f87171;
