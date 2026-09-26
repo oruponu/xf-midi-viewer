@@ -165,6 +165,21 @@ describe('buildKaraokePages display tick', () => {
     );
     expect(result.map((p) => p.displayTick)).toEqual([0, 1000]);
   });
+
+  test('shows a non-lyric page at its start tick', () => {
+    const a1 = sungLine(syl(0, 300));
+    const interlude = sungLine({ ...syl(1000, null), vocalPart: 'nonLyric' });
+    const result = buildKaraokePages(
+      parsed({
+        lines: [a1, interlude],
+        pages: [
+          { tick: 0, endTick: 1000, lines: [a1] },
+          { tick: 1000, endTick: null, lines: [interlude] },
+        ],
+      }),
+    );
+    expect(result.map((p) => p.displayTick)).toEqual([0, 1000]);
+  });
 });
 
 describe('resolveKaraokeDisplay', () => {

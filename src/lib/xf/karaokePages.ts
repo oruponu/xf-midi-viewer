@@ -52,13 +52,18 @@ export function buildKaraokePages(
     syllableIdx += page.lines.reduce((sum, line) => sum + line.syllables.length, 0);
     return {
       ...page,
-      displayTick: displayTickAfter(pages[i - 1]?.lines ?? [], page.startTick),
+      displayTick: displayTickAfter(pages[i - 1]?.lines ?? [], page),
       sectionStart,
     };
   });
 }
 
-function displayTickAfter(prevLines: readonly LyricLine[], startTick: number): number {
+function displayTickAfter(
+  prevLines: readonly LyricLine[],
+  page: Pick<KaraokePage, 'startTick' | 'lines'>,
+): number {
+  const { startTick } = page;
+  if (isNonLyricPage(page)) return startTick;
   const wipeEnd = prevLines.at(-1)?.syllables.at(-1)?.endTick ?? null;
   return wipeEnd === null ? startTick : Math.min(wipeEnd, startTick);
 }
@@ -235,7 +240,10 @@ export function splitLongPages(
           ? { ...page, endTick: next!.tick, lines }
           : {
               startTick: lines[0]!.tick,
-              displayTick: displayTickAfter(page.lines.slice(0, start), lines[0]!.tick),
+              displayTick: displayTickAfter(page.lines.slice(0, start), {
+                startTick: lines[0]!.tick,
+                lines,
+              }),
               endTick: next?.tick ?? page.endTick,
               sectionStart: false,
               lines,
@@ -247,7 +255,7 @@ export function splitLongPages(
   return { pages: splitPages, pairs: splitPairs };
 }
 
-function isNonLyricPage(page: KaraokePage): boolean {
+function isNonLyricPage(page: Pick<KaraokePage, 'lines'>): boolean {
   return page.lines.every((line) => line.syllables.every((syl) => syl.vocalPart === 'nonLyric'));
 }
 
