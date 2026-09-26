@@ -9,6 +9,10 @@
   --meta-color: #115e59;
   --warning: #a16207;
   --danger: #b91c1c;
+  --part-base: #3563d4;
+  --part-female: #e11d48;
+  --part-mixed: #9333ea;
+  --part-other: #15803d;
 
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -42,6 +46,10 @@
   --meta-color: #2dd4bf;
   --warning: #facc15;
   --danger: #f87171;
+  --part-base: #6f95ff;
+  --part-female: #fb7185;
+  --part-mixed: #c084fc;
+  --part-other: #2fb163;
   color-scheme: dark;
 }
 
