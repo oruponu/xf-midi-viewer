@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
@@ -148,6 +148,10 @@ function DetailsView({
   parsedKaraoke: ParsedKaraoke;
   hasStyle: boolean;
 }) {
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
     <div className="details-view">
       {file && <FileSection file={file} />}
