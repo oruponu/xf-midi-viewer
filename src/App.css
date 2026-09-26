@@ -945,9 +945,8 @@
   top: 0;
   padding: 1px 4px;
   border-radius: var(--radius-sm);
-  font-family: var(--mono);
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-h);
   white-space: nowrap;
   transition:
