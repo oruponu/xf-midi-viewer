@@ -863,6 +863,10 @@
   white-space: nowrap;
 }
 
+.score-rehearsal--start {
+  transform: none;
+}
+
 .score-staff {
   --score-head-height: 24px;
   position: relative;

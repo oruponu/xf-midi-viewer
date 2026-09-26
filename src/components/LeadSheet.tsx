@@ -318,7 +318,13 @@ function ScoreRow({
       <span className="score-playhead" aria-hidden="true" style={{ opacity: 0 }} />
       <div className="score-rehearsals">
         {placedRehearsals.map((p, i) => (
-          <span key={i} className="score-rehearsal" style={{ left: `${p.xPercent}%` }}>
+          <span
+            key={i}
+            className={
+              p.xPercent === 0 ? 'score-rehearsal score-rehearsal--start' : 'score-rehearsal'
+            }
+            style={{ left: `${p.xPercent}%` }}
+          >
             {p.msg.letter}
             {"'".repeat(p.msg.variation)}
           </span>
