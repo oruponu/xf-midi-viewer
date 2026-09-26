@@ -322,6 +322,7 @@ function PlayerScope({
         autoScrollLyrics={settings.autoScrollLyrics}
         showPitchBar={settings.showPitchBar}
         keyShift={keyShift}
+        playbackRate={playbackRate}
       />
       <div className="player-dock" ref={dockRef}>
         <div className="player-dock-inner">

@@ -16,13 +16,15 @@ import type {
   KaraokeRow,
   LineAlignment,
 } from '../lib/xf/karaokePages.ts';
-import type { LyricLine, LyricRun } from '../lib/xf/lyrics.ts';
+import type { LyricLine, LyricRun, LyricSyllable } from '../lib/xf/lyrics.ts';
 import type { PitchLane } from '../lib/xf/pitchBars.ts';
 import type { VocalPart } from '../lib/xf/types.ts';
 import { partColorOf } from '../lib/xf/vocalPart.ts';
 import { PitchBarLane } from './PitchBarLane.tsx';
 
 const PREVIEW_LEAD_SECONDS = 1;
+
+type DurationLabels = ReadonlyMap<LyricSyllable, string>;
 
 type LineStatus = 'past' | 'sung' | 'active' | 'upcoming';
 
@@ -34,6 +36,8 @@ interface MergeState {
 interface KaraokeViewProps {
   pages: KaraokePage[];
   pitchLane: PitchLane | null;
+  nonLyricDurations: Map<LyricSyllable, number>;
+  playbackRate: number;
   sequence: PlaybackSequence;
   scheduler: MidiScheduler;
 }
@@ -41,9 +45,22 @@ interface KaraokeViewProps {
 export const KaraokeView = memo(function KaraokeView({
   pages,
   pitchLane,
+  nonLyricDurations,
+  playbackRate,
   sequence,
   scheduler,
 }: KaraokeViewProps) {
+  const durationLabels = useMemo(
+    () =>
+      new Map(
+        Array.from(nonLyricDurations, ([syl, seconds]) => [
+          syl,
+          `約${Math.round(seconds / playbackRate)}秒`,
+        ]),
+      ),
+    [nonLyricDurations, playbackRate],
+  );
+
   const [activeState, setActiveState] = useState<KaraokeDisplay>({
     pageIdx: 0,
     lineIdx: 0,
@@ -98,7 +115,7 @@ export const KaraokeView = memo(function KaraokeView({
       cancelled = true;
       observer.disconnect();
     };
-  }, [pages]);
+  }, [pages, durationLabels]);
 
   const layout = useMemo(() => {
     if (mergeState.pages !== pages) {
@@ -203,7 +220,11 @@ export const KaraokeView = memo(function KaraokeView({
     <div className="card karaoke-view">
       <div className="karaoke-screen" ref={screenRef}>
         <div className="karaoke-stage" ref={stageRef}>
-          <KaraokeMeasureLayer pages={pages} layerRef={measureLayerRef} />
+          <KaraokeMeasureLayer
+            pages={pages}
+            durationLabels={durationLabels}
+            layerRef={measureLayerRef}
+          />
           {pitchLane && <PitchBarLane lane={pitchLane} sequence={sequence} scheduler={scheduler} />}
           {nextPage &&
             rowsOf(activePageIdx + 1)
@@ -213,6 +234,7 @@ export const KaraokeView = memo(function KaraokeView({
                   key={`preview-${rowKey(row)}`}
                   row={row}
                   lines={nextPage.lines}
+                  durationLabels={durationLabels}
                   statusOf={() => 'upcoming'}
                   activeLineRef={activeLineRef}
                   fillRef={fillRef}
@@ -223,6 +245,7 @@ export const KaraokeView = memo(function KaraokeView({
               key={rowKey(row)}
               row={row}
               lines={activePage.lines}
+              durationLabels={durationLabels}
               statusOf={(i) =>
                 i < activeLineIndex ? 'past' : i === activeLineIndex ? 'active' : 'upcoming'
               }
@@ -238,9 +261,11 @@ export const KaraokeView = memo(function KaraokeView({
 
 const KaraokeMeasureLayer = memo(function KaraokeMeasureLayer({
   pages,
+  durationLabels,
   layerRef,
 }: {
   pages: KaraokePage[];
+  durationLabels: DurationLabels;
   layerRef: RefObject<HTMLDivElement | null>;
 }) {
   return (
@@ -250,7 +275,7 @@ const KaraokeMeasureLayer = memo(function KaraokeMeasureLayer({
         <div key={p} data-measure-page="">
           {page.lines.map((line, i) => (
             <div key={i} className="karaoke-line">
-              {renderLineContent(line)}
+              {renderLineContent(line, durationLabels)}
             </div>
           ))}
         </div>
@@ -262,12 +287,14 @@ const KaraokeMeasureLayer = memo(function KaraokeMeasureLayer({
 function KaraokeRowView({
   row,
   lines,
+  durationLabels,
   statusOf,
   activeLineRef,
   fillRef,
 }: {
   row: KaraokeRow;
   lines: LyricLine[];
+  durationLabels: DurationLabels;
   statusOf: (lineIndex: number) => LineStatus;
   activeLineRef: RefObject<HTMLDivElement | null>;
   fillRef: RefObject<HTMLSpanElement | null>;
@@ -277,6 +304,7 @@ function KaraokeRowView({
     return (
       <KaraokeLineView
         line={lines[left]!}
+        durationLabels={durationLabels}
         alignment={row.alignment}
         status={statusOf(left)}
         activeLineRef={activeLineRef}
@@ -292,6 +320,7 @@ function KaraokeRowView({
     <div className={className}>
       <KaraokeLineView
         line={lines[left]!}
+        durationLabels={durationLabels}
         status={leftStatus === 'past' ? 'sung' : leftStatus}
         activeLineRef={activeLineRef}
         fillRef={fillRef}
@@ -299,6 +328,7 @@ function KaraokeRowView({
       <span className="karaoke-line karaoke-gap"> </span>
       <KaraokeLineView
         line={lines[right]!}
+        durationLabels={durationLabels}
         status={rightStatus}
         activeLineRef={activeLineRef}
         fillRef={fillRef}
@@ -309,12 +339,14 @@ function KaraokeRowView({
 
 function KaraokeLineView({
   line,
+  durationLabels,
   alignment,
   status,
   activeLineRef,
   fillRef,
 }: {
   line: LyricLine;
+  durationLabels: DurationLabels;
   alignment?: LineAlignment;
   status: LineStatus;
   activeLineRef: RefObject<HTMLDivElement | null>;
@@ -327,15 +359,15 @@ function KaraokeLineView({
   if (isActive) className += ' karaoke-line--active';
   return (
     <div className={className} ref={isActive ? activeLineRef : undefined}>
-      <span className="karaoke-line-base">{renderLineContent(line)}</span>
+      <span className="karaoke-line-base">{renderLineContent(line, durationLabels)}</span>
       {isActive && (
         <span className="karaoke-line-fill" ref={fillRef} style={{ width: 0 }}>
-          {renderLineContent(line)}
+          {renderLineContent(line, durationLabels)}
         </span>
       )}
       {status === 'sung' && (
         <span className="karaoke-line-fill" style={{ width: '100%' }}>
-          {renderLineContent(line)}
+          {renderLineContent(line, durationLabels)}
         </span>
       )}
     </div>
@@ -353,10 +385,16 @@ function samePairs(a: boolean[][], b: boolean[][]): boolean {
   );
 }
 
-function renderLineContent(line: LyricLine): ReactNode {
+function renderLineContent(line: LyricLine, durationLabels: DurationLabels): ReactNode {
   return line.syllables.map((syl, i) => (
     <span key={i} className={syllableClassName(syl.vocalPart)} data-syl-idx={i}>
       {syl.runs.map((run, j) => renderRun(run, j))}
+      {durationLabels.has(syl) && (
+        <>
+          {' '}
+          <span className="karaoke-syl-duration">{durationLabels.get(syl)}</span>
+        </>
+      )}
     </span>
   ));
 }

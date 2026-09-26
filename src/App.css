@@ -1315,6 +1315,10 @@
   color: var(--text);
 }
 
+.karaoke-syl-duration {
+  font-size: 0.75em;
+}
+
 .karaoke-line ruby {
   display: inline-grid;
   justify-items: center;
