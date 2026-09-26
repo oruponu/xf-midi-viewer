@@ -139,6 +139,7 @@ export const LeadSheet = memo(function LeadSheet({
     let lastPos = NaN;
     let lastTick = NaN;
     let lastActiveRowIdx = -1;
+    let scrolled = false;
     const tick = () => {
       if (cancelled) return;
       const seconds = scheduler.getPosition();
@@ -165,7 +166,11 @@ export const LeadSheet = memo(function LeadSheet({
           if (autoScroll) {
             const activeRow = rowEls[activeRowIdx];
             if (activeRow) {
-              activeRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+              activeRow.scrollIntoView({
+                block: 'center',
+                behavior: scrolled ? 'smooth' : 'instant',
+              });
+              scrolled = true;
             }
           }
         }

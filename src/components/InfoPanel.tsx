@@ -303,11 +303,14 @@ function KaraokeSection({
     activeSyllableIndex,
   );
   const streamRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(false);
   useEffect(() => {
+    const behavior = mountedRef.current ? 'smooth' : 'instant';
+    mountedRef.current = true;
     if (!autoScroll) return;
     if (activeSyllableIndex < 0) return;
     const el = streamRef.current?.querySelector('.lyric--active');
-    el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el?.scrollIntoView({ block: 'center', behavior });
   }, [activeSyllableIndex, autoScroll]);
 
   return (
