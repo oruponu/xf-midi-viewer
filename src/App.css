@@ -854,7 +854,8 @@
   top: 2px;
   transform: translateX(-50%);
   padding: 1px 8px;
-  color: var(--text-h);
+  background: var(--text-h);
+  color: var(--bg);
   border: 1px solid var(--text-h);
   border-radius: var(--radius-sm);
   font-size: 12px;
