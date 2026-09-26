@@ -14,9 +14,17 @@ import { useWakeLock } from './hooks/useWakeLock.ts';
 import type { MidiScheduler } from './lib/player/scheduler.ts';
 import type { Song } from './lib/song.ts';
 import type { FileSummary } from './lib/songLoader.ts';
+import { nextTheme } from './lib/theme.ts';
+import type { Theme } from './lib/theme.ts';
 
 const MIDI_EXTENSIONS = ['.mid', '.midi', '.kar', '.xih', '.xkm'];
 const FILE_ACCEPT = [...MIDI_EXTENSIONS, 'audio/midi'].join(',');
+
+const THEME_LABELS: Record<Theme, string> = {
+  system: 'システム',
+  light: 'ライト',
+  dark: 'ダーク',
+};
 
 function App() {
   const { state: songState, loadFile } = useSongLoader();
@@ -116,6 +124,15 @@ function App() {
             <button
               type="button"
               className="icon-button"
+              title={`テーマ: ${THEME_LABELS[settings.theme]}`}
+              aria-label={`テーマ: ${THEME_LABELS[settings.theme]}`}
+              onClick={() => updateSettings({ theme: nextTheme(settings.theme) })}
+            >
+              <ThemeIcon theme={settings.theme} />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
               title="設定"
               aria-label="設定"
               onClick={() => setIsSettingsOpen(true)}
@@ -193,6 +210,36 @@ function FolderOpenIcon({ size = 20 }: { size?: number }) {
     >
       <path d="M3 7a2 2 0 0 1 2-2h3.5l2 2H19a2 2 0 0 1 2 2v1H3V7Z" />
       <path d="M3 10h18.2l-1.95 8.1A2 2 0 0 1 17.3 19.6H5.55a2 2 0 0 1-1.95-1.5L3 10Z" />
+    </svg>
+  );
+}
+
+function ThemeIcon({ theme }: { theme: Theme }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {theme === 'system' && (
+        <>
+          <circle cx="12" cy="12" r="8" />
+          <path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor" />
+        </>
+      )}
+      {theme === 'light' && (
+        <>
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+        </>
+      )}
+      {theme === 'dark' && <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" />}
     </svg>
   );
 }
