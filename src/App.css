@@ -638,15 +638,19 @@
   border: 1px solid var(--border);
 }
 
-.flag-on {
-  background: color-mix(in srgb, var(--success) 12%, transparent);
-  color: var(--success);
-  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+.flag-list .flag-on {
+  color: var(--text-h);
+  border-color: var(--text-h);
 }
 
-.flag-off {
+.flag-list .flag-on::before {
+  content: '✓' / '';
+  margin-right: 4px;
+}
+
+.flag-list .flag-off {
   color: var(--text);
-  opacity: 0.5;
+  border-style: dashed;
 }
 
 .info-dl {

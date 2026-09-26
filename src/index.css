@@ -8,7 +8,6 @@
   --accent-vivid: #3563d4;
   --meta-color: #115e59;
   --warning: #a16207;
-  --success: #166534;
   --danger: #b91c1c;
 
   --radius-sm: 4px;
@@ -39,7 +38,6 @@
     --accent-vivid: #6f95ff;
     --meta-color: #2dd4bf;
     --warning: #facc15;
-    --success: #4ade80;
     --danger: #f87171;
   }
 }
