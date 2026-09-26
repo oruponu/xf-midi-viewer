@@ -182,7 +182,8 @@ export const KaraokeView = memo(function KaraokeView({
         pageIdx !== last.pageIdx ||
         lineIdx !== last.lineIdx ||
         display.preview !== last.preview ||
-        display.hidden !== last.hidden;
+        display.hidden !== last.hidden ||
+        display.lineEnded !== last.lineEnded;
       if (switched) {
         last = display;
         setResolvedState({ pages: displayPages, display });
@@ -217,6 +218,7 @@ export const KaraokeView = memo(function KaraokeView({
   const activePageIdx = Math.min(activeState.pageIdx, displayPages.length - 1);
   const activePage = displayPages[activePageIdx]!;
   const activeLineIndex = Math.min(activeState.lineIdx, activePage.lines.length - 1);
+  const pastLineCount = activeLineIndex + (activeState.lineEnded ? 1 : 0);
   const nextPage = activeState.preview ? displayPages[activePageIdx + 1] : undefined;
   const rowsOf = (pageIdx: number) => buildKaraokeRows(layout.pairs[pageIdx]!);
 
@@ -252,7 +254,7 @@ export const KaraokeView = memo(function KaraokeView({
                 lines={activePage.lines}
                 durationLabels={durationLabels}
                 statusOf={(i) =>
-                  i < activeLineIndex ? 'past' : i === activeLineIndex ? 'active' : 'upcoming'
+                  i < pastLineCount ? 'past' : i === activeLineIndex ? 'active' : 'upcoming'
                 }
                 activeLineRef={activeLineRef}
                 fillRef={fillRef}

@@ -201,6 +201,7 @@ describe('resolveKaraokeDisplay', () => {
       lineIdx: 1,
       preview: false,
       hidden: false,
+      lineEnded: false,
     });
   });
 
@@ -210,6 +211,7 @@ describe('resolveKaraokeDisplay', () => {
       lineIdx: 2,
       preview: true,
       hidden: false,
+      lineEnded: false,
     });
   });
 
@@ -223,6 +225,7 @@ describe('resolveKaraokeDisplay', () => {
       lineIdx: 1,
       preview: false,
       hidden: false,
+      lineEnded: false,
     });
   });
 
@@ -232,6 +235,7 @@ describe('resolveKaraokeDisplay', () => {
       lineIdx: 0,
       preview: false,
       hidden: false,
+      lineEnded: false,
     });
   });
 
@@ -251,6 +255,7 @@ describe('resolveKaraokeDisplay', () => {
       lineIdx: 0,
       preview: true,
       hidden: false,
+      lineEnded: false,
     });
   });
 
@@ -265,6 +270,7 @@ describe('resolveKaraokeDisplay', () => {
       lineIdx: 0,
       preview: false,
       hidden: false,
+      lineEnded: false,
     });
   });
 
@@ -281,6 +287,58 @@ describe('resolveKaraokeDisplay', () => {
     const lyric = [page(480, [sungLine(syl(480, 500))])];
     expect(resolveKaraokeDisplay(lyric, 0, 479).hidden).toBe(true);
     expect(resolveKaraokeDisplay(lyric, 0, 480).hidden).toBe(false);
+  });
+
+  describe('lineEnded', () => {
+    const endedAt = (first: LyricLine, tick: number) =>
+      resolveKaraokeDisplay([page(0, [first, sungLine(syl(1000, null))])], tick, tick).lineEnded;
+
+    test('ends the active line once both its line end and its wipe have passed', () => {
+      const first = { ...sungLine(syl(0, 100)), endTick: 80 };
+      expect(endedAt(first, 99)).toBe(false);
+      expect(endedAt(first, 100)).toBe(true);
+    });
+
+    test('waits for the line end when the wipe finishes first', () => {
+      const first = { ...sungLine(syl(0, 100)), endTick: 200 };
+      expect(endedAt(first, 199)).toBe(false);
+      expect(endedAt(first, 200)).toBe(true);
+    });
+
+    test('ends a speech line at its line end', () => {
+      const first = { ...sungLine({ ...syl(0, 1000), vocalPart: 'speech' }), endTick: 200 };
+      expect(endedAt(first, 200)).toBe(true);
+    });
+
+    test('keeps a non-lyric line until the next line starts', () => {
+      const first = { ...sungLine({ ...syl(0, 100), vocalPart: 'nonLyric' }), endTick: 100 };
+      expect(endedAt(first, 999)).toBe(false);
+    });
+
+    test('keeps a line without an end', () => {
+      expect(endedAt(sungLine(syl(0, null)), 999)).toBe(false);
+    });
+
+    test('keeps a finished line when the next line follows within the lookahead', () => {
+      const pages = [
+        page(0, [{ ...sungLine(syl(0, 100)), endTick: 200 }, sungLine(syl(1000, null))]),
+      ];
+      expect(resolveKaraokeDisplay(pages, 300, 1100).lineEnded).toBe(false);
+      expect(resolveKaraokeDisplay(pages, 300, 1000).lineEnded).toBe(true);
+    });
+
+    test('keeps the last line when the next page follows within the lookahead', () => {
+      const pages = [
+        page(0, [{ ...sungLine(syl(0, 100)), endTick: 200 }]),
+        page(250, [sungLine(syl(250, null))]),
+      ];
+      expect(resolveKaraokeDisplay(pages, 200, 300).lineEnded).toBe(false);
+    });
+
+    test('ends the last line of the song', () => {
+      const pages = [page(0, [{ ...sungLine(syl(0, 100)), endTick: 200 }])];
+      expect(resolveKaraokeDisplay(pages, 200, 1200).lineEnded).toBe(true);
+    });
   });
 });
 

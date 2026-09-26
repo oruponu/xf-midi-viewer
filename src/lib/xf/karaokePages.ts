@@ -15,6 +15,7 @@ export interface KaraokeDisplay {
   lineIdx: number;
   preview: boolean;
   hidden: boolean;
+  lineEnded: boolean;
 }
 
 const FALLBACK_LINES_PER_PAGE = 4;
@@ -98,7 +99,7 @@ export function resolveKaraokeDisplay(
     const first = pages[0]!;
     const revealTick = isNonLyricPage(first) ? tick : lookaheadTick;
     if (first.displayTick > revealTick) {
-      return { pageIdx: 0, lineIdx: 0, preview: false, hidden: true };
+      return { pageIdx: 0, lineIdx: 0, preview: false, hidden: true, lineEnded: false };
     }
   }
   const pageIdx = Math.max(0, lo - 1);
@@ -115,9 +116,23 @@ export function resolveKaraokeDisplay(
     next.displayTick <= lookaheadTick;
 
   if (preview && isNonLyricPage(page)) {
-    return { pageIdx: pageIdx + 1, lineIdx: 0, preview: false, hidden: false };
+    return { pageIdx: pageIdx + 1, lineIdx: 0, preview: false, hidden: false, lineEnded: false };
   }
-  return { pageIdx, lineIdx, preview, hidden: false };
+  const endTick = lineEndTick(page.lines[lineIdx]!);
+  const nextTick = page.lines[lineIdx + 1]?.tick ?? next?.displayTick ?? null;
+  const lineEnded =
+    endTick !== null &&
+    endTick <= tick &&
+    (nextTick === null || nextTick - endTick > lookaheadTick - tick);
+  return { pageIdx, lineIdx, preview, hidden: false, lineEnded };
+}
+
+function lineEndTick(line: LyricLine): number | null {
+  if (line.syllables.every((syl) => syl.vocalPart === 'nonLyric')) return null;
+  const last = line.syllables.at(-1)!;
+  const wipeEnd = last.vocalPart === 'speech' ? null : last.endTick;
+  if (line.endTick === null) return wipeEnd;
+  return wipeEnd === null ? line.endTick : Math.max(line.endTick, wipeEnd);
 }
 
 export type LineAlignment = 'left' | 'right' | 'center';
