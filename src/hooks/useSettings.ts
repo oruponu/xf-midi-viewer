@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { isTheme } from '../lib/theme.ts';
+import type { Theme } from '../lib/theme.ts';
 
 const STORAGE_KEY = 'xf-midi-viewer:settings';
 
@@ -6,12 +8,14 @@ export interface Settings {
   autoScrollLeadSheet: boolean;
   autoScrollLyrics: boolean;
   showPitchBar: boolean;
+  theme: Theme;
 }
 
 const DEFAULT_SETTINGS: Settings = {
   autoScrollLeadSheet: true,
   autoScrollLyrics: true,
   showPitchBar: true,
+  theme: 'system',
 };
 
 function loadSettings(): Settings {
@@ -25,13 +29,14 @@ function loadSettings(): Settings {
       autoScrollLeadSheet: readBoolean(parsed, 'autoScrollLeadSheet'),
       autoScrollLyrics: readBoolean(parsed, 'autoScrollLyrics'),
       showPitchBar: readBoolean(parsed, 'showPitchBar'),
+      theme: isTheme(parsed.theme) ? parsed.theme : DEFAULT_SETTINGS.theme,
     };
   } catch {
     return DEFAULT_SETTINGS;
   }
 }
 
-function readBoolean(parsed: Partial<Settings>, key: keyof Settings): boolean {
+function readBoolean(parsed: Partial<Settings>, key: Exclude<keyof Settings, 'theme'>): boolean {
   const value = parsed[key];
   return typeof value === 'boolean' ? value : DEFAULT_SETTINGS[key];
 }
