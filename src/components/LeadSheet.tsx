@@ -176,9 +176,12 @@ export const LeadSheet = memo(function LeadSheet({
         }
       }
       if (tickValue !== lastTick) {
+        const initial = Number.isNaN(lastTick);
         lastTick = tickValue;
         markProgress(chordEls, chordTicks, tickValue, 'score-chord');
         markProgress(lyricEls, lyricTicks, tickValue, 'score-lyric');
+        // Row layout has already resolved the unplayed colors, so the first marking would fade.
+        if (initial) for (const a of container.getAnimations({ subtree: true })) a.finish();
       }
       raf = requestAnimationFrame(tick);
     };
