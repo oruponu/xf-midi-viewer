@@ -52,3 +52,13 @@ h3 {
   color: var(--text-h);
   font-weight: 600;
 }
+
+a {
+  color: inherit;
+  text-underline-offset: 2px;
+}
+
+a:hover,
+a:focus-visible {
+  color: var(--accent);
+}
