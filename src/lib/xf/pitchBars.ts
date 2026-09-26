@@ -1,6 +1,9 @@
 import type { PlaybackNote } from '../smf/playback.ts';
 import type { SmfTiming } from '../smf/timing.ts';
+import type { LyricSyllable } from './lyrics.ts';
 import type { RehearsalMessage } from './types.ts';
+import { partColorOf } from './vocalPart.ts';
+import type { PartColor } from './vocalPart.ts';
 
 const VIEW_QUARTER_NOTES = 16;
 const MIN_ROWS = 12;
@@ -9,6 +12,7 @@ export interface PitchBarNote {
   note: number;
   startTick: number;
   endTick: number;
+  part: PartColor;
 }
 
 export interface PitchBarRehearsal {
@@ -32,12 +36,18 @@ export function buildPitchLane(
   timing: SmfTiming,
   rehearsals: readonly RehearsalMessage[],
   durationTicks: number,
+  syllables: readonly LyricSyllable[] = [],
 ): PitchLane | null {
   if (timing.ppq <= 0) return null;
   const channels = new Set(melodyChannels.map((ch) => ch - 1));
   const melody = notes
     .filter((n) => channels.has(n.channel))
-    .map(({ note, startTick, endTick }) => ({ note, startTick, endTick }))
+    .map(({ note, startTick, endTick }) => ({
+      note,
+      startTick,
+      endTick,
+      part: partAt(syllables, startTick),
+    }))
     .sort((a, b) => a.startTick - b.startTick || a.note - b.note);
   if (melody.length === 0) return null;
 
@@ -53,6 +63,17 @@ export function buildPitchLane(
     endTick,
     viewTicks: timing.ppq * VIEW_QUARTER_NOTES,
   };
+}
+
+function partAt(syllables: readonly LyricSyllable[], tick: number): PartColor {
+  let lo = 0;
+  let hi = syllables.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (syllables[mid]!.tick <= tick) lo = mid + 1;
+    else hi = mid;
+  }
+  return partColorOf(syllables[lo - 1]?.vocalPart ?? null);
 }
 
 function noteRange(notes: readonly PitchBarNote[]): { lowNote: number; highNote: number } {

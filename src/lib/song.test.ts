@@ -72,10 +72,11 @@ describe('buildSong', () => {
     ]);
   });
 
-  test('builds the pitch lane from the melody channel', () => {
+  test('builds the pitch lane from the melody channel and the vocal parts', () => {
     const song = buildSong(
       makeSmf([
         meta(0, 0x07, ascii('$Lyrc:1:0:')),
+        meta(0, 0x07, ascii('&f')),
         meta(0, 0x05, ascii('a')),
         noteOn(0, 60),
         { deltaTime: 240, event: { kind: 'noteOff', channel: 0, note: 60, velocity: 0 } },
@@ -85,7 +86,7 @@ describe('buildSong', () => {
     expect(song.pitchLane).toEqual({
       lowNote: 55,
       highNote: 66,
-      notes: [{ note: 60, startTick: 0, endTick: 240 }],
+      notes: [{ note: 60, startTick: 0, endTick: 240, part: 'female' }],
       barTicks: [0],
       rehearsals: [],
       endTick: 1920,

@@ -50,6 +50,7 @@ export function buildSong(smf: SmfFile): Song {
       timing,
       rehearsals,
       sequence.durationTicks,
+      karaoke.syllables,
     ),
   };
 }

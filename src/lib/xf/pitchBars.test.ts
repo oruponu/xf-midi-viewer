@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import type { PlaybackNote } from '../smf/playback.ts';
 import type { SmfTiming } from '../smf/timing.ts';
+import type { LyricSyllable } from './lyrics.ts';
 import { buildPitchLane } from './pitchBars.ts';
-import type { RehearsalLetter, RehearsalMessage } from './types.ts';
+import type { RehearsalLetter, RehearsalMessage, VocalPart } from './types.ts';
 
 const BAR = 1920;
 
@@ -36,6 +37,13 @@ const rehearsal = (
   variation,
 });
 
+const syllable = (tick: number, vocalPart: VocalPart | null): LyricSyllable => ({
+  tick,
+  endTick: null,
+  runs: [],
+  vocalPart,
+});
+
 const lane = (
   durationTicks: number,
   options: { sigs?: [number, number, number][]; rehearsals?: RehearsalMessage[] } = {},
@@ -59,8 +67,8 @@ describe('buildPitchLane melody', () => {
     );
 
     expect(result!.notes).toEqual([
-      { note: 60, startTick: 0, endTick: 240 },
-      { note: 72, startTick: 240, endTick: 480 },
+      { note: 60, startTick: 0, endTick: 240, part: 'base' },
+      { note: 72, startTick: 240, endTick: 480, part: 'base' },
     ]);
   });
 
@@ -84,6 +92,30 @@ describe('buildPitchLane melody', () => {
 
   test('shows 16 quarter notes at a time', () => {
     expect(lane(BAR)!.viewTicks).toBe(480 * 16);
+  });
+});
+
+describe('buildPitchLane parts', () => {
+  const partsOf = (notes: PlaybackNote[], syllables: LyricSyllable[]) =>
+    buildPitchLane(notes, [1], timing(), [], BAR, syllables)!.notes.map((n) => n.part);
+
+  test('takes the part of the last syllable at or before each note start', () => {
+    const syllables = [syllable(0, 'male'), syllable(480, 'female'), syllable(960, 'mixed')];
+
+    expect(
+      partsOf(
+        [note(60, 0, 240), note(60, 479, 480), note(60, 480, 720), note(60, 1200, 1440)],
+        syllables,
+      ),
+    ).toEqual(['base', 'base', 'female', 'mixed']);
+  });
+
+  test('uses the base part before the first syllable and without syllables', () => {
+    expect(partsOf([note(60, 0, 240), note(60, 480, 720)], [syllable(480, 'chorus')])).toEqual([
+      'base',
+      'other',
+    ]);
+    expect(partsOf([note(60, 0, 240)], [])).toEqual(['base']);
   });
 });
 
