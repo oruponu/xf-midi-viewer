@@ -1238,7 +1238,7 @@
   top: -0.7em;
   bottom: 0;
   padding-top: 0.7em;
-  color: var(--accent);
+  color: var(--accent-vivid);
   overflow: hidden;
   white-space: nowrap;
   pointer-events: none;
@@ -1278,7 +1278,7 @@
 }
 
 .karaoke-line-fill ruby rt {
-  color: var(--accent);
+  color: var(--accent-vivid);
   opacity: 0.7;
 }
 
@@ -1339,7 +1339,7 @@
 }
 
 .pitch-lane-sung .pitch-lane-note {
-  fill: var(--accent);
+  fill: var(--accent-vivid);
 }
 
 .pitch-lane-cursor {

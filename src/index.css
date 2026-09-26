@@ -5,6 +5,7 @@
   --border: #e2e6ec;
   --surface: #f3f5f8;
   --accent: #2851a3;
+  --accent-vivid: #3563d4;
   --key-color: #115e59;
   --timesig-color: #92400e;
   --warning: #a16207;
@@ -36,6 +37,7 @@
     --border: #2a313d;
     --surface: #1b2029;
     --accent: #86a8ff;
+    --accent-vivid: #6f95ff;
     --key-color: #2dd4bf;
     --timesig-color: #fbbf24;
     --warning: #facc15;
