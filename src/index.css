@@ -20,7 +20,8 @@
   --radius-xl: 12px;
 
   --sans:
-    'Noto Sans JP', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', Meiryo, sans-serif;
+    'Noto Sans', 'Noto Sans JP', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI',
+    Meiryo, sans-serif;
   --mono: 'Roboto Mono', ui-monospace, 'SF Mono', Consolas, monospace;
 
   font: 16px/1.5 var(--sans);
