@@ -601,8 +601,8 @@
 .badge {
   display: inline-block;
   padding: 4px 10px;
-  background: var(--accent);
-  color: white;
+  background: var(--text-h);
+  color: var(--bg);
   border-radius: var(--radius-sm);
   font-family: var(--mono);
   font-size: 13px;
