@@ -185,6 +185,7 @@ describe('resolveKaraokeDisplay', () => {
       pageIdx: 0,
       lineIdx: 1,
       preview: false,
+      hidden: false,
     });
   });
 
@@ -193,6 +194,7 @@ describe('resolveKaraokeDisplay', () => {
       pageIdx: 0,
       lineIdx: 2,
       preview: true,
+      hidden: false,
     });
   });
 
@@ -205,6 +207,7 @@ describe('resolveKaraokeDisplay', () => {
       pageIdx: 0,
       lineIdx: 1,
       preview: false,
+      hidden: false,
     });
   });
 
@@ -213,6 +216,7 @@ describe('resolveKaraokeDisplay', () => {
       pageIdx: 1,
       lineIdx: 0,
       preview: false,
+      hidden: false,
     });
   });
 
@@ -231,6 +235,7 @@ describe('resolveKaraokeDisplay', () => {
       pageIdx: 1,
       lineIdx: 0,
       preview: true,
+      hidden: false,
     });
   });
 
@@ -244,7 +249,23 @@ describe('resolveKaraokeDisplay', () => {
       pageIdx: 1,
       lineIdx: 0,
       preview: false,
+      hidden: false,
     });
+  });
+
+  test('hides a leading non-lyric page until it starts', () => {
+    const nonLyric = [
+      page(480, [sungLine({ ...syl(480, 500), vocalPart: 'nonLyric' })]),
+      page(1000, [sungLine(syl(1000, 1100))]),
+    ];
+    expect(resolveKaraokeDisplay(nonLyric, 479, 479).hidden).toBe(true);
+    expect(resolveKaraokeDisplay(nonLyric, 480, 480).hidden).toBe(false);
+  });
+
+  test('shows a leading lyric page once the lookahead reaches it', () => {
+    const lyric = [page(480, [sungLine(syl(480, 500))])];
+    expect(resolveKaraokeDisplay(lyric, 0, 479).hidden).toBe(true);
+    expect(resolveKaraokeDisplay(lyric, 0, 480).hidden).toBe(false);
   });
 });
 

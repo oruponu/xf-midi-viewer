@@ -14,6 +14,7 @@ export interface KaraokeDisplay {
   pageIdx: number;
   lineIdx: number;
   preview: boolean;
+  hidden: boolean;
 }
 
 const FALLBACK_LINES_PER_PAGE = 4;
@@ -88,6 +89,13 @@ export function resolveKaraokeDisplay(
     if (pages[mid]!.displayTick <= tick) lo = mid + 1;
     else hi = mid;
   }
+  if (lo === 0) {
+    const first = pages[0]!;
+    const revealTick = isNonLyricPage(first) ? tick : lookaheadTick;
+    if (first.displayTick > revealTick) {
+      return { pageIdx: 0, lineIdx: 0, preview: false, hidden: true };
+    }
+  }
   const pageIdx = Math.max(0, lo - 1);
   const page = pages[pageIdx]!;
   const lineIdx = findActiveLineIndex(page.lines, tick);
@@ -102,9 +110,9 @@ export function resolveKaraokeDisplay(
     next.displayTick <= lookaheadTick;
 
   if (preview && isNonLyricPage(page)) {
-    return { pageIdx: pageIdx + 1, lineIdx: 0, preview: false };
+    return { pageIdx: pageIdx + 1, lineIdx: 0, preview: false, hidden: false };
   }
-  return { pageIdx, lineIdx, preview };
+  return { pageIdx, lineIdx, preview, hidden: false };
 }
 
 export type LineAlignment = 'left' | 'right' | 'center';

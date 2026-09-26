@@ -65,6 +65,7 @@ export const KaraokeView = memo(function KaraokeView({
     pageIdx: 0,
     lineIdx: 0,
     preview: false,
+    hidden: false,
   });
   const [mergeState, setMergeState] = useState<MergeState>({ pages: [], pairs: [] });
 
@@ -178,7 +179,8 @@ export const KaraokeView = memo(function KaraokeView({
         last === null ||
         pageIdx !== last.pageIdx ||
         lineIdx !== last.lineIdx ||
-        display.preview !== last.preview;
+        display.preview !== last.preview ||
+        display.hidden !== last.hidden;
       if (switched) {
         last = display;
         setActiveState(display);
@@ -240,19 +242,20 @@ export const KaraokeView = memo(function KaraokeView({
                   fillRef={fillRef}
                 />
               ))}
-          {rowsOf(activePageIdx).map((row) => (
-            <KaraokeRowView
-              key={rowKey(row)}
-              row={row}
-              lines={activePage.lines}
-              durationLabels={durationLabels}
-              statusOf={(i) =>
-                i < activeLineIndex ? 'past' : i === activeLineIndex ? 'active' : 'upcoming'
-              }
-              activeLineRef={activeLineRef}
-              fillRef={fillRef}
-            />
-          ))}
+          {!activeState.hidden &&
+            rowsOf(activePageIdx).map((row) => (
+              <KaraokeRowView
+                key={rowKey(row)}
+                row={row}
+                lines={activePage.lines}
+                durationLabels={durationLabels}
+                statusOf={(i) =>
+                  i < activeLineIndex ? 'past' : i === activeLineIndex ? 'active' : 'upcoming'
+                }
+                activeLineRef={activeLineRef}
+                fillRef={fillRef}
+              />
+            ))}
         </div>
       </div>
     </div>
