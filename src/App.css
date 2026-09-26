@@ -1307,8 +1307,8 @@
   color: var(--part-other);
 }
 
-.karaoke-line-fill .karaoke-syl--speech {
-  visibility: hidden;
+.karaoke-line-base .karaoke-syl--speech {
+  color: var(--part-other);
 }
 
 .karaoke-line-base .karaoke-syl--non-lyric {
