@@ -181,6 +181,22 @@ export function secondsToTick(seconds: number, sequence: PlaybackSequence): numb
   return Math.round(segment.tick + (seconds - segment.seconds) * ticksPerSecond);
 }
 
+export function tickToSeconds(tick: number, sequence: PlaybackSequence): number {
+  if (!Number.isFinite(tick) || tick <= 0) return 0;
+  const { tempos, ticksPerQuarter, durationSeconds, durationTicks } = sequence;
+  if (ticksPerQuarter <= 0 || tempos.length === 0) {
+    if (durationTicks <= 0) return 0;
+    return (Math.min(tick, durationTicks) / durationTicks) * durationSeconds;
+  }
+  let segment = tempos[0]!;
+  for (const t of tempos) {
+    if (t.tick <= tick) segment = t;
+    else break;
+  }
+  const secondsPerTick = 60 / (segment.bpm * ticksPerQuarter);
+  return segment.seconds + (tick - segment.tick) * secondsPerTick;
+}
+
 function toAbsoluteTrack(track: SmfTrack): Array<TrackEvent & { tick: number }> {
   let tick = 0;
   return track.events.map((event) => {
