@@ -13,6 +13,19 @@
       rel="stylesheet"
     />
     <title>XF MIDI Viewer</title>
+    <!-- Apply the theme before first paint to avoid a flash on load -->
+    <script>
+      (() => {
+        let theme;
+        try {
+          theme = JSON.parse(localStorage.getItem('xf-midi-viewer:settings') ?? 'null')?.theme;
+        } catch {}
+        if (theme !== 'light' && theme !== 'dark') {
+          theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

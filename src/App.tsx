@@ -9,6 +9,7 @@ import { useMidiPlayer } from './hooks/useMidiPlayer.ts';
 import { useSettings } from './hooks/useSettings.ts';
 import type { Settings } from './hooks/useSettings.ts';
 import { useSongLoader } from './hooks/useSongLoader.ts';
+import { useTheme } from './hooks/useTheme.ts';
 import { useWakeLock } from './hooks/useWakeLock.ts';
 import type { MidiScheduler } from './lib/player/scheduler.ts';
 import type { Song } from './lib/song.ts';
@@ -23,6 +24,7 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { settings, updateSettings } = useSettings();
+  useTheme(settings.theme);
   const song = songState.status === 'loaded' ? songState.song : null;
   const file = songState.status === 'empty' ? null : songState.file;
   const errorMessage = songState.status === 'error' ? songState.message : (song?.xfError ?? null);
