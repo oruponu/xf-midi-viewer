@@ -74,7 +74,7 @@ function renderNotes(lane: PitchLane): ReactNode[] {
   return lane.notes.map((n, i) => (
     <rect
       key={i}
-      className="pitch-lane-note"
+      className={`pitch-lane-note pitch-lane-note--part-${n.part}`}
       x={percent(n.startTick / lane.endTick)}
       width={percent((n.endTick - n.startTick) / lane.endTick)}
       y={percent((lane.highNote - n.note) / rows)}

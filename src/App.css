@@ -1375,8 +1375,20 @@
   rx: 0.4cqi;
 }
 
-.pitch-lane-sung .pitch-lane-note {
-  fill: var(--accent-vivid);
+.pitch-lane-sung .pitch-lane-note--part-base {
+  fill: var(--part-base);
+}
+
+.pitch-lane-sung .pitch-lane-note--part-female {
+  fill: var(--part-female);
+}
+
+.pitch-lane-sung .pitch-lane-note--part-mixed {
+  fill: var(--part-mixed);
+}
+
+.pitch-lane-sung .pitch-lane-note--part-other {
+  fill: var(--part-other);
 }
 
 .pitch-lane-cursor {
