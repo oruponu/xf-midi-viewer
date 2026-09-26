@@ -24,6 +24,7 @@ import type {
   XfStyleData,
   XfVersion,
 } from '../lib/xf/types.ts';
+import { partColorOf } from '../lib/xf/vocalPart.ts';
 import { KaraokeView } from './KaraokeView.tsx';
 import { LeadSheet } from './LeadSheet.tsx';
 
@@ -320,7 +321,9 @@ function KaraokeSection({
             return [
               <div key={`bc-${idx}`} className="karaoke-badge-cell">
                 {block.part !== null && (
-                  <span className="part-badge">{VOCAL_PART_LABELS[block.part]}</span>
+                  <span className={`part-badge part-badge--${partColorOf(block.part)}`}>
+                    {VOCAL_PART_LABELS[block.part]}
+                  </span>
                 )}
               </div>,
               <div key={`lc-${idx}`} className="karaoke-lyric-cell">
