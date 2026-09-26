@@ -61,11 +61,10 @@ export const KaraokeView = memo(function KaraokeView({
     [nonLyricDurations, playbackRate],
   );
 
-  const [activeState, setActiveState] = useState<KaraokeDisplay>({
-    pageIdx: 0,
-    lineIdx: 0,
-    preview: false,
-    hidden: false,
+  const [activeState, setActiveState] = useState<KaraokeDisplay>(() => {
+    if (pages.length === 0) return { pageIdx: 0, lineIdx: 0, preview: false, hidden: false };
+    const { tick, lookaheadTick } = playbackTicks(sequence, scheduler);
+    return resolveKaraokeDisplay(pages, tick, lookaheadTick);
   });
   const [mergeState, setMergeState] = useState<MergeState>({ pages: [], pairs: [] });
 
@@ -166,12 +165,7 @@ export const KaraokeView = memo(function KaraokeView({
 
     const loop = () => {
       if (cancelled) return;
-      const position = scheduler.getPosition();
-      const tick = secondsToTick(position, sequence);
-      const lookaheadTick = secondsToTick(
-        position + PREVIEW_LEAD_SECONDS * scheduler.getState().playbackRate,
-        sequence,
-      );
+      const { tick, lookaheadTick } = playbackTicks(sequence, scheduler);
       const display = resolveKaraokeDisplay(displayPages, tick, lookaheadTick);
       const { pageIdx, lineIdx } = display;
       const page = displayPages[pageIdx]!;
@@ -375,6 +369,20 @@ function KaraokeLineView({
       )}
     </div>
   );
+}
+
+function playbackTicks(
+  sequence: PlaybackSequence,
+  scheduler: MidiScheduler,
+): { tick: number; lookaheadTick: number } {
+  const position = scheduler.getPosition();
+  return {
+    tick: secondsToTick(position, sequence),
+    lookaheadTick: secondsToTick(
+      position + PREVIEW_LEAD_SECONDS * scheduler.getState().playbackRate,
+      sequence,
+    ),
+  };
 }
 
 function rowKey(row: KaraokeRow): number {
