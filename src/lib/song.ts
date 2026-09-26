@@ -6,7 +6,8 @@ import type { SmfFile } from './smf/types.ts';
 import { buildKaraokePages } from './xf/karaokePages.ts';
 import type { KaraokePage } from './xf/karaokePages.ts';
 import { parseKaraoke } from './xf/lyrics.ts';
-import type { ParsedKaraoke } from './xf/lyrics.ts';
+import type { LyricSyllable, ParsedKaraoke } from './xf/lyrics.ts';
+import { nonLyricDurations } from './xf/nonLyricDurations.ts';
 import { extractXf } from './xf/parser.ts';
 import { buildPitchLane } from './xf/pitchBars.ts';
 import type { PitchLane } from './xf/pitchBars.ts';
@@ -21,6 +22,7 @@ export interface Song {
   chords: ChordMessage[];
   rehearsals: RehearsalMessage[];
   karaokePages: KaraokePage[];
+  nonLyricDurations: Map<LyricSyllable, number>;
   pitchLane: PitchLane | null;
 }
 
@@ -44,6 +46,7 @@ export function buildSong(smf: SmfFile): Song {
     chords,
     rehearsals,
     karaokePages: buildKaraokePages(karaoke, rehearsals),
+    nonLyricDurations: nonLyricDurations(karaoke.syllables, sequence),
     pitchLane: buildPitchLane(
       sequence.notes,
       xf.karaoke.header?.melodyChannels ?? [],
