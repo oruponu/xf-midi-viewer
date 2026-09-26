@@ -850,9 +850,8 @@
   top: 2px;
   transform: translateX(-50%);
   padding: 1px 8px;
-  background: color-mix(in srgb, var(--rehearsal-color) 14%, transparent);
-  color: var(--rehearsal-color);
-  border: 1px solid color-mix(in srgb, var(--rehearsal-color) 40%, transparent);
+  color: var(--text-h);
+  border: 1px solid var(--text-h);
   border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 600;
@@ -1324,12 +1323,12 @@
 }
 
 .pitch-lane-rehearsal line {
-  stroke: var(--rehearsal-color);
+  stroke: var(--text-h);
   stroke-width: 1.5;
 }
 
 .pitch-lane-rehearsal text {
-  fill: var(--rehearsal-color);
+  fill: var(--text-h);
   font-size: 1.6cqi;
   font-weight: 600;
 }
