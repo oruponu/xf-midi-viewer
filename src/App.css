@@ -369,6 +369,8 @@
 }
 
 .playback-key {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   flex-direction: column;
   align-items: stretch;
@@ -450,6 +452,8 @@
 }
 
 .playback-time-sig {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -477,6 +481,27 @@
   font-size: 14px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+.playback-pulse {
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border: 1px solid var(--meta-color);
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--meta-color) 18%, transparent);
+  pointer-events: none;
+  opacity: 0;
+  animation: playback-pulse 1s ease-out;
+}
+
+@keyframes playback-pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 .midi-output-select {

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, RefObject } from 'react';
 import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
+import { isPlaybackAdvance } from '../lib/player/advance.ts';
 import {
   KEY_SHIFT_MAX,
   KEY_SHIFT_MIN,
@@ -13,7 +14,7 @@ import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatKeySignature, shiftKeySignature, tickToBarBeat } from '../lib/smf/timing.ts';
-import type { SmfTiming } from '../lib/smf/timing.ts';
+import type { KeySignature, SmfTiming } from '../lib/smf/timing.ts';
 
 interface PlaybackPanelProps {
   sequence: PlaybackSequence;
@@ -100,6 +101,11 @@ function PlaybackReadout({
   const [dragSeconds, setDragSeconds] = useState<number | null>(null);
   const positionSeconds = dragSeconds ?? playbackSeconds;
   const sliderRef = useRef<HTMLInputElement | null>(null);
+  const isDraggingRef = useRef(false);
+
+  useEffect(() => {
+    isDraggingRef.current = dragSeconds !== null;
+  }, [dragSeconds]);
 
   useEffect(() => {
     const slider = sliderRef.current;
@@ -144,31 +150,31 @@ function PlaybackReadout({
     )}.${String(bb.tickInBeat).padStart(4, '0')}`;
   }, [positionSeconds, sequence, timing]);
   const keyLabel = useMemo(() => {
-    if (timing.keySignatures.length === 0) return null;
-    const tick = secondsToTick(positionSeconds, sequence);
-    let current = timing.keySignatures[0]!;
-    for (const change of timing.keySignatures) {
-      if (change.tick <= tick) current = change;
-      else break;
-    }
-    const shifted =
-      keyShift === 0 ? current.signature : shiftKeySignature(current.signature, keyShift);
-    return formatKeySignature(shifted);
+    const signature = keySignatureAt(positionSeconds, sequence, timing);
+    if (!signature) return null;
+    return formatKeySignature(keyShift === 0 ? signature : shiftKeySignature(signature, keyShift));
   }, [keyShift, positionSeconds, sequence, timing]);
   const canDecreaseShift = keyShift > KEY_SHIFT_MIN;
   const canIncreaseShift = keyShift < KEY_SHIFT_MAX;
   const isShiftModified = keyShift !== 0;
   const keyShiftLabel = keyShift > 0 ? `+${keyShift}` : String(keyShift);
-  const timeSigLabel = useMemo(() => {
-    if (timing.timeSignatures.length === 0) return null;
-    const tick = secondsToTick(positionSeconds, sequence);
-    let current = timing.timeSignatures[0]!;
-    for (const change of timing.timeSignatures) {
-      if (change.tick <= tick) current = change;
-      else break;
-    }
-    return `${current.signature.numerator}/${current.signature.denominator}`;
-  }, [positionSeconds, sequence, timing]);
+  const timeSigLabel = useMemo(
+    () => timeSignatureLabelAt(positionSeconds, sequence, timing),
+    [positionSeconds, sequence, timing],
+  );
+  const keyIdentityAt = useCallback(
+    (seconds: number) => {
+      const signature = keySignatureAt(seconds, sequence, timing);
+      return signature ? formatKeySignature(signature) : null;
+    },
+    [sequence, timing],
+  );
+  const timeSigIdentityAt = useCallback(
+    (seconds: number) => timeSignatureLabelAt(seconds, sequence, timing),
+    [sequence, timing],
+  );
+  const keyPulse = useChangePulse(scheduler, keyIdentityAt, isDraggingRef);
+  const timeSigPulse = useChangePulse(scheduler, timeSigIdentityAt, isDraggingRef);
 
   return (
     <>
@@ -225,6 +231,7 @@ function PlaybackReadout({
             aria-label={`Key ${keyLabel ?? 'unknown'}, shift ${keyShiftLabel}`}
             title="現在のキー（移調適用後）"
           >
+            {keyPulse > 0 && <span key={keyPulse} className="playback-pulse" aria-hidden="true" />}
             <span className="playback-key-header">
               <span className="playback-key-label">キー</span>
               <span
@@ -267,6 +274,9 @@ function PlaybackReadout({
               aria-label={`Time signature ${timeSigLabel}`}
               title="現在の拍子"
             >
+              {timeSigPulse > 0 && (
+                <span key={timeSigPulse} className="playback-pulse" aria-hidden="true" />
+              )}
               <span className="playback-time-sig-label">拍子</span>
               <span className="playback-time-sig-value">{timeSigLabel}</span>
             </span>
@@ -292,6 +302,67 @@ function PlaybackReadout({
       </div>
     </>
   );
+}
+
+function useChangePulse(
+  scheduler: MidiScheduler,
+  identityAt: (seconds: number) => string | null,
+  isDraggingRef: RefObject<boolean>,
+): number {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let previousSeconds = scheduler.getPositionSnapshot();
+    let previousIdentity = identityAt(previousSeconds);
+    return scheduler.subscribe(() => {
+      const seconds = scheduler.getPositionSnapshot();
+      const identity = identityAt(seconds);
+      if (
+        previousIdentity !== null &&
+        identity !== null &&
+        identity !== previousIdentity &&
+        scheduler.getState().isPlaying &&
+        !isDraggingRef.current &&
+        isPlaybackAdvance(previousSeconds, seconds)
+      ) {
+        setCount((c) => c + 1);
+      }
+      previousSeconds = seconds;
+      previousIdentity = identity;
+    });
+  }, [scheduler, identityAt, isDraggingRef]);
+
+  return count;
+}
+
+function keySignatureAt(
+  seconds: number,
+  sequence: PlaybackSequence,
+  timing: SmfTiming,
+): KeySignature | null {
+  if (timing.keySignatures.length === 0) return null;
+  const tick = secondsToTick(seconds, sequence);
+  let current = timing.keySignatures[0]!;
+  for (const change of timing.keySignatures) {
+    if (change.tick <= tick) current = change;
+    else break;
+  }
+  return current.signature;
+}
+
+function timeSignatureLabelAt(
+  seconds: number,
+  sequence: PlaybackSequence,
+  timing: SmfTiming,
+): string | null {
+  if (timing.timeSignatures.length === 0) return null;
+  const tick = secondsToTick(seconds, sequence);
+  let current = timing.timeSignatures[0]!;
+  for (const change of timing.timeSignatures) {
+    if (change.tick <= tick) current = change;
+    else break;
+  }
+  return `${current.signature.numerator}/${current.signature.denominator}`;
 }
 
 function PlayIcon() {
