@@ -28,6 +28,11 @@ type DurationLabels = ReadonlyMap<LyricSyllable, string>;
 
 type LineStatus = 'past' | 'sung' | 'active' | 'upcoming';
 
+interface ResolvedState {
+  pages: KaraokePage[];
+  display: KaraokeDisplay;
+}
+
 interface MergeState {
   pages: KaraokePage[];
   pairs: boolean[][];
@@ -61,11 +66,7 @@ export const KaraokeView = memo(function KaraokeView({
     [nonLyricDurations, playbackRate],
   );
 
-  const [activeState, setActiveState] = useState<KaraokeDisplay>(() => {
-    if (pages.length === 0) return { pageIdx: 0, lineIdx: 0, preview: false, hidden: false };
-    const { tick, lookaheadTick } = playbackTicks(sequence, scheduler);
-    return resolveKaraokeDisplay(pages, tick, lookaheadTick);
-  });
+  const [resolvedState, setResolvedState] = useState<ResolvedState | null>(null);
   const [mergeState, setMergeState] = useState<MergeState>({ pages: [], pairs: [] });
 
   const screenRef = useRef<HTMLDivElement | null>(null);
@@ -126,6 +127,13 @@ export const KaraokeView = memo(function KaraokeView({
   }, [pages, mergeState]);
   const displayPages = layout.pages;
 
+  let activeState = resolvedState?.pages === displayPages ? resolvedState.display : null;
+  if (activeState === null && displayPages.length > 0) {
+    const { tick, lookaheadTick } = playbackTicks(sequence, scheduler);
+    activeState = resolveKaraokeDisplay(displayPages, tick, lookaheadTick);
+    setResolvedState({ pages: displayPages, display: activeState });
+  }
+
   const activeLineRef = useRef<HTMLDivElement | null>(null);
   const lineMetricsRef = useRef<{
     width: number;
@@ -177,7 +185,7 @@ export const KaraokeView = memo(function KaraokeView({
         display.hidden !== last.hidden;
       if (switched) {
         last = display;
-        setActiveState(display);
+        setResolvedState({ pages: displayPages, display });
       }
 
       if (!switched) {
@@ -205,7 +213,7 @@ export const KaraokeView = memo(function KaraokeView({
     };
   }, [sequence, scheduler, displayPages]);
 
-  if (displayPages.length === 0) return null;
+  if (activeState === null) return null;
   const activePageIdx = Math.min(activeState.pageIdx, displayPages.length - 1);
   const activePage = displayPages[activePageIdx]!;
   const activeLineIndex = Math.min(activeState.lineIdx, activePage.lines.length - 1);
