@@ -601,8 +601,8 @@
 .badge {
   display: inline-block;
   padding: 4px 10px;
-  background: var(--accent);
-  color: white;
+  background: var(--text-h);
+  color: var(--bg);
   border-radius: var(--radius-sm);
   font-family: var(--mono);
   font-size: 13px;
@@ -638,15 +638,19 @@
   border: 1px solid var(--border);
 }
 
-.flag-on {
-  background: color-mix(in srgb, var(--success) 12%, transparent);
-  color: var(--success);
-  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+.flag-list .flag-on {
+  color: var(--text-h);
+  border-color: var(--text-h);
 }
 
-.flag-off {
+.flag-list .flag-on::before {
+  content: '✓' / '';
+  margin-right: 4px;
+}
+
+.flag-list .flag-off {
   color: var(--text);
-  opacity: 0.5;
+  border-style: dashed;
 }
 
 .info-dl {
@@ -733,9 +737,9 @@
   display: inline-block;
   padding: 0 6px;
   margin: 0 6px 0 0;
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: var(--surface);
+  color: var(--text-h);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 600;
@@ -850,9 +854,9 @@
   top: 2px;
   transform: translateX(-50%);
   padding: 1px 8px;
-  background: color-mix(in srgb, var(--rehearsal-color) 14%, transparent);
-  color: var(--rehearsal-color);
-  border: 1px solid color-mix(in srgb, var(--rehearsal-color) 40%, transparent);
+  background: var(--text-h);
+  color: var(--bg);
+  border: 1px solid var(--text-h);
   border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 600;
@@ -910,28 +914,21 @@
   align-items: baseline;
   gap: 4px;
   padding: 2px 5px;
+  background: color-mix(in srgb, var(--meta-color) 14%, transparent);
+  color: var(--meta-color);
+  border: 1px solid color-mix(in srgb, var(--meta-color) 40%, transparent);
   border-radius: var(--radius-sm);
   font-family: var(--mono);
   font-size: 11px;
   font-weight: 700;
 }
 
-.score-key {
-  background: color-mix(in srgb, var(--key-color) 14%, transparent);
-  color: var(--key-color);
-  border: 1px solid color-mix(in srgb, var(--key-color) 40%, transparent);
-}
-
 .score-key-label {
   font-size: 10px;
   letter-spacing: 0.12em;
-  opacity: 0.75;
 }
 
 .score-timesig {
-  background: color-mix(in srgb, var(--timesig-color) 14%, transparent);
-  color: var(--timesig-color);
-  border: 1px solid color-mix(in srgb, var(--timesig-color) 40%, transparent);
   font-variant-numeric: lining-nums tabular-nums;
 }
 
@@ -1239,7 +1236,7 @@
   top: -0.7em;
   bottom: 0;
   padding-top: 0.7em;
-  color: var(--accent);
+  color: var(--accent-vivid);
   overflow: hidden;
   white-space: nowrap;
   pointer-events: none;
@@ -1279,8 +1276,7 @@
 }
 
 .karaoke-line-fill ruby rt {
-  color: var(--accent);
-  opacity: 0.7;
+  color: var(--accent-vivid);
 }
 
 .pitch-lane {
@@ -1324,12 +1320,12 @@
 }
 
 .pitch-lane-rehearsal line {
-  stroke: var(--rehearsal-color);
+  stroke: var(--text-h);
   stroke-width: 1.5;
 }
 
 .pitch-lane-rehearsal text {
-  fill: var(--rehearsal-color);
+  fill: var(--text-h);
   font-size: 1.6cqi;
   font-weight: 600;
 }
@@ -1340,7 +1336,7 @@
 }
 
 .pitch-lane-sung .pitch-lane-note {
-  fill: var(--accent);
+  fill: var(--accent-vivid);
 }
 
 .pitch-lane-cursor {
@@ -1350,7 +1346,8 @@
   left: var(--pitch-lane-cursor);
   width: 2px;
   margin-left: -1px;
-  background: var(--text-h);
+  background: var(--accent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
 }
 
 @media (max-width: 720px) {
