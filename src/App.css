@@ -733,9 +733,9 @@
   display: inline-block;
   padding: 0 6px;
   margin: 0 6px 0 0;
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: var(--surface);
+  color: var(--text-h);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 600;
