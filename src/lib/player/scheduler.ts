@@ -173,7 +173,7 @@ export class MidiScheduler {
     this.setState({ sendError: null });
     this.intervalHandle = this.timers.setInterval(() => this.tick(), SCHEDULER_MS);
     this.setState({ isPlaying: true });
-    this.restart(this.position);
+    this.restart(this.position >= sequence.durationSeconds ? 0 : this.position);
   }
 
   pause(): void {
@@ -314,7 +314,7 @@ export class MidiScheduler {
       this.positionSnapshot = audible;
       this.notify();
     }
-    if (audible >= sequence.durationSeconds) this.stopInternal(true);
+    if (audible >= sequence.durationSeconds) this.stopInternal(false, sequence.durationSeconds);
   }
 
   private scheduleMessage(output: MidiOutputLike, message: PlaybackMidiMessage): boolean {

@@ -316,15 +316,32 @@ describe('MidiScheduler playback', () => {
     expect(scheduler.getPositionSnapshot()).toBe(0);
   });
 
-  test('reaching the end stops playback and rewinds to 0', () => {
+  test('reaching the end stops playback and stays at the end', () => {
     const { clock, scheduler } = setup([msg(0, [0xc0, 1])], 0.5);
     scheduler.play();
 
     clock.advance(600);
 
     expect(scheduler.getState().isPlaying).toBe(false);
+    expect(scheduler.getPosition()).toBe(0.5);
+    expect(scheduler.getPositionSnapshot()).toBe(0.5);
+  });
+
+  test('play() at the end restarts from 0', () => {
+    const { clock, scheduler, out } = setup([msg(0, [0x90, 60, 100])], 0.5);
+    scheduler.play();
+    clock.advance(600);
+    const before = playbackOnly(out.sent).length;
+
+    scheduler.play();
+
+    expect(scheduler.getState().isPlaying).toBe(true);
     expect(scheduler.getPosition()).toBe(0);
-    expect(scheduler.getPositionSnapshot()).toBe(0);
+    expect(
+      playbackOnly(out.sent)
+        .slice(before)
+        .map((m) => m.data),
+    ).toEqual([[0x90, 60, 100]]);
   });
 
   test('setOutput(null) while playing pauses at the current position', () => {
@@ -826,7 +843,7 @@ describe('MidiScheduler fence', () => {
     expectFenced(out.sent, beforePause);
   });
 
-  test('seek() to the end while playing stops and rewinds to 0', () => {
+  test('seek() to the end while playing stops at the end', () => {
     const { clock, scheduler } = setup(queuedNote(), 1, 0, { clear: false });
     scheduler.play();
     clock.advance(5);
@@ -835,7 +852,7 @@ describe('MidiScheduler fence', () => {
     clock.advance(200);
 
     expect(scheduler.getState().isPlaying).toBe(false);
-    expect(scheduler.getPosition()).toBe(0);
+    expect(scheduler.getPosition()).toBe(1);
   });
 
   test('a send failure while restarting stops even when the next window is empty', () => {
@@ -1076,6 +1093,6 @@ describe('MidiScheduler output latency', () => {
     expect(scheduler.getState().isPlaying).toBe(true);
     clock.advance(200);
     expect(scheduler.getState().isPlaying).toBe(false);
-    expect(scheduler.getPosition()).toBe(0);
+    expect(scheduler.getPosition()).toBe(1);
   });
 });
