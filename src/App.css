@@ -1183,6 +1183,7 @@
 .karaoke-line {
   position: relative;
   font-size: var(--karaoke-font-size);
+  font-weight: 700;
   line-height: 1.45;
   letter-spacing: 0.04em;
   color: var(--text-h);
