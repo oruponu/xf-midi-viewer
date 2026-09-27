@@ -73,6 +73,7 @@ function App() {
 
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
+    e.target.value = '';
     if (!f) return;
     openFile(f);
   };
