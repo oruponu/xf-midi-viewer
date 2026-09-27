@@ -42,6 +42,7 @@ export interface MidiPlayer {
   requestMidiAccess: () => Promise<void>;
   selectOutput: (id: string) => void;
   play: () => void;
+  stop: () => void;
 }
 
 export function useMidiPlayer(
@@ -236,6 +237,11 @@ export function useMidiPlayer(
       });
   }, [scheduler, isBuiltinSelected, prepare, isSoundBankBusy]);
 
+  const stop = useCallback(() => {
+    playRequestRef.current += 1;
+    scheduler.stop();
+  }, [scheduler]);
+
   const sendError = schedulerState.sendError;
   const playerError =
     accessError ??
@@ -258,6 +264,7 @@ export function useMidiPlayer(
       requestMidiAccess,
       selectOutput,
       play,
+      stop,
     }),
     [
       scheduler,
@@ -272,6 +279,7 @@ export function useMidiPlayer(
       requestMidiAccess,
       selectOutput,
       play,
+      stop,
     ],
   );
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import './App.css';
+import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { InfoPanel } from './components/InfoPanel.tsx';
 import type { InfoPanelTab } from './components/InfoPanel.tsx';
 import { PlaybackPanel } from './components/PlaybackPanel.tsx';
@@ -39,6 +40,9 @@ function App() {
   useTheme(settings.theme);
   const song = songState.status === 'loaded' ? songState.song : null;
   const file = songState.status === 'empty' ? null : songState.file;
+  const songKey = file ? `${file.name}-${file.size}-${file.lastModified}` : 'empty';
+  const [failedSongKey, setFailedSongKey] = useState<string | null>(null);
+  const songFailed = failedSongKey === songKey;
   const errorMessage = songState.status === 'error' ? songState.message : (song?.xfError ?? null);
   const heading = useMemo(
     () => (song && file ? songHeading(song.xf, file.name) : null),
@@ -51,7 +55,7 @@ function App() {
   const player = useMidiPlayer(song?.sequence ?? null, fixedKeyShifts);
   const { scheduler, isPlaying } = player;
   const outputReady = player.outputReady && !player.isPreparing;
-  const { play } = player;
+  const { play, stop } = player;
   useWakeLock(isPlaying);
 
   const songTitle = heading?.title;
@@ -118,7 +122,7 @@ function App() {
       if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
       if (e.repeat) return;
       if (isSettingsOpen) return;
-      if (!song) return;
+      if (!song || songFailed) return;
       if (isEditableTarget(e.target)) return;
       e.preventDefault();
       if (isPlaying) scheduler.pause();
@@ -126,7 +130,7 @@ function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isPlaying, isSettingsOpen, song, scheduler, play]);
+  }, [isPlaying, isSettingsOpen, song, songFailed, scheduler, play]);
 
   return (
     <>
@@ -200,19 +204,33 @@ function App() {
           </section>
         )}
 
-        <PlayerScope
-          key={file ? `${file.name}-${file.size}-${file.lastModified}` : 'empty'}
-          file={file}
-          song={song}
-          settings={settings}
-          scheduler={scheduler}
-          isPlaying={isPlaying}
-          playbackRate={player.playbackRate}
-          keyShift={player.keyShift}
-          fixedKeyShifts={fixedKeyShifts}
-          outputReady={outputReady}
-          onPlay={play}
-        />
+        <ErrorBoundary
+          key={songKey}
+          fallback={(error) => (
+            <section className="error" role="alert">
+              <strong>この曲を表示できませんでした:</strong> {error.message}
+              <br />
+              別のファイルを開いてください。
+            </section>
+          )}
+          onError={() => {
+            stop();
+            setFailedSongKey(songKey);
+          }}
+        >
+          <PlayerScope
+            file={file}
+            song={song}
+            settings={settings}
+            scheduler={scheduler}
+            isPlaying={isPlaying}
+            playbackRate={player.playbackRate}
+            keyShift={player.keyShift}
+            fixedKeyShifts={fixedKeyShifts}
+            outputReady={outputReady}
+            onPlay={play}
+          />
+        </ErrorBoundary>
       </main>
 
       <SettingsDialog
