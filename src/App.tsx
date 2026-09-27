@@ -177,7 +177,17 @@ function App() {
       </header>
 
       <main className={`app${isDragging ? ' app--dragging' : ''}`}>
-        {(songState.status === 'empty' || songState.status === 'loading') && (
+        {songState.status === 'error' && (
+          <section className="error" role="alert">
+            <LoadErrorMessage
+              fileName={songState.file.name}
+              reason={songState.reason}
+              detail={songState.detail}
+            />
+          </section>
+        )}
+
+        {songState.status !== 'loaded' && (
           <section className="empty-state">
             <div className="drop-zone">
               <span className="drop-zone-icon">
@@ -194,16 +204,6 @@ function App() {
               </button>
               <p className="drop-zone-formats">対応形式: {MIDI_EXTENSIONS.join(' ')}</p>
             </div>
-          </section>
-        )}
-
-        {songState.status === 'error' && (
-          <section className="error" role="alert">
-            <LoadErrorMessage
-              fileName={songState.file.name}
-              reason={songState.reason}
-              detail={songState.detail}
-            />
           </section>
         )}
 
