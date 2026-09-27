@@ -1,3 +1,4 @@
+import { isResetSysex } from '../player/chase.ts';
 import { transposeMidiData } from './playback.ts';
 import type { PlaybackMidiMessage } from './playback.ts';
 import type { SmfTiming } from './timing.ts';
@@ -46,7 +47,11 @@ export function transposeMessages(
     const { data } = message;
     const status = data[0]! & 0xf0;
     const notes = sounding[data[0]! & 0x0f]!;
-    if (status === 0xb0 && ALL_NOTES_OFF_CONTROLLERS.has(data[1]!)) notes.clear();
+    if (status === 0xb0 && ALL_NOTES_OFF_CONTROLLERS.has(data[1]!)) {
+      notes.clear();
+    } else if (data[0] === 0xf0 && isResetSysex(data)) {
+      for (const channelNotes of sounding) channelNotes.clear();
+    }
     if (data.length < 3 || (status !== 0x80 && status !== 0x90 && status !== 0xa0)) {
       out.push(message);
       continue;

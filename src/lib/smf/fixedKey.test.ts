@@ -278,6 +278,27 @@ describe('transposeMessages', () => {
     }
   });
 
+  test('forgets the sounding notes of every channel after a reset SysEx', () => {
+    const xgSystemOn = [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7];
+    const result = transposeMessages(
+      [
+        m(0, [0x90, 60, 100]),
+        m(0, [0x91, 60, 100]),
+        m(1000, xgSystemOn),
+        m(1920, [0x90, 60, 100]),
+        m(1920, [0x91, 60, 100]),
+        m(2000, [0x80, 60, 0]),
+        m(2000, [0x81, 60, 0]),
+      ],
+      shifts,
+      noDrums,
+    );
+    expect(result.slice(-2).map((r) => r.data)).toEqual([
+      [0x80, 59, 0],
+      [0x81, 59, 0],
+    ]);
+  });
+
   test('does not shift drum channels', () => {
     const drum = m(0, [0x99, 36, 100]);
     const result = transposeMessages([drum], shifts, new Set([9]));
