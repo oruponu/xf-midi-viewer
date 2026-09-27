@@ -1369,7 +1369,8 @@
   color: var(--part-other);
 }
 
-.karaoke-line-base .karaoke-syl--non-lyric {
+.karaoke-line-base .karaoke-syl--non-lyric,
+.karaoke-line-fill .karaoke-syl--non-lyric {
   color: var(--text);
 }
 
