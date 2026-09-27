@@ -17,7 +17,7 @@ import { buildFixedKeyShifts } from './lib/smf/fixedKey.ts';
 import type { KeyShiftChange } from './lib/smf/fixedKey.ts';
 import type { Song } from './lib/song.ts';
 import { songHeading } from './lib/songHeading.ts';
-import type { FileSummary } from './lib/songLoader.ts';
+import type { FileSummary, SongErrorReason } from './lib/songLoader.ts';
 import { nextTheme } from './lib/theme.ts';
 import type { Theme } from './lib/theme.ts';
 
@@ -43,7 +43,6 @@ function App() {
   const songKey = file ? `${file.name}-${file.size}-${file.lastModified}` : 'empty';
   const [failedSongKey, setFailedSongKey] = useState<string | null>(null);
   const songFailed = failedSongKey === songKey;
-  const errorMessage = songState.status === 'error' ? songState.detail : (song?.xfError ?? null);
   const heading = useMemo(
     () => (song && file ? songHeading(song.xf, file.name) : null),
     [song, file],
@@ -198,9 +197,19 @@ function App() {
           </section>
         )}
 
-        {errorMessage && (
+        {songState.status === 'error' && (
           <section className="error" role="alert">
-            <strong>パースエラー:</strong> {errorMessage}
+            <LoadErrorMessage
+              fileName={songState.file.name}
+              reason={songState.reason}
+              detail={songState.detail}
+            />
+          </section>
+        )}
+
+        {song?.xfError && (
+          <section className="error" role="alert">
+            <strong>パースエラー:</strong> {song.xfError}
           </section>
         )}
 
@@ -242,6 +251,44 @@ function App() {
       />
     </>
   );
+}
+
+function LoadErrorMessage({
+  fileName,
+  reason,
+  detail,
+}: {
+  fileName: string;
+  reason: SongErrorReason;
+  detail: string;
+}) {
+  switch (reason) {
+    case 'notSmf':
+      return (
+        <>
+          <strong>{fileName} は MIDI ファイルではありません。</strong>
+          <br />
+          MIDI ファイルを開いてください。
+        </>
+      );
+    case 'broken':
+      return (
+        <>
+          <strong>{fileName} を読み込めませんでした。</strong>
+          <br />
+          ファイルが壊れている可能性があります。
+          <div className="error-detail">詳細: {detail}</div>
+        </>
+      );
+    case 'readFailed':
+      return (
+        <>
+          <strong>{fileName} を読み込めませんでした。</strong>
+          <br />
+          もう一度開いてください。
+        </>
+      );
+  }
 }
 
 function FolderOpenIcon({ size = 20 }: { size?: number }) {
