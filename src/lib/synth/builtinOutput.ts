@@ -2,6 +2,8 @@ import { GM_SYSTEM_ON, XG_SYSTEM_ON } from '../player/messages.ts';
 import type { MidiOutputLike } from '../player/messages.ts';
 
 export const STALL_THRESHOLD_SECONDS = 0.25;
+export const CLOCK_START_TIMEOUT_MS = 3000;
+export const CLOCK_START_POLL_MS = 10;
 
 export interface SynthLike {
   sendMessage(
@@ -33,6 +35,26 @@ export interface BuiltinSynthOutputOptions {
 
 export function toContextTime(timestampMs: number, anchorSeconds: number): number {
   return timestampMs / 1000 + anchorSeconds;
+}
+
+export interface WaitForClockStartOptions {
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+export async function waitForClockStart(
+  clock: AudioClockLike,
+  options: WaitForClockStartOptions = {},
+): Promise<void> {
+  const now = options.now ?? (() => performance.now());
+  const sleep =
+    options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const startTime = clock.currentTime;
+  const deadline = now() + CLOCK_START_TIMEOUT_MS;
+  while (clock.currentTime <= startTime) {
+    if (now() >= deadline) throw new Error('出力が時間内に始まりませんでした');
+    await sleep(CLOCK_START_POLL_MS);
+  }
 }
 
 export class BuiltinSynthOutput implements MidiOutputLike {

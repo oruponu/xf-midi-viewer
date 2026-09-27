@@ -1,6 +1,6 @@
 import { WorkletSynthesizer } from 'spessasynth_lib';
 import processorUrl from 'spessasynth_lib/dist/spessasynth_processor.min.js?url';
-import { BuiltinSynthOutput } from './builtinOutput.ts';
+import { BuiltinSynthOutput, waitForClockStart } from './builtinOutput.ts';
 
 export type SoundBankLoadResult = 'loaded' | 'fallback';
 
@@ -114,6 +114,7 @@ export async function createBuiltinSynthEngine(
     await resumeAudio();
     await pending;
     if (!hasSoundBank) throw new Error('音源が読み込まれていません');
+    await waitForClockStart(context);
     output.activate();
   };
 

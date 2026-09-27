@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { BuiltinSynthOutput, STALL_THRESHOLD_SECONDS, toContextTime } from './builtinOutput.ts';
+import {
+  BuiltinSynthOutput,
+  CLOCK_START_TIMEOUT_MS,
+  STALL_THRESHOLD_SECONDS,
+  toContextTime,
+  waitForClockStart,
+} from './builtinOutput.ts';
 
 interface ClockState {
   currentTime: number;
@@ -230,5 +236,49 @@ describe('BuiltinSynthOutput', () => {
     );
     expect(setupOutput({ baseLatency: 0.01 }).output.latencyMs()).toBeCloseTo(10, 6);
     expect(setupOutput().output.latencyMs()).toBe(0);
+  });
+});
+
+describe('waitForClockStart', () => {
+  function setupClock(startsAfterMs: number) {
+    const clock: ClockState = { currentTime: 0, state: 'running' };
+    let nowMs = 0;
+    const sleep = (ms: number) => {
+      nowMs += ms;
+      if (nowMs >= startsAfterMs) clock.currentTime = (nowMs - startsAfterMs) / 1000 + 0.01;
+      return Promise.resolve();
+    };
+    return { clock, now: () => nowMs, sleep };
+  }
+
+  test('waits until the audio clock actually advances', async () => {
+    const { clock, now, sleep } = setupClock(1000);
+
+    await waitForClockStart(clock, { now, sleep });
+
+    expect(now()).toBeGreaterThanOrEqual(1000);
+    expect(clock.currentTime).toBeGreaterThan(0);
+  });
+
+  test('resolves after a single poll when the clock is already running', async () => {
+    const clock: ClockState = { currentTime: 5, state: 'running' };
+    let slept = 0;
+    const sleep = () => {
+      slept += 1;
+      clock.currentTime += 0.01;
+      return Promise.resolve();
+    };
+
+    await waitForClockStart(clock, { now: () => 0, sleep });
+
+    expect(slept).toBe(1);
+  });
+
+  test('rejects when the audio clock does not advance before the timeout', async () => {
+    const { clock, now, sleep } = setupClock(Infinity);
+
+    await expect(waitForClockStart(clock, { now, sleep })).rejects.toThrow();
+    expect(now()).toBeGreaterThanOrEqual(CLOCK_START_TIMEOUT_MS);
+    expect(now()).toBeLessThan(CLOCK_START_TIMEOUT_MS + 100);
   });
 });
