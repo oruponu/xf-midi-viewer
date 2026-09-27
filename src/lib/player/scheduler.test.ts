@@ -676,6 +676,101 @@ describe('MidiScheduler key shift', () => {
   });
 });
 
+describe('MidiScheduler key shift map', () => {
+  test('setKeyShiftMap() sends the transposed messages and ignores the manual key shift', () => {
+    const { scheduler, out } = setup([msg(0, [0x90, 60, 100]), msg(0.01, [0x80, 60, 0])], 1);
+    scheduler.setKeyShift(3);
+
+    scheduler.setKeyShiftMap([{ tick: 0, semitones: -2 }]);
+    scheduler.play();
+
+    expect(playbackOnly(out.sent).map((m) => m.data)).toEqual([
+      [0x90, 58, 100],
+      [0x80, 58, 0],
+    ]);
+  });
+
+  test('applies a new shift after a key change and ends a held note with its own shift', () => {
+    const { clock, scheduler, out } = setup(
+      [msg(0, [0x90, 60, 100]), msg(0.6, [0x80, 60, 0]), msg(0.6, [0x90, 62, 100])],
+      1,
+    );
+    scheduler.setKeyShiftMap([
+      { tick: 0, semitones: 2 },
+      { tick: 480, semitones: -1 },
+    ]);
+
+    scheduler.play();
+    clock.advance(700);
+
+    expect(playbackOnly(out.sent).map((m) => m.data)).toEqual([
+      [0x90, 62, 100],
+      [0x80, 62, 0],
+      [0x90, 61, 100],
+    ]);
+  });
+
+  test('seek() past a key change sends the note-off of an earlier note with its note-on shift', () => {
+    const { scheduler, out } = setup([msg(0, [0x90, 60, 100]), msg(0.6, [0x80, 60, 0])], 1);
+    scheduler.setKeyShiftMap([
+      { tick: 0, semitones: 2 },
+      { tick: 480, semitones: -1 },
+    ]);
+
+    scheduler.seek(0.58);
+    scheduler.play();
+
+    expect(playbackOnly(out.sent).map((m) => m.data)).toEqual([[0x80, 62, 0]]);
+  });
+
+  test('setKeyShiftMap() while playing restarts from the current position', () => {
+    const { clock, scheduler, out } = setup([msg(0, [0xc0, 7]), msg(0.14, [0x90, 60, 100])], 10);
+    scheduler.play();
+    clock.advance(100);
+    const before = out.sent.length;
+
+    scheduler.setKeyShiftMap([{ tick: 0, semitones: -1 }]);
+
+    expect(out.sent.slice(before).filter(isPanic)).toHaveLength(64);
+    expect(scheduler.getState().isPlaying).toBe(true);
+    expect(scheduler.getPosition()).toBeCloseTo(0.1, 3);
+    clock.advance(100);
+    expect(playbackOnly(out.sent).at(-1)!.data).toEqual([0x90, 59, 100]);
+  });
+
+  test('setKeyShiftMap(null) returns to the manual key shift', () => {
+    const { scheduler, out } = setup([msg(0, [0x90, 60, 100])], 1);
+    scheduler.setKeyShift(3);
+    scheduler.setKeyShiftMap([{ tick: 0, semitones: -2 }]);
+
+    scheduler.setKeyShiftMap(null);
+    scheduler.play();
+
+    expect(playbackOnly(out.sent).map((m) => m.data)).toEqual([[0x90, 63, 100]]);
+  });
+
+  test('setKeyShiftMap(null) without a map does not restart playback', () => {
+    const { clock, scheduler, out } = setup([msg(0, [0xc0, 7])], 10);
+    scheduler.play();
+    clock.advance(100);
+    const before = out.sent.length;
+
+    scheduler.setKeyShiftMap(null);
+
+    expect(out.sent.slice(before).filter(isPanic)).toHaveLength(0);
+  });
+
+  test('setSequence() clears the key shift map', () => {
+    const { scheduler, out } = setup([msg(0, [0x90, 60, 100])], 1);
+    scheduler.setKeyShiftMap([{ tick: 0, semitones: -2 }]);
+
+    scheduler.setSequence(makeSequence([msg(0, [0x90, 60, 100])], 1));
+    scheduler.play();
+
+    expect(playbackOnly(out.sent).map((m) => m.data)).toEqual([[0x90, 60, 100]]);
+  });
+});
+
 describe('MidiScheduler lookahead', () => {
   for (const rate of [0.5, 1, 2]) {
     test(`never sends a message more than 50ms ahead of the current time at rate ${rate}`, () => {

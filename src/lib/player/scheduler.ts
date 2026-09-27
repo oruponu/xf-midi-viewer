@@ -1,3 +1,5 @@
+import { transposeMessages } from '../smf/fixedKey.ts';
+import type { KeyShiftChange } from '../smf/fixedKey.ts';
 import { transposeMidiData } from '../smf/playback.ts';
 import type { PlaybackMidiMessage, PlaybackSequence } from '../smf/playback.ts';
 import { collectChaseMessages } from './chase.ts';
@@ -109,6 +111,7 @@ export class MidiScheduler {
   private sequence: PlaybackSequence | null = null;
   private output: MidiOutputLike | null = null;
   private drumChannels: ReadonlySet<number> = new Set();
+  private transposedMessages: PlaybackMidiMessage[] | null = null;
   private nextMessageIndex = 0;
   private intervalHandle: TimerHandle | null = null;
   private timeline: TimelineSegment[] = [];
@@ -146,6 +149,7 @@ export class MidiScheduler {
     }
     this.sequence = sequence;
     this.drumChannels = sequence?.drumChannels ?? new Set();
+    this.transposedMessages = null;
     this.setState({ playbackRate: 1, keyShift: 0 });
     this.notify();
   }
@@ -225,6 +229,17 @@ export class MidiScheduler {
     else this.notify();
   }
 
+  setKeyShiftMap(shifts: readonly KeyShiftChange[] | null): void {
+    if (shifts === null && this.transposedMessages === null) return;
+    const isPlaying = this.intervalHandle !== null;
+    const position = this.getPosition();
+    this.transposedMessages =
+      shifts && this.sequence
+        ? transposeMessages(this.sequence.midiMessages, shifts, this.drumChannels)
+        : null;
+    if (isPlaying) this.restart(position);
+  }
+
   sendReset(): void {
     const output = this.output;
     if (!output) return;
@@ -244,8 +259,9 @@ export class MidiScheduler {
     const startOffset = Math.min(position, Math.max(0, sequence.durationSeconds - 0.01));
     this.timeline = [{ atMs: resumeAtMs, position: startOffset, rate: this.state.playbackRate }];
     this.displayFloor = startOffset;
-    this.nextMessageIndex = firstMidiMessageIndexAtOrAfter(sequence.midiMessages, startOffset);
-    for (const message of collectChaseMessages(sequence.midiMessages, this.nextMessageIndex)) {
+    const messages = this.midiMessages(sequence);
+    this.nextMessageIndex = firstMidiMessageIndexAtOrAfter(messages, startOffset);
+    for (const message of collectChaseMessages(messages, this.nextMessageIndex)) {
       this.scheduleMessage(output, message);
     }
     if (this.state.sendError !== null) {
@@ -297,7 +313,7 @@ export class MidiScheduler {
       return;
     }
     const result = scheduleDueMidiMessages(
-      sequence.midiMessages,
+      this.midiMessages(sequence),
       this.nextMessageIndex,
       position,
       this.playingPosition(nowMs + LOOKAHEAD_MS),
@@ -319,12 +335,17 @@ export class MidiScheduler {
   }
 
   private scheduleMessage(output: MidiOutputLike, message: PlaybackMidiMessage): boolean {
-    const data = transposeMidiData(message.data, this.state.keyShift, this.drumChannels);
+    const keyShift = this.transposedMessages ? 0 : this.state.keyShift;
+    const data = transposeMidiData(message.data, keyShift, this.drumChannels);
     if (!data) return true;
     const segment = this.timeline.at(-1)!;
     const scheduledAt = timeAtPosition(segment, Math.max(message.seconds, segment.position));
     const sendAt = Math.max(scheduledAt, this.fences.get(output) ?? 0);
     return this.send(output, data, sendAt, this.reportSendFailure);
+  }
+
+  private midiMessages(sequence: PlaybackSequence): readonly PlaybackMidiMessage[] {
+    return this.transposedMessages ?? sequence.midiMessages;
   }
 
   private send(
