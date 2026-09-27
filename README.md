@@ -105,6 +105,8 @@ bun run dev
 
 内蔵音源の SoundFont は、S. Christian Collins 氏の [GeneralUser GS](https://schristiancollins.com/generaluser.php) にプリセットを加えたもので、GeneralUser GS のライセンスに従います。ライセンスの全文と、元にしたファイルの入手元は [`public/soundfonts/GeneralUser-GS-LICENSE.txt`](public/soundfonts/GeneralUser-GS-LICENSE.txt) にあります。
 
+数字などの表示に使うフォント `public/fonts/RobotoMono.woff2` は、[Roboto Mono](https://github.com/googlefonts/robotomono) の字形を一部変更したもので、SIL Open Font License 1.1 に従います。ライセンスの全文と、元にしたファイルの入手元、変更の内容は [`public/fonts/RobotoMono-OFL.txt`](public/fonts/RobotoMono-OFL.txt) にあります。
+
 使用しているライブラリのライセンス一覧は、アプリの設定画面の「ライセンス」から開けます。
 
 [^1]: XF フォーマットは、ヤマハが定めた SMF（Standard MIDI File）の拡張仕様です。歌詞、コード名、曲名や作曲者などの曲情報を SMF に格納できます。XF MIDI Viewer は個人が開発しているソフトウェアで、ヤマハ株式会社とは関係ありません。
