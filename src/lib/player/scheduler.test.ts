@@ -386,6 +386,22 @@ describe('MidiScheduler playback', () => {
     expect(scheduler.getPosition()).toBe(0);
   });
 
+  test('setSequence() resets the playback rate and the key shift', () => {
+    const { scheduler } = setup([msg(0, [0x90, 60, 100])], 1);
+    scheduler.setPlaybackRate(1.5);
+    scheduler.setKeyShift(-3);
+    let calls = 0;
+    scheduler.subscribe(() => {
+      calls += 1;
+    });
+
+    scheduler.setSequence(makeSequence([msg(0, [0x90, 60, 100])], 1));
+
+    expect(scheduler.getState().playbackRate).toBe(1);
+    expect(scheduler.getState().keyShift).toBe(0);
+    expect(calls).toBe(1);
+  });
+
   test('dispose() stops the timer and silences the output', () => {
     const { clock, scheduler, out } = setup([msg(0, [0xc0, 1])], 10);
     scheduler.play();

@@ -146,6 +146,7 @@ export class MidiScheduler {
     }
     this.sequence = sequence;
     this.drumChannels = sequence?.drumChannels ?? new Set();
+    this.setState({ playbackRate: 1, keyShift: 0 });
     this.notify();
   }
 
