@@ -14,7 +14,7 @@ function shiftToC(sharps: number): number {
   return semitones >= 6 ? semitones - 12 : semitones;
 }
 
-export function buildFixedKeyShifts(timing: SmfTiming): KeyShiftChange[] {
+export function buildFixedKeyShifts(timing: SmfTiming): KeyShiftChange[] | null {
   const changes = timing.keySignatures;
   const out: KeyShiftChange[] = [];
   changes.forEach((change, i) => {
@@ -23,7 +23,7 @@ export function buildFixedKeyShifts(timing: SmfTiming): KeyShiftChange[] {
     if (out.length === 0) out.push({ tick: 0, semitones });
     else if (out.at(-1)!.semitones !== semitones) out.push({ tick: change.tick, semitones });
   });
-  return out.length > 0 ? out : [{ tick: 0, semitones: 0 }];
+  return out.length > 0 ? out : null;
 }
 
 export function keyShiftAt(tick: number, shifts: readonly KeyShiftChange[]): number {

@@ -89,8 +89,8 @@ describe('buildFixedKeyShifts', () => {
     ).toEqual([{ tick: 0, semitones: 0 }]);
   });
 
-  test('returns a zero shift when there is no key signature', () => {
-    expect(buildFixedKeyShifts(timingWith([]))).toEqual([{ tick: 0, semitones: 0 }]);
+  test('returns null when there is no key signature', () => {
+    expect(buildFixedKeyShifts(timingWith([]))).toBeNull();
   });
 
   test('starts at tick 0 even when the first key signature comes later', () => {
