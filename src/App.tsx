@@ -209,7 +209,10 @@ function App() {
 
         {song?.xfError && (
           <section className="error" role="alert">
-            <strong>パースエラー:</strong> {song.xfError}
+            <strong>歌詞やコードなどの XF 情報を読み込めませんでした。</strong>
+            <br />
+            曲の再生はできます。
+            <div className="error-detail">詳細: {song.xfError}</div>
           </section>
         )}
 
