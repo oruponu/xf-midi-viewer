@@ -1089,16 +1089,18 @@
 }
 
 .score-lyric ruby {
-  display: inline-block;
-  position: relative;
+  display: inline-grid;
+  justify-items: center;
   line-height: 1;
 }
 
+.score-lyric ruby > * {
+  grid-area: 1 / 1;
+}
+
 .score-lyric rt {
-  position: absolute;
-  left: 50%;
-  bottom: 100%;
-  transform: translateX(-50%);
+  align-self: start;
+  transform: translateY(-100%);
   font-size: 10px;
   color: inherit;
   line-height: 1;

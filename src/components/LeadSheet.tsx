@@ -409,7 +409,7 @@ function ScoreRow({
                   }
                   return (
                     <ruby key={j}>
-                      {run.base}
+                      <span>{run.base}</span>
                       <rt>{run.reading}</rt>
                     </ruby>
                   );
