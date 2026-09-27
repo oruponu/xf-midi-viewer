@@ -15,10 +15,12 @@ import type { MidiScheduler } from './lib/player/scheduler.ts';
 import { buildFixedKeyShifts } from './lib/smf/fixedKey.ts';
 import type { KeyShiftChange } from './lib/smf/fixedKey.ts';
 import type { Song } from './lib/song.ts';
+import { songHeading } from './lib/songHeading.ts';
 import type { FileSummary } from './lib/songLoader.ts';
 import { nextTheme } from './lib/theme.ts';
 import type { Theme } from './lib/theme.ts';
 
+const APP_NAME = 'XF MIDI Viewer';
 const MIDI_EXTENSIONS = ['.mid', '.midi', '.kar', '.xih', '.xkm'];
 const FILE_ACCEPT = [...MIDI_EXTENSIONS, 'audio/midi'].join(',');
 
@@ -38,6 +40,10 @@ function App() {
   const song = songState.status === 'loaded' ? songState.song : null;
   const file = songState.status === 'empty' ? null : songState.file;
   const errorMessage = songState.status === 'error' ? songState.message : (song?.xfError ?? null);
+  const heading = useMemo(
+    () => (song && file ? songHeading(song.xf, file.name) : null),
+    [song, file],
+  );
   const fixedKeyShifts = useMemo(
     () => (settings.fixKeyToC && song ? buildFixedKeyShifts(song.timing) : null),
     [settings.fixKeyToC, song],
@@ -47,6 +53,11 @@ function App() {
   const outputReady = player.outputReady && !player.isPreparing;
   const { play } = player;
   useWakeLock(isPlaying);
+
+  const songTitle = heading?.title;
+  useEffect(() => {
+    document.title = songTitle ? `${songTitle} - ${APP_NAME}` : APP_NAME;
+  }, [songTitle]);
 
   const openFile = useCallback(
     (f: File) => {
@@ -121,7 +132,20 @@ function App() {
     <>
       <header className="app-bar">
         <div className="app-bar-inner">
-          <h1 className="app-bar-title">XF MIDI Viewer</h1>
+          {heading ? (
+            <div className="app-bar-song">
+              <h1 className="app-bar-title app-bar-song-title" title={heading.title}>
+                {heading.title}
+              </h1>
+              {heading.performer && (
+                <p className="app-bar-song-performer" title={heading.performer}>
+                  {heading.performer}
+                </p>
+              )}
+            </div>
+          ) : (
+            <h1 className="app-bar-title">{APP_NAME}</h1>
+          )}
           <div className="app-bar-actions">
             <label className="icon-button" title="ファイルを開く" aria-label="ファイルを開く">
               <input type="file" accept={FILE_ACCEPT} onChange={onChange} ref={fileInputRef} />
