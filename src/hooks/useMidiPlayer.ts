@@ -8,6 +8,7 @@ import {
   savePreferredOutputId,
 } from '../lib/player/outputSelection.ts';
 import { MidiScheduler } from '../lib/player/scheduler.ts';
+import type { KeyShiftChange } from '../lib/smf/fixedKey.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { isBuiltinSynthSupported } from '../lib/synth/engine.ts';
 import { useBuiltinSynth } from './useBuiltinSynth.ts';
@@ -43,7 +44,10 @@ export interface MidiPlayer {
   play: () => void;
 }
 
-export function useMidiPlayer(sequence: PlaybackSequence | null): MidiPlayer {
+export function useMidiPlayer(
+  sequence: PlaybackSequence | null,
+  keyShiftMap: readonly KeyShiftChange[] | null,
+): MidiPlayer {
   const [scheduler] = useState(() => new MidiScheduler());
   const schedulerState = useSyncExternalStore(scheduler.subscribe, scheduler.getState);
   const [midiAccessState, setMidiAccessState] = useState<MidiAccessState>(() =>
@@ -139,6 +143,10 @@ export function useMidiPlayer(sequence: PlaybackSequence | null): MidiPlayer {
   useEffect(() => {
     scheduler.setSequence(sequence);
   }, [scheduler, sequence]);
+
+  useEffect(() => {
+    scheduler.setKeyShiftMap(keyShiftMap);
+  }, [scheduler, keyShiftMap]);
 
   useEffect(() => {
     let output: MidiOutputLike | null = null;

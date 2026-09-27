@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
+import type { KeyShiftChange } from '../lib/smf/fixedKey.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatTickAsBarBeat } from '../lib/smf/timing.ts';
@@ -38,7 +39,7 @@ export function InfoPanel({
   autoScrollLeadSheet = true,
   autoScrollLyrics = true,
   showPitchBar = true,
-  keyShift = 0,
+  keyShifts,
   playbackRate = 1,
 }: {
   file: FileSummary | null;
@@ -48,7 +49,7 @@ export function InfoPanel({
   autoScrollLeadSheet?: boolean;
   autoScrollLyrics?: boolean;
   showPitchBar?: boolean;
-  keyShift?: number;
+  keyShifts: readonly KeyShiftChange[];
   playbackRate?: number;
 }) {
   const { xf: data, karaoke: parsedKaraoke, chords, rehearsals, timing, sequence } = song;
@@ -93,7 +94,7 @@ export function InfoPanel({
             sequence={sequence}
             scheduler={scheduler}
             autoScroll={autoScrollLeadSheet}
-            keyShift={keyShift}
+            keyShifts={keyShifts}
           />
         ) : (
           <EmptyView title="リードシート情報はありません" />

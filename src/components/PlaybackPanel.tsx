@@ -11,10 +11,14 @@ import {
   PLAYBACK_RATE_STEP,
 } from '../lib/player/scheduler.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
+import { keyShiftAt } from '../lib/smf/fixedKey.ts';
+import type { KeyShiftChange } from '../lib/smf/fixedKey.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatKeySignature, shiftKeySignature, tickToBarBeat } from '../lib/smf/timing.ts';
 import type { KeySignature, SmfTiming } from '../lib/smf/timing.ts';
+
+const FIXED_KEY_NOTICE_MS = 4000;
 
 interface PlaybackPanelProps {
   sequence: PlaybackSequence;
@@ -23,6 +27,8 @@ interface PlaybackPanelProps {
   isPlaying: boolean;
   playbackRate: number;
   keyShift: number;
+  keyShifts: readonly KeyShiftChange[];
+  isKeyFixed: boolean;
   outputReady: boolean;
   onPlay: () => void;
 }
@@ -34,6 +40,8 @@ export function PlaybackPanel({
   isPlaying,
   playbackRate,
   keyShift,
+  keyShifts,
+  isKeyFixed,
   outputReady,
   onPlay,
 }: PlaybackPanelProps) {
@@ -74,6 +82,8 @@ export function PlaybackPanel({
         scheduler={scheduler}
         playbackRate={playbackRate}
         keyShift={keyShift}
+        keyShifts={keyShifts}
+        isKeyFixed={isKeyFixed}
         canPlay={canPlay}
       />
     </section>
@@ -86,6 +96,8 @@ interface PlaybackReadoutProps {
   scheduler: MidiScheduler;
   playbackRate: number;
   keyShift: number;
+  keyShifts: readonly KeyShiftChange[];
+  isKeyFixed: boolean;
   canPlay: boolean;
 }
 
@@ -95,6 +107,8 @@ function PlaybackReadout({
   scheduler,
   playbackRate,
   keyShift,
+  keyShifts,
+  isKeyFixed,
   canPlay,
 }: PlaybackReadoutProps) {
   const playbackSeconds = usePlaybackPosition(scheduler, (seconds) => seconds);
@@ -102,10 +116,28 @@ function PlaybackReadout({
   const positionSeconds = dragSeconds ?? playbackSeconds;
   const sliderRef = useRef<HTMLInputElement | null>(null);
   const isDraggingRef = useRef(false);
+  const [fixedKeyNotice, setFixedKeyNotice] = useState(() => ({
+    sequence,
+    visible: isKeyFixed,
+  }));
+  if (fixedKeyNotice.sequence !== sequence) {
+    setFixedKeyNotice({ sequence, visible: isKeyFixed });
+  } else if (fixedKeyNotice.visible && !isKeyFixed) {
+    setFixedKeyNotice({ sequence, visible: false });
+  }
 
   useEffect(() => {
     isDraggingRef.current = dragSeconds !== null;
   }, [dragSeconds]);
+
+  useEffect(() => {
+    if (!fixedKeyNotice.visible) return;
+    const handle = window.setTimeout(
+      () => setFixedKeyNotice((notice) => ({ ...notice, visible: false })),
+      FIXED_KEY_NOTICE_MS,
+    );
+    return () => window.clearTimeout(handle);
+  }, [fixedKeyNotice]);
 
   useEffect(() => {
     const slider = sliderRef.current;
@@ -149,15 +181,21 @@ function PlaybackReadout({
       '0',
     )}.${String(bb.tickInBeat).padStart(4, '0')}`;
   }, [positionSeconds, sequence, timing]);
+  const currentKeyShift = useMemo(
+    () => keyShiftAt(secondsToTick(positionSeconds, sequence), keyShifts),
+    [keyShifts, positionSeconds, sequence],
+  );
   const keyLabel = useMemo(() => {
     const signature = keySignatureAt(positionSeconds, sequence, timing);
     if (!signature) return null;
-    return formatKeySignature(keyShift === 0 ? signature : shiftKeySignature(signature, keyShift));
-  }, [keyShift, positionSeconds, sequence, timing]);
-  const canDecreaseShift = keyShift > KEY_SHIFT_MIN;
-  const canIncreaseShift = keyShift < KEY_SHIFT_MAX;
-  const isShiftModified = keyShift !== 0;
-  const keyShiftLabel = keyShift > 0 ? `+${keyShift}` : String(keyShift);
+    return formatKeySignature(
+      currentKeyShift === 0 ? signature : shiftKeySignature(signature, currentKeyShift),
+    );
+  }, [currentKeyShift, positionSeconds, sequence, timing]);
+  const canDecreaseShift = !isKeyFixed && keyShift > KEY_SHIFT_MIN;
+  const canIncreaseShift = !isKeyFixed && keyShift < KEY_SHIFT_MAX;
+  const isShiftModified = currentKeyShift !== 0;
+  const keyShiftLabel = currentKeyShift > 0 ? `+${currentKeyShift}` : String(currentKeyShift);
   const timeSigLabel = useMemo(
     () => timeSignatureLabelAt(positionSeconds, sequence, timing),
     [positionSeconds, sequence, timing],
@@ -229,9 +267,20 @@ function PlaybackReadout({
           <span
             className="playback-key"
             aria-label={`Key ${keyLabel ?? 'unknown'}, shift ${keyShiftLabel}`}
-            title="現在のキー（移調適用後）"
+            title={isKeyFixed ? 'キーを C / Am に固定中' : '現在のキー（移調適用後）'}
           >
             {keyPulse > 0 && <span key={keyPulse} className="playback-pulse" aria-hidden="true" />}
+            <span className="playback-key-notice-region" role="status">
+              {fixedKeyNotice.visible && (
+                <button
+                  type="button"
+                  className="playback-key-notice"
+                  onClick={() => setFixedKeyNotice((notice) => ({ ...notice, visible: false }))}
+                >
+                  キーを C / Am に固定中
+                </button>
+              )}
+            </span>
             <span className="playback-key-header">
               <span className="playback-key-label">キー</span>
               <span

@@ -3,6 +3,8 @@ import { useMediaQuery } from '../hooks/useMediaQuery.ts';
 import { labelSpan, spreadLabels } from '../lib/layout/spread.ts';
 import type { SpreadItem } from '../lib/layout/spread.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
+import { keyShiftAt } from '../lib/smf/fixedKey.ts';
+import type { KeyShiftChange } from '../lib/smf/fixedKey.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatKeySignature, shiftKeySignature, tickToBarBeat } from '../lib/smf/timing.ts';
@@ -56,7 +58,7 @@ interface LeadSheetProps {
   sequence: PlaybackSequence;
   scheduler: MidiScheduler;
   autoScroll: boolean;
-  keyShift: number;
+  keyShifts: readonly KeyShiftChange[];
 }
 
 export const LeadSheet = memo(function LeadSheet({
@@ -67,7 +69,7 @@ export const LeadSheet = memo(function LeadSheet({
   sequence,
   scheduler,
   autoScroll,
-  keyShift,
+  keyShifts,
 }: LeadSheetProps) {
   const renderable = useMemo(() => syllables.filter((s) => s.runs.length > 0), [syllables]);
 
@@ -108,14 +110,14 @@ export const LeadSheet = memo(function LeadSheet({
   }, [timing, totalBars]);
 
   const barKeySignatures = useMemo(() => {
-    const map = new Map<number, KeySignature>();
+    const map = new Map<number, KeySignatureChange>();
     let lastKey: KeySignature | null = null;
     for (const change of timing.keySignatures) {
       const bb = tickToBarBeat(change.tick, timing);
       if (!bb) continue;
       if (bb.bar > totalBars) break;
       if (lastKey && sameKeyDisplay(lastKey, change.signature)) continue;
-      map.set(bb.bar, change.signature);
+      map.set(bb.bar, change);
       lastKey = change.signature;
     }
     return map;
@@ -212,7 +214,7 @@ export const LeadSheet = memo(function LeadSheet({
             timing={timing}
             barTimeSignatures={barTimeSignatures}
             barKeySignatures={barKeySignatures}
-            keyShift={keyShift}
+            keyShifts={keyShifts}
           />
         ))}
       </div>
@@ -249,7 +251,7 @@ function ScoreRow({
   timing,
   barTimeSignatures,
   barKeySignatures,
-  keyShift,
+  keyShifts,
 }: {
   startBar: number;
   barCount: number;
@@ -259,8 +261,8 @@ function ScoreRow({
   syllables: LyricSyllable[];
   timing: SmfTiming;
   barTimeSignatures: Map<number, TimeSignature>;
-  barKeySignatures: Map<number, KeySignature>;
-  keyShift: number;
+  barKeySignatures: Map<number, KeySignatureChange>;
+  keyShifts: readonly KeyShiftChange[];
 }) {
   const startPos = startBar - 1;
   const endPos = startPos + barCount;
@@ -314,7 +316,7 @@ function ScoreRow({
       cancelled = true;
       observer.disconnect();
     };
-  }, [placedChords, placedSyllables, barCount, keyShift]);
+  }, [placedChords, placedSyllables, barCount, keyShifts]);
 
   const bars = useMemo(
     () => Array.from({ length: barCount }, (_, i) => startBar + i),
@@ -350,7 +352,11 @@ function ScoreRow({
                   <span className="score-bar-num">{bar}</span>
                   {key &&
                     (() => {
-                      const shifted = keyShift === 0 ? key : shiftKeySignature(key, keyShift);
+                      const semitones = keyShiftAt(key.tick, keyShifts);
+                      const shifted =
+                        semitones === 0
+                          ? key.signature
+                          : shiftKeySignature(key.signature, semitones);
                       const label = formatKeySignature(shifted);
                       return (
                         <span className="score-key" aria-label={`Key ${label}`}>
@@ -382,7 +388,7 @@ function ScoreRow({
               data-bar={p.barIndex}
               style={{ left: `${p.xPercent}%` }}
             >
-              {formatTransposedChord(p.msg, timing, keyShift)}
+              {formatTransposedChord(p.msg, timing, keyShifts)}
             </span>
           ))}
         </div>
@@ -444,7 +450,12 @@ function preferFlatsForChord(tick: number, timing: SmfTiming, keyShift: number):
   return shifted.sharps < 0;
 }
 
-function formatTransposedChord(chord: ChordMessage, timing: SmfTiming, keyShift: number): string {
+function formatTransposedChord(
+  chord: ChordMessage,
+  timing: SmfTiming,
+  keyShifts: readonly KeyShiftChange[],
+): string {
+  const keyShift = keyShiftAt(chord.tick, keyShifts);
   if (keyShift === 0) return formatChord(chord.root, chord.type, chord.bass);
   const preferFlats = preferFlatsForChord(chord.tick, timing, keyShift);
   return formatChord(
