@@ -193,6 +193,12 @@
   font-size: 14px;
 }
 
+.error-detail {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
 .viewer-chrome {
   position: sticky;
   top: var(--app-bar-height);

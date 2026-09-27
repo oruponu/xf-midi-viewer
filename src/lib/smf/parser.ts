@@ -10,6 +10,13 @@ import type {
   TrackEvent,
 } from './types.ts';
 
+export class NotSmfError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotSmfError';
+  }
+}
+
 export function parseSmf(buffer: ArrayBuffer | Uint8Array): SmfFile {
   const r = new ByteReader(buffer);
   const header = parseHeader(r);
@@ -33,9 +40,12 @@ export function parseSmf(buffer: ArrayBuffer | Uint8Array): SmfFile {
 }
 
 function parseHeader(r: ByteReader): SmfHeader {
+  if (r.length < 4) {
+    throw new NotSmfError(`expected MThd, got ${r.length} bytes`);
+  }
   const type = r.readAscii(4);
   if (type !== 'MThd') {
-    throw new Error(`expected MThd, got "${type}"`);
+    throw new NotSmfError(`expected MThd, got "${type}"`);
   }
   const length = r.readUint32();
   if (length < 6) {
