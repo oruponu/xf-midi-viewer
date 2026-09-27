@@ -1,68 +1,86 @@
 import { describe, expect, test } from 'bun:test';
-import { shiftChordBass, shiftChordRoot } from './transpose.ts';
-import type { ChordRoot } from './types.ts';
+import type { KeySignature } from '../smf/timing.ts';
+import { formatChord } from './format.ts';
+import { transposeChord } from './transpose.ts';
+import type { ChordBass, ChordRoot } from './types.ts';
 
-describe('shiftChordRoot', () => {
-  test('returns the same root when semitones is 0', () => {
-    const root: ChordRoot = { note: 'C', accidental: 'natural' };
-    expect(shiftChordRoot(root, 0, false)).toBe(root);
+const C_MAJOR: KeySignature = { sharps: 0, mode: 'major' };
+const A_MINOR: KeySignature = { sharps: 0, mode: 'minor' };
+
+function root(name: string): ChordRoot {
+  return {
+    note: name[0] as ChordRoot['note'],
+    accidental: (name.slice(1) || 'natural') as ChordRoot['accidental'],
+  };
+}
+
+function transposed(name: string, semitones: number, key: KeySignature): string {
+  const [main, bassName] = name.split('/');
+  const match = /^([A-G][#b]*)(.*)$/.exec(main!)!;
+  const type = match[2]!;
+  const bass: ChordBass | null = bassName ? { root: root(bassName), type: '' } : null;
+  const result = transposeChord(root(match[1]!), type, bass, semitones, key);
+  return formatChord(result.root, type, result.bass);
+}
+
+describe('transposeChord', () => {
+  test('returns the same root and bass when semitones is 0', () => {
+    const r = root('Bb');
+    const bass = { root: root('D'), type: '' };
+    const result = transposeChord(r, '', bass, 0, C_MAJOR);
+    expect(result.root).toBe(r);
+    expect(result.bass).toBe(bass);
   });
 
   test('preserves the reserved root', () => {
-    const root: ChordRoot = { note: 'reserved', accidental: 'natural' };
-    expect(shiftChordRoot(root, 5, false)).toBe(root);
+    const r: ChordRoot = { note: 'reserved', accidental: 'natural' };
+    expect(transposeChord(r, '', null, 5, C_MAJOR).root).toBe(r);
   });
 
   test.each([
-    ['C', 'natural', 2, false, 'D', 'natural'],
-    ['C', 'natural', 1, false, 'C', '#'],
-    ['C', 'natural', 1, true, 'D', 'b'],
-    ['B', 'b', 2, false, 'C', 'natural'],
-    ['B', 'b', 2, true, 'C', 'natural'],
-    ['F', '#', -1, false, 'F', 'natural'],
-    ['F', '#', -7, true, 'B', 'natural'],
-    ['G', 'natural', -2, true, 'F', 'natural'],
-    ['E', 'b', 4, false, 'G', 'natural'],
-    ['E', 'b', 3, true, 'G', 'b'],
-  ] as const)(
-    '%s%s shift %i preferFlats=%s -> %s%s',
-    (note, acc, shift, preferFlats, expNote, expAcc) => {
-      expect(shiftChordRoot({ note, accidental: acc }, shift, preferFlats)).toEqual({
-        note: expNote,
-        accidental: expAcc,
-      });
-    },
-  );
-
-  test('normalizes double-sharp input', () => {
-    // F## == G semitone-wise
-    expect(shiftChordRoot({ note: 'F', accidental: '##' }, 1, false)).toEqual({
-      note: 'G',
-      accidental: '#',
-    });
+    ['D', 'G'],
+    ['Em7', 'Am7'],
+    ['F', 'Bb'],
+    ['Eb', 'Ab'],
+    ['Bb7', 'Eb7'],
+    ['Ab', 'Db'],
+    ['Db', 'Gb'],
+    ['Bbm', 'Ebm'],
+    ['C#m7', 'F#m7'],
+    ['C#m7b5', 'F#m7b5'],
+    ['D#dim', 'G#dim'],
+    ['G#dim7', 'C#dim7'],
+  ])('spells %s up a fourth into C major as %s', (name, expected) => {
+    expect(transposed(name, 5, C_MAJOR)).toBe(expected);
   });
 
-  test('normalizes double-flat input', () => {
-    // Dbb == C semitone-wise
-    expect(shiftChordRoot({ note: 'D', accidental: 'bb' }, 2, false)).toEqual({
-      note: 'D',
-      accidental: 'natural',
-    });
-  });
-});
-
-describe('shiftChordBass', () => {
-  test('shifts the bass root and preserves the type', () => {
-    expect(
-      shiftChordBass({ root: { note: 'C', accidental: 'natural' }, type: 'm' }, 2, false),
-    ).toEqual({ root: { note: 'D', accidental: 'natural' }, type: 'm' });
+  test.each([
+    ['C', 'F'],
+    ['B7', 'E7'],
+    ['F', 'Bb'],
+    ['Eb', 'Ab'],
+    ['EbM7', 'AbM7'],
+    ['D#dim', 'G#dim'],
+    ['G#m', 'C#m'],
+    ['C#m7', 'F#m7'],
+  ])('spells %s up a fourth into A minor as %s', (name, expected) => {
+    expect(transposed(name, 5, A_MINOR)).toBe(expected);
   });
 
-  test('returns the same bass when semitones is 0', () => {
-    const bass = {
-      root: { note: 'C', accidental: 'natural' } as ChordRoot,
-      type: 'm',
-    };
-    expect(shiftChordBass(bass, 0, false)).toBe(bass);
+  test.each([
+    ['B7/D#', A_MINOR, 'E7/G#'],
+    ['G/F', C_MAJOR, 'C/Bb'],
+    ['A/C#', C_MAJOR, 'D/F#'],
+    ['C/G', C_MAJOR, 'F/C'],
+  ])('spells the bass of %s from the chord root', (name, key, expected) => {
+    expect(transposed(name, 5, key)).toBe(expected);
+  });
+
+  test('keeps the key letters for diatonic notes', () => {
+    expect(transposed('B', 6, { sharps: 6, mode: 'major' })).toBe('E#');
+  });
+
+  test('avoids Cb, Fb, E#, B# and double accidentals for notes outside the key', () => {
+    expect(transposed('Bb', 1, { sharps: -5, mode: 'major' })).toBe('B');
   });
 });

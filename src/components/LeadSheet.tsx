@@ -17,7 +17,7 @@ import type {
 } from '../lib/smf/timing.ts';
 import { formatChord } from '../lib/xf/format.ts';
 import type { LyricSyllable } from '../lib/xf/lyrics.ts';
-import { shiftChordBass, shiftChordRoot } from '../lib/xf/transpose.ts';
+import { transposeChord } from '../lib/xf/transpose.ts';
 import type { ChordMessage, RehearsalMessage } from '../lib/xf/types.ts';
 
 const BARS_PER_ROW = 4;
@@ -444,12 +444,6 @@ function findKeySignatureAt(tick: number, changes: KeySignatureChange[]): KeySig
   return result;
 }
 
-function preferFlatsForChord(tick: number, timing: SmfTiming, keyShift: number): boolean {
-  const sig = findKeySignatureAt(tick, timing.keySignatures);
-  const shifted = keyShift === 0 ? sig : shiftKeySignature(sig, keyShift);
-  return shifted.sharps < 0;
-}
-
 function formatTransposedChord(
   chord: ChordMessage,
   timing: SmfTiming,
@@ -457,12 +451,9 @@ function formatTransposedChord(
 ): string {
   const keyShift = keyShiftAt(chord.tick, keyShifts);
   if (keyShift === 0) return formatChord(chord.root, chord.type, chord.bass);
-  const preferFlats = preferFlatsForChord(chord.tick, timing, keyShift);
-  return formatChord(
-    shiftChordRoot(chord.root, keyShift, preferFlats),
-    chord.type,
-    chord.bass === null ? null : shiftChordBass(chord.bass, keyShift, preferFlats),
-  );
+  const key = shiftKeySignature(findKeySignatureAt(chord.tick, timing.keySignatures), keyShift);
+  const { root, bass } = transposeChord(chord.root, chord.type, chord.bass, keyShift, key);
+  return formatChord(root, chord.type, bass);
 }
 
 function barPositionAt(tick: number, timing: SmfTiming): number {
