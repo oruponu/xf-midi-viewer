@@ -26,22 +26,13 @@ import type {
   XfVersion,
 } from '../lib/xf/types.ts';
 import { partColorOf } from '../lib/xf/vocalPart.ts';
+import { ErrorBoundary } from './ErrorBoundary.tsx';
 import { KaraokeView } from './KaraokeView.tsx';
 import { LeadSheet } from './LeadSheet.tsx';
 
 export type InfoPanelTab = 'leadSheet' | 'lyrics' | 'karaoke' | 'details';
 
-export function InfoPanel({
-  file,
-  song,
-  activeTab,
-  scheduler,
-  autoScrollLeadSheet = true,
-  autoScrollLyrics = true,
-  showPitchBar = true,
-  keyShifts,
-  playbackRate = 1,
-}: {
+type InfoPanelProps = {
   file: FileSummary | null;
   song: Song;
   activeTab: InfoPanelTab;
@@ -51,7 +42,36 @@ export function InfoPanel({
   showPitchBar?: boolean;
   keyShifts: readonly KeyShiftChange[];
   playbackRate?: number;
-}) {
+};
+
+export function InfoPanel(props: InfoPanelProps) {
+  return (
+    <section className="info-panel">
+      <ErrorBoundary
+        key={props.activeTab}
+        fallback={(error) => (
+          <div className="error" role="alert">
+            <strong>このビューを表示できませんでした:</strong> {error.message}
+          </div>
+        )}
+      >
+        <ActiveView {...props} />
+      </ErrorBoundary>
+    </section>
+  );
+}
+
+function ActiveView({
+  file,
+  song,
+  activeTab,
+  scheduler,
+  autoScrollLeadSheet = true,
+  autoScrollLyrics = true,
+  showPitchBar = true,
+  keyShifts,
+  playbackRate = 1,
+}: InfoPanelProps) {
   const { xf: data, karaoke: parsedKaraoke, chords, rehearsals, timing, sequence } = song;
   const hasKaraoke = data.karaoke.header !== null || data.karaoke.events.length > 0;
   const hasStyle = data.style.events.length > 0;
@@ -63,19 +83,15 @@ export function InfoPanel({
     !hasStyle;
 
   if (empty) {
-    return (
-      <section className="info-panel">
-        {activeTab === 'details' ? (
-          <div className="details-view">
-            {file && <FileSection file={file} />}
-            <div className="card">
-              <p className="muted">XFデータは含まれていません</p>
-            </div>
-          </div>
-        ) : (
-          <EmptyView title="表示できるXFデータはありません" />
-        )}
-      </section>
+    return activeTab === 'details' ? (
+      <div className="details-view">
+        {file && <FileSection file={file} />}
+        <div className="card">
+          <p className="muted">XFデータは含まれていません</p>
+        </div>
+      </div>
+    ) : (
+      <EmptyView title="表示できるXFデータはありません" />
     );
   }
 
@@ -83,7 +99,7 @@ export function InfoPanel({
     chords.length > 0 || rehearsals.length > 0 || parsedKaraoke.syllables.length > 0;
 
   return (
-    <section className="info-panel">
+    <>
       {activeTab === 'leadSheet' &&
         (showChart ? (
           <LeadSheet
@@ -136,7 +152,7 @@ export function InfoPanel({
           hasStyle={hasStyle}
         />
       )}
-    </section>
+    </>
   );
 }
 
