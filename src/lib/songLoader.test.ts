@@ -13,6 +13,10 @@ function brokenBytes(): ArrayBuffer {
   return new Uint8Array([1, 2, 3]).buffer;
 }
 
+function truncatedSmfBytes(): ArrayBuffer {
+  return new Uint8Array(smfBytes()).slice(0, -2).buffer;
+}
+
 function controlledSource(name: string) {
   let resolve!: (buffer: ArrayBuffer) => void;
   let reject!: (error: unknown) => void;
@@ -62,11 +66,28 @@ describe('createSongLoader', () => {
       ['error', 'a.mid'],
     ]);
     const last = states.at(-1)!;
-    expect(last.status === 'error' && last.message.length > 0).toBe(true);
+    expect(last.status === 'error' && last.reason).toBe('notSmf');
+  });
+
+  test('reports a broken SMF with the parser detail', async () => {
+    const { states, loader, summary } = record();
+    const a = controlledSource('a.mid');
+
+    const done = loader.load(a.source);
+    a.resolve(truncatedSmfBytes());
+    await done;
+
+    expect(summary()).toEqual([
+      ['loading', 'a.mid'],
+      ['error', 'a.mid'],
+    ]);
+    const last = states.at(-1)!;
+    expect(last.status === 'error' && last.reason).toBe('broken');
+    expect(last.status === 'error' && last.detail.length > 0).toBe(true);
   });
 
   test('reports an error when reading the file fails', async () => {
-    const { loader, summary } = record();
+    const { states, loader, summary } = record();
     const a = controlledSource('a.mid');
 
     const done = loader.load(a.source);
@@ -77,6 +98,9 @@ describe('createSongLoader', () => {
       ['loading', 'a.mid'],
       ['error', 'a.mid'],
     ]);
+    const last = states.at(-1)!;
+    expect(last.status === 'error' && last.reason).toBe('readFailed');
+    expect(last.status === 'error' && last.detail).toBe('read failed');
   });
 
   test('ignores an older load that succeeds after a newer one succeeded', async () => {

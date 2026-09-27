@@ -1,4 +1,4 @@
-import { parseSmf } from './smf/parser.ts';
+import { NotSmfError, parseSmf } from './smf/parser.ts';
 import { buildSong } from './song.ts';
 import type { Song } from './song.ts';
 
@@ -12,10 +12,12 @@ export interface SongSource extends FileSummary {
   arrayBuffer(): Promise<ArrayBuffer>;
 }
 
+export type SongErrorReason = 'notSmf' | 'broken' | 'readFailed';
+
 export type SongState =
   | { status: 'empty' }
   | { status: 'loading'; file: FileSummary }
-  | { status: 'error'; file: FileSummary; message: string }
+  | { status: 'error'; file: FileSummary; reason: SongErrorReason; detail: string }
   | { status: 'loaded'; file: FileSummary; song: Song };
 
 export interface SongLoader {
@@ -33,17 +35,27 @@ export function createSongLoader(onChange: (state: SongState) => void): SongLoad
       lastModified: source.lastModified,
     };
     onChange({ status: 'loading', file });
-    let next: SongState;
-    try {
-      next = { status: 'loaded', file, song: buildSong(parseSmf(await source.arrayBuffer())) };
-    } catch (error) {
-      next = {
-        status: 'error',
-        file,
-        message: error instanceof Error ? error.message : String(error),
-      };
-    }
+    const next = await readSong(source, file);
     if (token === latest) onChange(next);
   };
   return { load };
+}
+
+async function readSong(source: SongSource, file: FileSummary): Promise<SongState> {
+  let buffer: ArrayBuffer;
+  try {
+    buffer = await source.arrayBuffer();
+  } catch (error) {
+    return { status: 'error', file, reason: 'readFailed', detail: errorMessage(error) };
+  }
+  try {
+    return { status: 'loaded', file, song: buildSong(parseSmf(buffer)) };
+  } catch (error) {
+    const reason = error instanceof NotSmfError ? 'notSmf' : 'broken';
+    return { status: 'error', file, reason, detail: errorMessage(error) };
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

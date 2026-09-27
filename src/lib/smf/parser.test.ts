@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { parseSmf } from './parser.ts';
+import { NotSmfError, parseSmf } from './parser.ts';
 import type { SmfEvent } from './types.ts';
 
 const u8 = (...values: number[]): Uint8Array => new Uint8Array(values);
@@ -70,14 +70,26 @@ describe('parseSmf - header', () => {
     });
   });
 
-  test('throws on wrong magic', () => {
+  test('throws NotSmfError on wrong magic', () => {
     const buf = u8(0x58, 0x46, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, 0x01, 0xe0);
+    expect(() => parseSmf(buf)).toThrow(NotSmfError);
     expect(() => parseSmf(buf)).toThrow(/expected MThd/);
+  });
+
+  test('throws NotSmfError on a PNG signature', () => {
+    const buf = u8(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+    expect(() => parseSmf(buf)).toThrow(NotSmfError);
+  });
+
+  test('throws NotSmfError on data shorter than the chunk type', () => {
+    expect(() => parseSmf(u8(0x4d, 0x54, 0x68))).toThrow(NotSmfError);
+    expect(() => parseSmf(u8())).toThrow(NotSmfError);
   });
 
   test('throws on too-short MThd length', () => {
     const buf = u8(0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 5, 0, 0, 0, 1, 0x01);
     expect(() => parseSmf(buf)).toThrow(/MThd length too small/);
+    expect(() => parseSmf(buf)).not.toThrow(NotSmfError);
   });
 
   test('skips extra header bytes when length > 6', () => {

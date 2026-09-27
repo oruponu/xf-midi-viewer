@@ -43,7 +43,7 @@ function App() {
   const songKey = file ? `${file.name}-${file.size}-${file.lastModified}` : 'empty';
   const [failedSongKey, setFailedSongKey] = useState<string | null>(null);
   const songFailed = failedSongKey === songKey;
-  const errorMessage = songState.status === 'error' ? songState.message : (song?.xfError ?? null);
+  const errorMessage = songState.status === 'error' ? songState.detail : (song?.xfError ?? null);
   const heading = useMemo(
     () => (song && file ? songHeading(song.xf, file.name) : null),
     [song, file],
