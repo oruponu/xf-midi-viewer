@@ -18,6 +18,8 @@ import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatKeySignature, shiftKeySignature, tickToBarBeat } from '../lib/smf/timing.ts';
 import type { KeySignature, SmfTiming } from '../lib/smf/timing.ts';
 
+const FIXED_KEY_NOTICE_MS = 4000;
+
 interface PlaybackPanelProps {
   sequence: PlaybackSequence;
   timing: SmfTiming;
@@ -114,10 +116,28 @@ function PlaybackReadout({
   const positionSeconds = dragSeconds ?? playbackSeconds;
   const sliderRef = useRef<HTMLInputElement | null>(null);
   const isDraggingRef = useRef(false);
+  const [fixedKeyNotice, setFixedKeyNotice] = useState(() => ({
+    sequence,
+    visible: isKeyFixed,
+  }));
+  if (fixedKeyNotice.sequence !== sequence) {
+    setFixedKeyNotice({ sequence, visible: isKeyFixed });
+  } else if (fixedKeyNotice.visible && !isKeyFixed) {
+    setFixedKeyNotice({ sequence, visible: false });
+  }
 
   useEffect(() => {
     isDraggingRef.current = dragSeconds !== null;
   }, [dragSeconds]);
+
+  useEffect(() => {
+    if (!fixedKeyNotice.visible) return;
+    const handle = window.setTimeout(
+      () => setFixedKeyNotice((notice) => ({ ...notice, visible: false })),
+      FIXED_KEY_NOTICE_MS,
+    );
+    return () => window.clearTimeout(handle);
+  }, [fixedKeyNotice]);
 
   useEffect(() => {
     const slider = sliderRef.current;
@@ -250,6 +270,17 @@ function PlaybackReadout({
             title={isKeyFixed ? 'キーを C / Am に固定中' : '現在のキー（移調適用後）'}
           >
             {keyPulse > 0 && <span key={keyPulse} className="playback-pulse" aria-hidden="true" />}
+            <span className="playback-key-notice-region" role="status">
+              {fixedKeyNotice.visible && (
+                <button
+                  type="button"
+                  className="playback-key-notice"
+                  onClick={() => setFixedKeyNotice((notice) => ({ ...notice, visible: false }))}
+                >
+                  キーを C / Am に固定中
+                </button>
+              )}
+            </span>
             <span className="playback-key-header">
               <span className="playback-key-label">キー</span>
               <span
