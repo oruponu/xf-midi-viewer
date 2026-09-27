@@ -140,6 +140,24 @@ export function SettingsDialog({
                   ライセンス
                 </a>
               </li>
+              <li>
+                フォント Roboto Mono（The Roboto Mono Project Authors）:{' '}
+                <a
+                  href="https://github.com/googlefonts/robotomono"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  配布サイト
+                </a>
+                {' / '}
+                <a
+                  href={`${import.meta.env.BASE_URL}fonts/RobotoMono-OFL.txt`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  ライセンス
+                </a>
+              </li>
             </ul>
           </section>
         </div>
