@@ -1,3 +1,10 @@
+@font-face {
+  font-family: 'Roboto Mono';
+  src: url('/fonts/RobotoMono.woff2') format('woff2');
+  font-weight: 100 700;
+  font-display: swap;
+}
+
 :root {
   --text: #64707f;
   --text-h: #0f1a2a;
