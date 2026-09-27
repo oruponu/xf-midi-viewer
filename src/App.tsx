@@ -54,6 +54,11 @@ function App() {
   const { play } = player;
   useWakeLock(isPlaying);
 
+  const songTitle = heading?.title;
+  useEffect(() => {
+    document.title = songTitle ? `${songTitle} - ${APP_NAME}` : APP_NAME;
+  }, [songTitle]);
+
   const openFile = useCallback(
     (f: File) => {
       scheduler.stop();
