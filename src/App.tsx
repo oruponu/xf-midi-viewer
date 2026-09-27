@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import './App.css';
 import { InfoPanel } from './components/InfoPanel.tsx';
@@ -12,6 +12,7 @@ import { useSongLoader } from './hooks/useSongLoader.ts';
 import { useTheme } from './hooks/useTheme.ts';
 import { useWakeLock } from './hooks/useWakeLock.ts';
 import type { MidiScheduler } from './lib/player/scheduler.ts';
+import type { KeyShiftChange } from './lib/smf/fixedKey.ts';
 import type { Song } from './lib/song.ts';
 import type { FileSummary } from './lib/songLoader.ts';
 import { nextTheme } from './lib/theme.ts';
@@ -286,6 +287,7 @@ function PlayerScope({
 }) {
   const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
   const dockRef = useRef<HTMLDivElement | null>(null);
+  const keyShifts = useMemo<KeyShiftChange[]>(() => [{ tick: 0, semitones: keyShift }], [keyShift]);
 
   useEffect(() => {
     const el = dockRef.current;
@@ -321,7 +323,7 @@ function PlayerScope({
         autoScrollLeadSheet={settings.autoScrollLeadSheet}
         autoScrollLyrics={settings.autoScrollLyrics}
         showPitchBar={settings.showPitchBar}
-        keyShift={keyShift}
+        keyShifts={keyShifts}
         playbackRate={playbackRate}
       />
       <div className="player-dock" ref={dockRef}>
@@ -333,6 +335,7 @@ function PlayerScope({
             isPlaying={isPlaying}
             playbackRate={playbackRate}
             keyShift={keyShift}
+            keyShifts={keyShifts}
             outputReady={outputReady}
             onPlay={onPlay}
           />

@@ -11,6 +11,8 @@ import {
   PLAYBACK_RATE_STEP,
 } from '../lib/player/scheduler.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
+import { keyShiftAt } from '../lib/smf/fixedKey.ts';
+import type { KeyShiftChange } from '../lib/smf/fixedKey.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatKeySignature, shiftKeySignature, tickToBarBeat } from '../lib/smf/timing.ts';
@@ -23,6 +25,7 @@ interface PlaybackPanelProps {
   isPlaying: boolean;
   playbackRate: number;
   keyShift: number;
+  keyShifts: readonly KeyShiftChange[];
   outputReady: boolean;
   onPlay: () => void;
 }
@@ -34,6 +37,7 @@ export function PlaybackPanel({
   isPlaying,
   playbackRate,
   keyShift,
+  keyShifts,
   outputReady,
   onPlay,
 }: PlaybackPanelProps) {
@@ -74,6 +78,7 @@ export function PlaybackPanel({
         scheduler={scheduler}
         playbackRate={playbackRate}
         keyShift={keyShift}
+        keyShifts={keyShifts}
         canPlay={canPlay}
       />
     </section>
@@ -86,6 +91,7 @@ interface PlaybackReadoutProps {
   scheduler: MidiScheduler;
   playbackRate: number;
   keyShift: number;
+  keyShifts: readonly KeyShiftChange[];
   canPlay: boolean;
 }
 
@@ -95,6 +101,7 @@ function PlaybackReadout({
   scheduler,
   playbackRate,
   keyShift,
+  keyShifts,
   canPlay,
 }: PlaybackReadoutProps) {
   const playbackSeconds = usePlaybackPosition(scheduler, (seconds) => seconds);
@@ -149,15 +156,21 @@ function PlaybackReadout({
       '0',
     )}.${String(bb.tickInBeat).padStart(4, '0')}`;
   }, [positionSeconds, sequence, timing]);
+  const currentKeyShift = useMemo(
+    () => keyShiftAt(secondsToTick(positionSeconds, sequence), keyShifts),
+    [keyShifts, positionSeconds, sequence],
+  );
   const keyLabel = useMemo(() => {
     const signature = keySignatureAt(positionSeconds, sequence, timing);
     if (!signature) return null;
-    return formatKeySignature(keyShift === 0 ? signature : shiftKeySignature(signature, keyShift));
-  }, [keyShift, positionSeconds, sequence, timing]);
+    return formatKeySignature(
+      currentKeyShift === 0 ? signature : shiftKeySignature(signature, currentKeyShift),
+    );
+  }, [currentKeyShift, positionSeconds, sequence, timing]);
   const canDecreaseShift = keyShift > KEY_SHIFT_MIN;
   const canIncreaseShift = keyShift < KEY_SHIFT_MAX;
-  const isShiftModified = keyShift !== 0;
-  const keyShiftLabel = keyShift > 0 ? `+${keyShift}` : String(keyShift);
+  const isShiftModified = currentKeyShift !== 0;
+  const keyShiftLabel = currentKeyShift > 0 ? `+${currentKeyShift}` : String(currentKeyShift);
   const timeSigLabel = useMemo(
     () => timeSignatureLabelAt(positionSeconds, sequence, timing),
     [positionSeconds, sequence, timing],
