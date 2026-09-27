@@ -192,7 +192,7 @@ describe('resolveKaraokeDisplay', () => {
   });
   const pages = [
     page(0, [sungLine(syl(0, 100)), sungLine(syl(100, 200)), sungLine(syl(200, 300))]),
-    page(300, [sungLine(syl(1000, 1100)), sungLine(syl(1100, 1200)), sungLine(syl(1200, null))]),
+    page(300, [sungLine(syl(400, 500)), sungLine(syl(500, 600)), sungLine(syl(600, null))]),
   ];
 
   test('follows the active line without preview', () => {
@@ -206,7 +206,7 @@ describe('resolveKaraokeDisplay', () => {
   });
 
   test('previews the next page while the last line is sung and the lookahead reaches it', () => {
-    expect(resolveKaraokeDisplay(pages, 250, 300)).toEqual({
+    expect(resolveKaraokeDisplay(pages, 250, 400)).toEqual({
       pageIdx: 0,
       lineIdx: 2,
       preview: true,
@@ -239,6 +239,35 @@ describe('resolveKaraokeDisplay', () => {
     });
   });
 
+  test('holds the next page until the lookahead reaches its first line after a long gap', () => {
+    const gap = [page(0, [sungLine(syl(0, 100))]), page(100, [sungLine(syl(1000, null))])];
+    expect(resolveKaraokeDisplay(gap, 500, 600).pageIdx).toBe(0);
+    expect(resolveKaraokeDisplay(gap, 899, 999).pageIdx).toBe(0);
+    expect(resolveKaraokeDisplay(gap, 900, 1000).pageIdx).toBe(1);
+  });
+
+  test('does not preview a page held for its first line', () => {
+    const gap = [page(0, [sungLine(syl(0, 100))]), page(100, [sungLine(syl(1000, null))])];
+    expect(resolveKaraokeDisplay(gap, 350, 950)).toEqual({
+      pageIdx: 0,
+      lineIdx: 0,
+      preview: false,
+      hidden: false,
+      lineEnded: false,
+    });
+  });
+
+  test('shows the whole next page at once after the last line has ended', () => {
+    const gap = [page(0, [sungLine(syl(0, 100))]), page(100, [sungLine(syl(1000, null))])];
+    expect(resolveKaraokeDisplay(gap, 800, 900)).toEqual({
+      pageIdx: 0,
+      lineIdx: 0,
+      preview: false,
+      hidden: false,
+      lineEnded: true,
+    });
+  });
+
   test('never previews on the last page', () => {
     expect(resolveKaraokeDisplay(pages, 1250, 5000).preview).toBe(false);
   });
@@ -250,7 +279,7 @@ describe('resolveKaraokeDisplay', () => {
       page(600, [sungLine(syl(1000, 1100)), sungLine(syl(1100, null))]),
     ];
     expect(resolveKaraokeDisplay(single, 200, 700).preview).toBe(false);
-    expect(resolveKaraokeDisplay(single, 500, 700)).toEqual({
+    expect(resolveKaraokeDisplay(single, 500, 900)).toEqual({
       pageIdx: 1,
       lineIdx: 0,
       preview: true,

@@ -88,43 +88,48 @@ export function resolveKaraokeDisplay(
   tick: number,
   lookaheadTick: number,
 ): KaraokeDisplay {
+  const lead = lookaheadTick - tick;
   let lo = 0;
   let hi = pages.length;
   while (lo < hi) {
     const mid = (lo + hi) >>> 1;
-    if (pages[mid]!.displayTick <= tick) lo = mid + 1;
+    if (revealTick(pages, mid, lead) <= tick) lo = mid + 1;
     else hi = mid;
   }
   if (lo === 0) {
-    const first = pages[0]!;
-    const revealTick = isNonLyricPage(first) ? tick : lookaheadTick;
-    if (first.displayTick > revealTick) {
-      return { pageIdx: 0, lineIdx: 0, preview: false, hidden: true, lineEnded: false };
-    }
+    return { pageIdx: 0, lineIdx: 0, preview: false, hidden: true, lineEnded: false };
   }
-  const pageIdx = Math.max(0, lo - 1);
+  const pageIdx = lo - 1;
   const page = pages[pageIdx]!;
   const lineIdx = findActiveLineIndex(page.lines, tick);
 
   const next = pages[pageIdx + 1];
-  const lastLine = page.lines.at(-1);
+  const nextRevealTick = next === undefined ? null : revealTick(pages, pageIdx + 1, lead);
+  const endTick = lineEndTick(page.lines[lineIdx]!);
+  const nextTick = page.lines[lineIdx + 1]?.tick ?? nextRevealTick;
+  const lineEnded =
+    endTick !== null && endTick <= tick && (nextTick === null || nextTick - endTick > lead);
+
+  const lastLine = page.lines.at(-1)!;
   const preview =
     next !== undefined &&
-    lastLine !== undefined &&
+    nextRevealTick === next.displayTick &&
     lineIdx === page.lines.length - 1 &&
     lastLine.tick <= tick &&
+    !lineEnded &&
     next.displayTick <= lookaheadTick;
 
   if (preview && isNonLyricPage(page)) {
     return { pageIdx: pageIdx + 1, lineIdx: 0, preview: false, hidden: false, lineEnded: false };
   }
-  const endTick = lineEndTick(page.lines[lineIdx]!);
-  const nextTick = page.lines[lineIdx + 1]?.tick ?? next?.displayTick ?? null;
-  const lineEnded =
-    endTick !== null &&
-    endTick <= tick &&
-    (nextTick === null || nextTick - endTick > lookaheadTick - tick);
   return { pageIdx, lineIdx, preview, hidden: false, lineEnded };
+}
+
+function revealTick(pages: readonly KaraokePage[], index: number, lead: number): number {
+  const page = pages[index]!;
+  if (isNonLyricPage(page)) return page.displayTick;
+  const leadIn = page.startTick - lead;
+  return index === 0 ? leadIn : Math.max(page.displayTick, leadIn);
 }
 
 function lineEndTick(line: LyricLine): number | null {
