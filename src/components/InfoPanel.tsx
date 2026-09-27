@@ -335,7 +335,13 @@ function KaraokeSection({
     if (!autoScroll) return;
     if (activeSyllableIndex < 0) return;
     const el = streamRef.current?.querySelector('.lyric--active');
-    el?.scrollIntoView({ block: 'center', behavior });
+    if (!el) return;
+    // WebKit's scrollIntoView targets a different box for spans containing ruby.
+    const rect = el.getBoundingClientRect();
+    window.scrollTo({
+      top: window.scrollY + rect.top + rect.height / 2 - window.innerHeight / 2,
+      behavior,
+    });
   }, [activeSyllableIndex, autoScroll]);
 
   return (
