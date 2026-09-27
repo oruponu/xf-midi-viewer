@@ -322,14 +322,20 @@ describe('resolveKaraokeDisplay', () => {
     const endedAt = (first: LyricLine, tick: number) =>
       resolveKaraokeDisplay([page(0, [first, sungLine(syl(1000, null))])], tick, tick).lineEnded;
 
-    test('ends the active line once both its line end and its wipe have passed', () => {
+    test('ends a sung line when its wipe finishes after the line break', () => {
       const first = { ...sungLine(syl(0, 100)), endTick: 80 };
       expect(endedAt(first, 99)).toBe(false);
       expect(endedAt(first, 100)).toBe(true);
     });
 
-    test('waits for the line end when the wipe finishes first', () => {
-      const first = { ...sungLine(syl(0, 100)), endTick: 200 };
+    test('ends a sung line when its wipe finishes before a later line break', () => {
+      const first = { ...sungLine(syl(0, 100)), endTick: 900 };
+      expect(endedAt(first, 99)).toBe(false);
+      expect(endedAt(first, 100)).toBe(true);
+    });
+
+    test('uses the line break when the wipe end is unknown', () => {
+      const first = { ...sungLine(syl(0, null)), endTick: 200 };
       expect(endedAt(first, 199)).toBe(false);
       expect(endedAt(first, 200)).toBe(true);
     });
@@ -349,23 +355,18 @@ describe('resolveKaraokeDisplay', () => {
     });
 
     test('keeps a finished line when the next line follows within the lookahead', () => {
-      const pages = [
-        page(0, [{ ...sungLine(syl(0, 100)), endTick: 200 }, sungLine(syl(1000, null))]),
-      ];
+      const pages = [page(0, [sungLine(syl(0, 200)), sungLine(syl(1000, null))])];
       expect(resolveKaraokeDisplay(pages, 300, 1100).lineEnded).toBe(false);
       expect(resolveKaraokeDisplay(pages, 300, 1000).lineEnded).toBe(true);
     });
 
     test('keeps the last line when the next page follows within the lookahead', () => {
-      const pages = [
-        page(0, [{ ...sungLine(syl(0, 100)), endTick: 200 }]),
-        page(250, [sungLine(syl(250, null))]),
-      ];
+      const pages = [page(0, [sungLine(syl(0, 200))]), page(250, [sungLine(syl(250, null))])];
       expect(resolveKaraokeDisplay(pages, 200, 300).lineEnded).toBe(false);
     });
 
     test('ends the last line of the song', () => {
-      const pages = [page(0, [{ ...sungLine(syl(0, 100)), endTick: 200 }])];
+      const pages = [page(0, [sungLine(syl(0, 200))])];
       expect(resolveKaraokeDisplay(pages, 200, 1200).lineEnded).toBe(true);
     });
   });

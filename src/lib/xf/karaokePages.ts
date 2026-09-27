@@ -136,8 +136,7 @@ function lineEndTick(line: LyricLine): number | null {
   if (line.syllables.every((syl) => syl.vocalPart === 'nonLyric')) return null;
   const last = line.syllables.at(-1)!;
   const wipeEnd = last.vocalPart === 'speech' ? null : last.endTick;
-  if (line.endTick === null) return wipeEnd;
-  return wipeEnd === null ? line.endTick : Math.max(line.endTick, wipeEnd);
+  return wipeEnd ?? line.endTick;
 }
 
 export type LineAlignment = 'left' | 'right' | 'center';
