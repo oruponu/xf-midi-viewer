@@ -26,6 +26,7 @@ interface PlaybackPanelProps {
   playbackRate: number;
   keyShift: number;
   keyShifts: readonly KeyShiftChange[];
+  isKeyFixed: boolean;
   outputReady: boolean;
   onPlay: () => void;
 }
@@ -38,6 +39,7 @@ export function PlaybackPanel({
   playbackRate,
   keyShift,
   keyShifts,
+  isKeyFixed,
   outputReady,
   onPlay,
 }: PlaybackPanelProps) {
@@ -79,6 +81,7 @@ export function PlaybackPanel({
         playbackRate={playbackRate}
         keyShift={keyShift}
         keyShifts={keyShifts}
+        isKeyFixed={isKeyFixed}
         canPlay={canPlay}
       />
     </section>
@@ -92,6 +95,7 @@ interface PlaybackReadoutProps {
   playbackRate: number;
   keyShift: number;
   keyShifts: readonly KeyShiftChange[];
+  isKeyFixed: boolean;
   canPlay: boolean;
 }
 
@@ -102,6 +106,7 @@ function PlaybackReadout({
   playbackRate,
   keyShift,
   keyShifts,
+  isKeyFixed,
   canPlay,
 }: PlaybackReadoutProps) {
   const playbackSeconds = usePlaybackPosition(scheduler, (seconds) => seconds);
@@ -167,8 +172,8 @@ function PlaybackReadout({
       currentKeyShift === 0 ? signature : shiftKeySignature(signature, currentKeyShift),
     );
   }, [currentKeyShift, positionSeconds, sequence, timing]);
-  const canDecreaseShift = keyShift > KEY_SHIFT_MIN;
-  const canIncreaseShift = keyShift < KEY_SHIFT_MAX;
+  const canDecreaseShift = !isKeyFixed && keyShift > KEY_SHIFT_MIN;
+  const canIncreaseShift = !isKeyFixed && keyShift < KEY_SHIFT_MAX;
   const isShiftModified = currentKeyShift !== 0;
   const keyShiftLabel = currentKeyShift > 0 ? `+${currentKeyShift}` : String(currentKeyShift);
   const timeSigLabel = useMemo(
@@ -242,7 +247,7 @@ function PlaybackReadout({
           <span
             className="playback-key"
             aria-label={`Key ${keyLabel ?? 'unknown'}, shift ${keyShiftLabel}`}
-            title="現在のキー（移調適用後）"
+            title={isKeyFixed ? 'キーを C / Am に固定中' : '現在のキー（移調適用後）'}
           >
             {keyPulse > 0 && <span key={keyPulse} className="playback-pulse" aria-hidden="true" />}
             <span className="playback-key-header">

@@ -95,6 +95,16 @@ export function SettingsDialog({
           </section>
 
           <section className="settings-section">
+            <h3>移調</h3>
+            <p className="settings-section-desc">転調のたびに C または Am に移調して再生します</p>
+            <ToggleRow
+              label="キーを C / Am に固定"
+              checked={settings.fixKeyToC}
+              onChange={(v) => onChange({ fixKeyToC: v })}
+            />
+          </section>
+
+          <section className="settings-section">
             <h3>出力</h3>
             <p className="settings-section-desc">再生に使う音源を選択します</p>
             <OutputControl player={player} />

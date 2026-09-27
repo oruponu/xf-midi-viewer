@@ -12,6 +12,7 @@ import { useSongLoader } from './hooks/useSongLoader.ts';
 import { useTheme } from './hooks/useTheme.ts';
 import { useWakeLock } from './hooks/useWakeLock.ts';
 import type { MidiScheduler } from './lib/player/scheduler.ts';
+import { buildFixedKeyShifts } from './lib/smf/fixedKey.ts';
 import type { KeyShiftChange } from './lib/smf/fixedKey.ts';
 import type { Song } from './lib/song.ts';
 import type { FileSummary } from './lib/songLoader.ts';
@@ -37,7 +38,11 @@ function App() {
   const song = songState.status === 'loaded' ? songState.song : null;
   const file = songState.status === 'empty' ? null : songState.file;
   const errorMessage = songState.status === 'error' ? songState.message : (song?.xfError ?? null);
-  const player = useMidiPlayer(song?.sequence ?? null);
+  const fixedKeyShifts = useMemo(
+    () => (settings.fixKeyToC && song ? buildFixedKeyShifts(song.timing) : null),
+    [settings.fixKeyToC, song],
+  );
+  const player = useMidiPlayer(song?.sequence ?? null, fixedKeyShifts);
   const { scheduler, isPlaying } = player;
   const outputReady = player.outputReady && !player.isPreparing;
   const { play } = player;
@@ -180,6 +185,7 @@ function App() {
           isPlaying={isPlaying}
           playbackRate={player.playbackRate}
           keyShift={player.keyShift}
+          fixedKeyShifts={fixedKeyShifts}
           outputReady={outputReady}
           onPlay={play}
         />
@@ -272,6 +278,7 @@ function PlayerScope({
   isPlaying,
   playbackRate,
   keyShift,
+  fixedKeyShifts,
   outputReady,
   onPlay,
 }: {
@@ -282,12 +289,17 @@ function PlayerScope({
   isPlaying: boolean;
   playbackRate: number;
   keyShift: number;
+  fixedKeyShifts: readonly KeyShiftChange[] | null;
   outputReady: boolean;
   onPlay: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
   const dockRef = useRef<HTMLDivElement | null>(null);
-  const keyShifts = useMemo<KeyShiftChange[]>(() => [{ tick: 0, semitones: keyShift }], [keyShift]);
+  const manualKeyShifts = useMemo<KeyShiftChange[]>(
+    () => [{ tick: 0, semitones: keyShift }],
+    [keyShift],
+  );
+  const keyShifts = fixedKeyShifts ?? manualKeyShifts;
 
   useEffect(() => {
     const el = dockRef.current;
@@ -336,6 +348,7 @@ function PlayerScope({
             playbackRate={playbackRate}
             keyShift={keyShift}
             keyShifts={keyShifts}
+            isKeyFixed={fixedKeyShifts !== null}
             outputReady={outputReady}
             onPlay={onPlay}
           />

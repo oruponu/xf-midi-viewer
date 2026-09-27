@@ -8,6 +8,7 @@ export interface Settings {
   autoScrollLeadSheet: boolean;
   autoScrollLyrics: boolean;
   showPitchBar: boolean;
+  fixKeyToC: boolean;
   theme: Theme;
 }
 
@@ -15,6 +16,7 @@ const DEFAULT_SETTINGS: Settings = {
   autoScrollLeadSheet: true,
   autoScrollLyrics: true,
   showPitchBar: true,
+  fixKeyToC: false,
   theme: 'system',
 };
 
@@ -29,6 +31,7 @@ function loadSettings(): Settings {
       autoScrollLeadSheet: readBoolean(parsed, 'autoScrollLeadSheet'),
       autoScrollLyrics: readBoolean(parsed, 'autoScrollLyrics'),
       showPitchBar: readBoolean(parsed, 'showPitchBar'),
+      fixKeyToC: readBoolean(parsed, 'fixKeyToC'),
       theme: isTheme(parsed.theme) ? parsed.theme : DEFAULT_SETTINGS.theme,
     };
   } catch {
