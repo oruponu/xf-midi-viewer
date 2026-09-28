@@ -47,7 +47,7 @@ describe('transposeChord', () => {
     ['Db', 'Gb'],
     ['Bbm', 'Ebm'],
     ['C#m7', 'F#m7'],
-    ['C#m7b5', 'F#m7b5'],
+    ['C#m7(b5)', 'F#m7(b5)'],
     ['D#dim', 'G#dim'],
     ['G#dim7', 'C#dim7'],
   ])('spells %s up a fourth into C major as %s', (name, expected) => {

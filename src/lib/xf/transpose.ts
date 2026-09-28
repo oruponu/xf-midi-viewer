@@ -29,7 +29,7 @@ const OFFSET_TO_ACCIDENTAL: Record<number, ChordRoot['accidental']> = {
 const MAJOR_SCALE: readonly number[] = [0, 2, 4, 5, 7, 9, 11];
 const MINOR_SCALE: readonly number[] = [0, 2, 3, 5, 7, 8, 10];
 
-const DIMINISHED_TYPES: ReadonlySet<string> = new Set(['dim', 'dim7', 'm7b5']);
+const DIMINISHED_TYPES: ReadonlySet<string> = new Set(['dim', 'dim7', 'm7(b5)']);
 const MINOR_TYPES: ReadonlySet<string> = new Set([
   'm',
   'm6',
