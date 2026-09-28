@@ -35,10 +35,10 @@ const MINOR_TYPES: ReadonlySet<string> = new Set([
   'm6',
   'm7',
   'madd9',
-  'm7(9)',
-  'm7(11)',
+  'm9',
+  'm11',
   'mM7',
-  'mM7(9)',
+  'mM9',
 ]);
 
 const AWKWARD_NAMES: ReadonlySet<string> = new Set(['Cb', 'Fb', 'E#', 'B#']);
