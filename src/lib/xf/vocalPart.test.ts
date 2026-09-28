@@ -5,11 +5,11 @@ import type { PartColor } from './vocalPart.ts';
 
 describe('partColorOf', () => {
   test.each<[VocalPart | null, PartColor]>([
-    ['male', 'base'],
-    ['solo', 'base'],
     [null, 'base'],
+    ['solo', 'base'],
+    ['mixed', 'base'],
+    ['male', 'male'],
     ['female', 'female'],
-    ['mixed', 'mixed'],
     ['chorus', 'other'],
     ['speech', 'other'],
     ['nonLyric', 'other'],

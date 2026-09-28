@@ -1,17 +1,17 @@
 import type { VocalPart } from './types.ts';
 
-export type PartColor = 'base' | 'female' | 'mixed' | 'other';
+export type PartColor = 'base' | 'male' | 'female' | 'other';
 
 export function partColorOf(part: VocalPart | null): PartColor {
   switch (part) {
     case null:
-    case 'male':
     case 'solo':
+    case 'mixed':
       return 'base';
+    case 'male':
+      return 'male';
     case 'female':
       return 'female';
-    case 'mixed':
-      return 'mixed';
     default:
       return 'other';
   }

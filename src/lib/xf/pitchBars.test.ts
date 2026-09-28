@@ -100,14 +100,14 @@ describe('buildPitchLane parts', () => {
     buildPitchLane(notes, [1], timing(), [], BAR, syllables)!.notes.map((n) => n.part);
 
   test('takes the part of the last syllable at or before each note start', () => {
-    const syllables = [syllable(0, 'male'), syllable(480, 'female'), syllable(960, 'mixed')];
+    const syllables = [syllable(0, 'male'), syllable(480, 'female'), syllable(960, 'chorus')];
 
     expect(
       partsOf(
         [note(60, 0, 240), note(60, 479, 480), note(60, 480, 720), note(60, 1200, 1440)],
         syllables,
       ),
-    ).toEqual(['base', 'base', 'female', 'mixed']);
+    ).toEqual(['male', 'male', 'female', 'other']);
   });
 
   test('uses the base part before the first syllable and without syllables', () => {

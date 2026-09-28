@@ -860,12 +860,12 @@
   background: var(--part-base);
 }
 
-.part-badge--female {
-  background: var(--part-female);
+.part-badge--male {
+  background: var(--part-male);
 }
 
-.part-badge--mixed {
-  background: var(--part-mixed);
+.part-badge--female {
+  background: var(--part-female);
 }
 
 .part-badge--other {
@@ -1383,12 +1383,12 @@
   color: var(--part-base);
 }
 
-.karaoke-line-fill .karaoke-syl--part-female {
-  color: var(--part-female);
+.karaoke-line-fill .karaoke-syl--part-male {
+  color: var(--part-male);
 }
 
-.karaoke-line-fill .karaoke-syl--part-mixed {
-  color: var(--part-mixed);
+.karaoke-line-fill .karaoke-syl--part-female {
+  color: var(--part-female);
 }
 
 .karaoke-line-fill .karaoke-syl--part-other {
@@ -1487,12 +1487,12 @@
   fill: var(--part-base);
 }
 
-.pitch-lane-sung .pitch-lane-note--part-female {
-  fill: var(--part-female);
+.pitch-lane-sung .pitch-lane-note--part-male {
+  fill: var(--part-male);
 }
 
-.pitch-lane-sung .pitch-lane-note--part-mixed {
-  fill: var(--part-mixed);
+.pitch-lane-sung .pitch-lane-note--part-female {
+  fill: var(--part-female);
 }
 
 .pitch-lane-sung .pitch-lane-note--part-other {
