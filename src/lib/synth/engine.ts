@@ -19,6 +19,9 @@ export const BUNDLED_SOUND_BANK_URL = `${import.meta.env.BASE_URL}soundfonts/Gen
 
 const MAIN_SOUND_BANK_ID = 'main';
 
+// Cancels SPESSASYNTH_GAIN_FACTOR (0.6) that spessasynth applies to every voice.
+const MASTER_GAIN = 1 / 0.6;
+
 type AudioSessionNavigator = Navigator & { audioSession?: { type: string } };
 
 export function isBuiltinSynthSupported(): boolean {
@@ -53,6 +56,7 @@ export async function createBuiltinSynthEngine(
     throw error;
   }
   const synth = new WorkletSynthesizer(context);
+  synth.setSystemParameter('gain', MASTER_GAIN);
   const gain = context.createGain();
   synth.connect(gain);
   gain.connect(context.destination);
