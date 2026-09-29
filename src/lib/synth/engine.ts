@@ -22,6 +22,14 @@ const MAIN_SOUND_BANK_ID = 'main';
 // Cancels SPESSASYNTH_GAIN_FACTOR (0.6) that spessasynth applies to every voice.
 const MASTER_GAIN = 1 / 0.6;
 
+const LIMITER_OPTIONS: DynamicsCompressorOptions = {
+  threshold: -6,
+  knee: 0,
+  ratio: 20,
+  attack: 0,
+  release: 0.25,
+};
+
 type AudioSessionNavigator = Navigator & { audioSession?: { type: string } };
 
 export function isBuiltinSynthSupported(): boolean {
@@ -58,8 +66,10 @@ export async function createBuiltinSynthEngine(
   const synth = new WorkletSynthesizer(context);
   synth.setSystemParameter('gain', MASTER_GAIN);
   const gain = context.createGain();
+  const limiter = new DynamicsCompressorNode(context, LIMITER_OPTIONS);
   synth.connect(gain);
-  gain.connect(context.destination);
+  gain.connect(limiter);
+  limiter.connect(context.destination);
   const output = new BuiltinSynthOutput({ synth, clock: context, gain: gain.gain, onStall });
   const onStateChange = () => output.notifyStateChange();
   context.addEventListener('statechange', onStateChange);
