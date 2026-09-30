@@ -1,8 +1,9 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { SoundBankLoader, SpessaLog } from 'spessasynth_core';
 import type { BasicSoundBank, MIDIPatch } from 'spessasynth_core';
-import { buildXgSoundBank, readSoundBank } from './build.ts';
-import { SOURCE_SOUND_BANK_PATH } from './paths.ts';
+import { buildXgBank, buildXgSoundBank, readSoundBank, sourceSha256 } from './build.ts';
+import { NO_CORRECTIONS, readCorrections } from './calibration/corrections.ts';
+import { CORRECTIONS_PATH, SOURCE_SOUND_BANK_PATH } from './paths.ts';
 import { XG_KITS } from './xgDrumKits.ts';
 import { XG_SFX_VOICES } from './xgSfxVoices.ts';
 
@@ -14,7 +15,7 @@ let built: BasicSoundBank;
 beforeAll(() => {
   const data = readSoundBank(SOURCE_SOUND_BANK_PATH);
   source = SoundBankLoader.fromArrayBuffer(data.slice(0));
-  built = SoundBankLoader.fromArrayBuffer(buildXgSoundBank(data));
+  built = SoundBankLoader.fromArrayBuffer(buildXgSoundBank(data, NO_CORRECTIONS));
 });
 
 const patch = (bankMSB: number, program: number, isGMGSDrum = false): MIDIPatch => ({
@@ -93,5 +94,24 @@ describe('buildXgSoundBank', () => {
 
   test('adds no samples', () => {
     expect(built.samples.length).toBe(source.samples.length);
+  });
+
+  test('stops when the source differs from the one the corrections were fitted to', () => {
+    const data = readSoundBank(SOURCE_SOUND_BANK_PATH);
+    expect(() => buildXgBank(data, { ...NO_CORRECTIONS, sourceSha256: '0'.repeat(64) })).toThrow(
+      'fitted to',
+    );
+    expect(() =>
+      buildXgBank(data, { ...NO_CORRECTIONS, sourceSha256: sourceSha256(data) }),
+    ).not.toThrow();
+  });
+
+  test('builds with the committed corrections file', () => {
+    const data = readSoundBank(SOURCE_SOUND_BANK_PATH);
+    const bank = SoundBankLoader.fromArrayBuffer(
+      buildXgSoundBank(data, readCorrections(CORRECTIONS_PATH)),
+    );
+    expect(bank.samples.length).toBe(source.samples.length);
+    expect(bank.presets.length).toBe(built.presets.length);
   });
 });

@@ -1,19 +1,38 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { writeFileSync, readFileSync } from 'node:fs';
 import { SoundBankLoader, SpessaLog } from 'spessasynth_core';
-import { OUTPUT_SOUND_BANK_PATH, SOURCE_SOUND_BANK_PATH } from './paths.ts';
+import type { BasicSoundBank } from 'spessasynth_core';
+import { applyCorrections } from './calibration/apply.ts';
+import { readCorrections } from './calibration/corrections.ts';
+import type { Corrections } from './calibration/corrections.ts';
+import { CORRECTIONS_PATH, OUTPUT_SOUND_BANK_PATH, SOURCE_SOUND_BANK_PATH } from './paths.ts';
 import { buildKitPreset, buildSfxVoicePreset } from './remap.ts';
 import { XG_KITS } from './xgDrumKits.ts';
 import { XG_SFX_VOICES } from './xgSfxVoices.ts';
 
-export function buildXgSoundBank(source: ArrayBuffer): ArrayBuffer {
-  const bank = SoundBankLoader.fromArrayBuffer(source);
+export function sourceSha256(source: ArrayBuffer): string {
+  return createHash('sha256').update(new Uint8Array(source)).digest('hex');
+}
+
+export function buildXgBank(source: ArrayBuffer, corrections: Corrections): BasicSoundBank {
+  if (corrections.sourceSha256 !== null && corrections.sourceSha256 !== sourceSha256(source)) {
+    throw new Error(
+      'The source SF3 differs from the one the corrections were fitted to; rerun scripts/xg-soundfont/calibration/calibrate.ts',
+    );
+  }
+  const bank = SoundBankLoader.fromArrayBuffer(source.slice(0));
   const presets = [
     ...XG_KITS.map((kit) => buildKitPreset(bank, kit)),
     ...XG_SFX_VOICES.map((sfx) => buildSfxVoicePreset(bank, sfx)),
   ];
   bank.addPresets(...presets);
+  applyCorrections(bank, corrections);
   bank.flush();
-  return bank.writeSF2({ software: 'xf-midi-viewer' });
+  return bank;
+}
+
+export function buildXgSoundBank(source: ArrayBuffer, corrections: Corrections): ArrayBuffer {
+  return buildXgBank(source, corrections).writeSF2({ software: 'xf-midi-viewer' });
 }
 
 export function readSoundBank(path: string): ArrayBuffer {
@@ -23,6 +42,9 @@ export function readSoundBank(path: string): ArrayBuffer {
 
 if (import.meta.main) {
   SpessaLog.setLogLevel(false, true, false);
-  const output = buildXgSoundBank(readSoundBank(SOURCE_SOUND_BANK_PATH));
+  const output = buildXgSoundBank(
+    readSoundBank(SOURCE_SOUND_BANK_PATH),
+    readCorrections(CORRECTIONS_PATH),
+  );
   writeFileSync(OUTPUT_SOUND_BANK_PATH, new Uint8Array(output));
 }
