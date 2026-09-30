@@ -30,6 +30,9 @@ const LIMITER_OPTIONS: DynamicsCompressorOptions = {
   release: 0.25,
 };
 
+// Look-ahead of DynamicsCompressorNode, measured in Chrome; the API does not expose it.
+const LIMITER_LATENCY_SECONDS = 0.006;
+
 type AudioSessionNavigator = Navigator & { audioSession?: { type: string } };
 
 export function isBuiltinSynthSupported(): boolean {
@@ -70,7 +73,13 @@ export async function createBuiltinSynthEngine(
   synth.connect(gain);
   gain.connect(limiter);
   limiter.connect(context.destination);
-  const output = new BuiltinSynthOutput({ synth, clock: context, gain: gain.gain, onStall });
+  const output = new BuiltinSynthOutput({
+    synth,
+    clock: context,
+    gain: gain.gain,
+    onStall,
+    processingLatency: LIMITER_LATENCY_SECONDS,
+  });
   const onStateChange = () => output.notifyStateChange();
   context.addEventListener('statechange', onStateChange);
 
