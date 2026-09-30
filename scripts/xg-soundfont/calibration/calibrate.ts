@@ -314,4 +314,5 @@ if (import.meta.main) {
     outputGainDb: existing.outputGainDb,
     sourceSha256: sourceSha256(source),
   });
+  console.log('outputGainDb was kept from the previous file; run outputGain.ts again');
 }
