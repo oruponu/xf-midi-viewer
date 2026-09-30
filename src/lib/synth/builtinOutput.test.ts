@@ -14,7 +14,7 @@ interface ClockState {
   baseLatency?: number;
 }
 
-function setupOutput(clockInit: Partial<ClockState> = {}) {
+function setupOutput(clockInit: Partial<ClockState> = {}, processingLatency?: number) {
   const calls: { data: number[]; time: number }[] = [];
   const gainCalls: string[] = [];
   const clock: ClockState = { currentTime: 10, state: 'running', ...clockInit };
@@ -35,6 +35,7 @@ function setupOutput(clockInit: Partial<ClockState> = {}) {
     onStall: (stalledAtMs) => {
       stallTimes.push(stalledAtMs);
     },
+    processingLatency,
   });
   return {
     output,
@@ -236,6 +237,11 @@ describe('BuiltinSynthOutput', () => {
     );
     expect(setupOutput({ baseLatency: 0.01 }).output.latencyMs()).toBeCloseTo(10, 6);
     expect(setupOutput().output.latencyMs()).toBe(0);
+  });
+
+  test('latencyMs() adds the processing latency', () => {
+    expect(setupOutput({ outputLatency: 0.03 }, 0.006).output.latencyMs()).toBeCloseTo(36, 6);
+    expect(setupOutput({}, 0.006).output.latencyMs()).toBeCloseTo(6, 6);
   });
 });
 
