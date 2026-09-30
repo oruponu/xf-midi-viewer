@@ -46,6 +46,7 @@ export interface CalibrationResult {
   readonly corrections: Corrections;
   readonly drums: ErrorStats;
   readonly voices: ErrorStats;
+  readonly voiceMeans: ErrorStats;
   readonly passed: boolean;
   readonly unmeasured: readonly string[];
   readonly worst: readonly { unit: string; errorDb: number }[];
@@ -256,6 +257,12 @@ export function calibrate(input: CalibrationInput): CalibrationResult {
   }));
   const drumStats = errorStats(unitErrors.filter((u) => u.drum).flatMap((u) => u.errors));
   const voiceStats = errorStats(unitErrors.filter((u) => !u.drum).flatMap((u) => u.errors));
+  // One level per voice cannot remove the spread across its notes.
+  const voiceMeanStats = errorStats(
+    unitErrors
+      .filter((u) => !u.drum)
+      .map((u) => u.errors.reduce((s, e) => s + e, 0) / u.errors.length),
+  );
   const worst = unitErrors
     .map((u) => ({
       unit: u.unit,
@@ -267,7 +274,8 @@ export function calibrate(input: CalibrationInput): CalibrationResult {
     corrections: current(),
     drums: drumStats,
     voices: voiceStats,
-    passed: deficit === 0 && meetsCriteria(drumStats) && meetsCriteria(voiceStats),
+    voiceMeans: voiceMeanStats,
+    passed: deficit === 0 && meetsCriteria(drumStats) && meetsCriteria(voiceMeanStats),
     unmeasured: unmeasured.map((u) => u.id),
     worst,
   };
@@ -302,6 +310,7 @@ if (import.meta.main) {
     );
   show('drums', result.drums);
   show('voices', result.voices);
+  show('voice means', result.voiceMeans);
   console.log(`common attenuation ${result.corrections.commonAttenuation}`);
   console.log(`unmeasured: ${result.unmeasured.join(', ') || '-'}`);
   for (const w of result.worst) console.log(`  ${w.unit}: ${w.errorDb.toFixed(2)} dB`);

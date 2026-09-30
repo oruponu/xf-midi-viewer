@@ -214,9 +214,21 @@ describe('calibrate', () => {
     expect(
       result.drums.median > 0.5 ||
         result.drums.p90 > 2 ||
-        result.voices.median > 0.5 ||
-        result.voices.p90 > 2,
+        result.voiceMeans.median > 0.5 ||
+        result.voiceMeans.p90 > 2,
     ).toBe(true);
+  });
+
+  test('judges voices by their mean error and still reports the error of each point', () => {
+    const ref = reference();
+    const voices = ref.voices.map((v) => ({
+      ...v,
+      levels: { '60/64': v.levels['60/64']! + 3, '60/127': v.levels['60/127']! - 3 },
+    }));
+    const result = run([], { ...ref, voices });
+    expect(result.passed).toBe(true);
+    expect(result.voiceMeans.max).toBeLessThan(0.05);
+    expect(result.voices.median).toBeCloseTo(3, 1);
   });
 
   test('fails when the attenuation floor is still reached after all retries', () => {
