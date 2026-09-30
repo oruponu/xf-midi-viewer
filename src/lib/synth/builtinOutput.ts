@@ -31,6 +31,7 @@ export interface BuiltinSynthOutputOptions {
   gain: GainParamLike;
   now?: () => number;
   onStall?: (stalledAtMs: number) => void;
+  processingLatency?: number;
 }
 
 export function toContextTime(timestampMs: number, anchorSeconds: number): number {
@@ -63,6 +64,7 @@ export class BuiltinSynthOutput implements MidiOutputLike {
   private readonly gain: GainParamLike;
   private readonly now: () => number;
   private readonly onStall: (stalledAtMs: number) => void;
+  private readonly processingLatency: number;
   private anchor = 0;
   private anchorLead = 0;
   private lastQueuedTime = 0;
@@ -75,6 +77,7 @@ export class BuiltinSynthOutput implements MidiOutputLike {
     this.gain = options.gain;
     this.now = options.now ?? (() => performance.now());
     this.onStall = options.onStall ?? (() => {});
+    this.processingLatency = options.processingLatency ?? 0;
   }
 
   get isActive(): boolean {
@@ -93,7 +96,7 @@ export class BuiltinSynthOutput implements MidiOutputLike {
   }
 
   latencyMs(): number {
-    return (hardwareLatencySeconds(this.clock) + this.anchorLead) * 1000;
+    return (hardwareLatencySeconds(this.clock) + this.processingLatency + this.anchorLead) * 1000;
   }
 
   notifyStateChange(): void {
