@@ -28,3 +28,11 @@ export function saveFailureMessage(next: SoundBankEntry): string {
     ? '保存できませんでした。次回は標準の音源を読み込みます'
     : `保存できませんでした。次回は ${next.name} を読み込みます`;
 }
+
+// Copied from outputGainDb in scripts/xg-soundfont/calibration/corrections.json;
+// a test keeps them equal.
+export const BUNDLED_SOUND_BANK_GAIN_DB = 0;
+
+export function soundBankGain(bundled: boolean): number {
+  return bundled ? 10 ** (BUNDLED_SOUND_BANK_GAIN_DB / 20) : 1;
+}
