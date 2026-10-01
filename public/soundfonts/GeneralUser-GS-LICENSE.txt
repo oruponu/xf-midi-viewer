@@ -14,7 +14,9 @@ https://github.com/mrbumpy409/GeneralUser-GS
 
 This project adds presets for Yamaha XG drum kits, SFX kits and SFX voices to
 the source SF3 at build time (scripts/xg-soundfont/). The added presets reuse the
-original instruments and samples; the original presets are left unchanged.
+original instruments and samples. The levels and velocity sensitivity of the
+drum kits and voices are adjusted to match the balance of an XG tone generator;
+no samples are added or changed.
 The file served by the application is GeneralUser-GS-XG.sf3.
 
 ----------------------------------------------------------------------
