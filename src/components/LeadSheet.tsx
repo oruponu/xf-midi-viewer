@@ -1,5 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useMediaQuery } from '../hooks/useMediaQuery.ts';
+import { buildScoreRows } from '../lib/layout/scoreRows.ts';
+import type { ScoreRowSpec } from '../lib/layout/scoreRows.ts';
 import { labelSpan, spreadLabels } from '../lib/layout/spread.ts';
 import type { SpreadItem } from '../lib/layout/spread.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
@@ -45,11 +47,6 @@ interface PlacedSyllable extends Placement {
   syllable: LyricSyllable;
 }
 
-interface RowSpec {
-  startBar: number;
-  barCount: number;
-}
-
 interface LeadSheetProps {
   chords: ChordMessage[];
   rehearsals: RehearsalMessage[];
@@ -86,14 +83,10 @@ export const LeadSheet = memo(function LeadSheet({
   const isNarrow = useMediaQuery('(max-width: 720px)');
   const barsPerRow = isNarrow ? NARROW_BARS_PER_ROW : BARS_PER_ROW;
 
-  const rows = useMemo<RowSpec[]>(() => {
-    const out: RowSpec[] = [];
-    for (let s = 1; s <= totalBars; s += barsPerRow) {
-      const remaining = totalBars - s + 1;
-      out.push({ startBar: s, barCount: Math.min(barsPerRow, remaining) });
-    }
-    return out;
-  }, [totalBars, barsPerRow]);
+  const rows = useMemo<ScoreRowSpec[]>(() => {
+    const sectionStartBars = rehearsals.flatMap((r) => tickToBarBeat(r.tick, timing)?.bar ?? []);
+    return buildScoreRows(totalBars, barsPerRow, sectionStartBars);
+  }, [rehearsals, timing, totalBars, barsPerRow]);
 
   const barTimeSignatures = useMemo(() => {
     const map = new Map<number, TimeSignature>();
