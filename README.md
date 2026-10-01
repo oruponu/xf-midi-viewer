@@ -38,7 +38,7 @@ XF MIDI Viewer は、XF フォーマットのデータを読み取り、4 つの
 
 出力先は、設定画面の「出力」で選びます。設定画面は、右上の歯車アイコンから開きます。初期状態の出力先は内蔵音源です。
 
-**内蔵音源**：ブラウザの中で動くソフトウェアシンセサイザーです。標準で使う SoundFont は、GeneralUser GS に XG のドラムキットと SFX の音色のプリセットを加えたものです。追加したプリセットでは、GeneralUser GS に元からある音色とサンプルを、XG のドラムキットの鍵盤配置と SFX の音色に合わせて割り当てています。新しいサンプルは含みません。
+**内蔵音源**：ブラウザの中で動くソフトウェアシンセサイザーです。標準で使う SoundFont は、GeneralUser GS に XG のドラムキットと SFX の音色のプリセットを加えたものです。追加したプリセットでは、GeneralUser GS に元からある音色とサンプルを、XG のドラムキットの鍵盤配置と SFX の音色に合わせて割り当てています。音色やドラムの音量とベロシティによる強弱の付き方は、XG 音源に合わせて調整しています。新しいサンプルは含みません。
 
 設定画面の「読み込み」で SF2、SF3、DLS 形式のファイルを選ぶと、音色を差し替えられます。選んだファイルはブラウザに保存します。保存できた場合は、次に同じブラウザでページを開いたときも、その音色で再生します。「標準に戻す」を押すと、標準の SoundFont に戻ります。スマホでは、大きな SoundFont を避けてください。
 
@@ -78,7 +78,7 @@ bun run dev
 `bun run dev` と `bun run build` は、Vite を起動する前に次の 2 つのファイルを生成します。どちらもリポジトリには含めていません。
 
 - `public/third-party-licenses.txt`：使用しているライブラリのライセンス一覧
-- `public/soundfonts/GeneralUser-GS-XG.sf3`：`assets/soundfonts/GeneralUser-GS.sf3` に、XG のドラムキットと SFX の音色のプリセットを加えた SoundFont
+- `public/soundfonts/GeneralUser-GS-XG.sf3`：`assets/soundfonts/GeneralUser-GS.sf3` に、XG のドラムキットと SFX の音色のプリセットを加え、音量のバランスを調整した SoundFont
 
 ### スクリプト
 

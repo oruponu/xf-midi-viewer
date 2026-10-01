@@ -1,15 +1,18 @@
 import { WorkletSynthesizer } from 'spessasynth_lib';
 import processorUrl from 'spessasynth_lib/dist/spessasynth_processor.min.js?url';
 import { BuiltinSynthOutput, waitForClockStart } from './builtinOutput.ts';
+import { soundBankGain } from './soundBank.ts';
 
 export type SoundBankLoadResult = 'loaded' | 'fallback';
 
+export interface SoundBankLoadOptions {
+  readonly bundled: boolean;
+  readonly fallback?: () => Promise<ArrayBuffer>;
+}
+
 export interface BuiltinSynthEngine {
   readonly output: BuiltinSynthOutput;
-  loadSoundBank(
-    data: ArrayBuffer,
-    fallback?: () => Promise<ArrayBuffer>,
-  ): Promise<SoundBankLoadResult>;
+  loadSoundBank(data: ArrayBuffer, options: SoundBankLoadOptions): Promise<SoundBankLoadResult>;
   resumeAudio(): Promise<void>;
   prepare(): Promise<void>;
   destroy(): void;
@@ -108,19 +111,24 @@ export async function createBuiltinSynthEngine(
         );
     });
 
+  const setGain = (bundled: boolean) =>
+    synth.setSystemParameter('gain', MASTER_GAIN * soundBankGain(bundled));
+
   const loadSoundBank = (
     data: ArrayBuffer,
-    fallback?: () => Promise<ArrayBuffer>,
+    options: SoundBankLoadOptions,
   ): Promise<SoundBankLoadResult> => {
     const run = async (): Promise<SoundBankLoadResult> => {
       try {
         await addSoundBank(data);
-        return 'loaded';
       } catch (error) {
-        if (!fallback) throw error;
-        await addSoundBank(await fallback());
+        if (!options.fallback) throw error;
+        await addSoundBank(await options.fallback());
+        setGain(true);
         return 'fallback';
       }
+      setGain(options.bundled);
+      return 'loaded';
     };
     const result = pending.then(run, run);
     pending = result.catch(() => {});

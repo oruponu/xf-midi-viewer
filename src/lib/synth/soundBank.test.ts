@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import {
   BUNDLED_SOUND_BANK,
+  BUNDLED_SOUND_BANK_GAIN_DB,
   nextSoundBankToLoad,
   saveFailureMessage,
   savedAfterAttempt,
+  soundBankGain,
 } from './soundBank.ts';
 
 const userA = { name: 'A.sf2', bundled: false };
@@ -33,5 +35,12 @@ describe('saveFailureMessage', () => {
   test('says the standard sound bank will load when nothing was saved before', () => {
     const next = nextSoundBankToLoad(savedAfterAttempt(null, userB, false));
     expect(saveFailureMessage(next)).toBe('保存できませんでした。次回は標準の音源を読み込みます');
+  });
+});
+
+describe('soundBankGain', () => {
+  test('applies the bundled gain only to the bundled sound bank', () => {
+    expect(soundBankGain(false)).toBe(1);
+    expect(soundBankGain(true)).toBeCloseTo(10 ** (BUNDLED_SOUND_BANK_GAIN_DB / 20), 10);
   });
 });

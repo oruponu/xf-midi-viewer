@@ -128,7 +128,7 @@ export function useBuiltinSynth({ active, onStall }: BuiltinSynthOptions): Built
       try {
         const data = await file.arrayBuffer();
         try {
-          await engine.loadSoundBank(data.slice(0));
+          await engine.loadSoundBank(data.slice(0), { bundled: false });
         } catch (e) {
           setNotice(`${file.name} を読み込めませんでした: ${formatError(e)}`);
           return;
@@ -169,7 +169,7 @@ export function useBuiltinSynth({ active, onStall }: BuiltinSynthOptions): Built
         messages.push(DELETE_FAILURE_MESSAGE);
       }
       try {
-        await engine.loadSoundBank(await fetchBundledSoundBank());
+        await engine.loadSoundBank(await fetchBundledSoundBank(), { bundled: true });
         setSoundBank(BUNDLED_SOUND_BANK);
       } catch (e) {
         messages.push(`標準の音源を読み込めませんでした: ${formatError(e)}`);
@@ -230,7 +230,7 @@ async function loadEngine(onStall: (stalledAtMs: number) => void): Promise<Loade
     if (saved) {
       const entry: SoundBankEntry = { name: saved.name, bundled: false };
       const result = engine
-        .loadSoundBank(saved.data, fetchBundledSoundBank)
+        .loadSoundBank(saved.data, { bundled: false, fallback: fetchBundledSoundBank })
         .then(async (outcome): Promise<InitialLoadResult> => {
           if (outcome !== 'fallback') return { outcome, deleted: false };
           const deleted = await deleteSavedSoundBank().then(
@@ -242,7 +242,7 @@ async function loadEngine(onStall: (stalledAtMs: number) => void): Promise<Loade
       return { engine, soundBank: entry, saved: entry, result };
     }
     const result = engine
-      .loadSoundBank(await fetchBundledSoundBank())
+      .loadSoundBank(await fetchBundledSoundBank(), { bundled: true })
       .then((outcome): InitialLoadResult => ({ outcome, deleted: false }));
     return { engine, soundBank: BUNDLED_SOUND_BANK, saved: null, result };
   } catch (error) {
