@@ -194,12 +194,8 @@ export function calibrate(input: CalibrationInput): CalibrationResult {
   const unmeasured = units.filter((u) => u.keys.length === 0);
   for (const u of unmeasured) u.restoreVelocity();
   const difference0 = new Map(measured.map((u) => [u, meanDifference(u.points(g0))!]));
-  const c0 = commonShiftDb([...difference0.values()]);
-  if (c0 < 0) {
-    throw new Error(
-      'Reference is quieter than the sound bank for every unit; the common shift would be negative',
-    );
-  }
+  // A negative shift would raise the zones that get only the common attenuation.
+  const c0 = Math.max(0, commonShiftDb([...difference0.values()]));
 
   let margin = 0;
   let shift = c0;

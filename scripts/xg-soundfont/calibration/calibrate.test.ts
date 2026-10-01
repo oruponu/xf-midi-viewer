@@ -243,7 +243,7 @@ describe('calibrate', () => {
     expect(result.passed).toBe(false);
   });
 
-  test('refuses a reference quieter than the sound bank for every unit', () => {
+  test('keeps the common shift at zero when the reference is quieter for every unit', () => {
     const ref = reference();
     const quiet: LevelTable = {
       drums: ref.drums.map((d) => ({
@@ -259,6 +259,13 @@ describe('calibrate', () => {
         ),
       })),
     };
-    expect(() => run([], quiet)).toThrow('common shift would be negative');
+    const result = run([], quiet);
+    expect(result.passed).toBe(true);
+    expect(result.corrections.commonAttenuation).toBe(0);
+    expect(result.corrections.drums.find((d) => d.key === 36)!.layers[0].attenuation).toBe(250);
+    expect(
+      result.corrections.drums.find((d) => d.key === 40)!.layers.map((l) => l.attenuation),
+    ).toEqual([320, 260]);
+    expect(result.corrections.voices.map((v) => v.zones[0].attenuation)).toEqual([400, 275]);
   });
 });
