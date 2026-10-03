@@ -152,7 +152,6 @@ function ActiveView({
           metaEvents={metaEvents}
           data={data}
           timing={timing}
-          parsedKaraoke={parsedKaraoke}
           hasStyle={hasStyle}
         />
       )}
@@ -165,14 +164,12 @@ function DetailsView({
   metaEvents,
   data,
   timing,
-  parsedKaraoke,
   hasStyle,
 }: {
   file: FileSummary | null;
   metaEvents: SmfMetaEvents;
   data: XfData;
   timing: SmfTiming;
-  parsedKaraoke: ParsedKaraoke;
   hasStyle: boolean;
 }) {
   useLayoutEffect(() => {
@@ -188,9 +185,7 @@ function DetailsView({
       {data.languageHeaders.map((h, i) => (
         <LanguageSection key={`${h.language}-${i}`} header={h} />
       ))}
-      {(data.karaoke.header || data.karaoke.events.length > 0) && (
-        <KaraokeMetaSection parsed={parsedKaraoke} />
-      )}
+      {data.karaoke.header && <KaraokeMetaSection header={data.karaoke.header} />}
       {hasStyle && <StyleSection data={data.style} timing={timing} />}
     </div>
   );
@@ -530,18 +525,11 @@ function KaraokeHeaderInfo({ header }: { header: XfLyricsHeader }) {
   );
 }
 
-function KaraokeMetaSection({ parsed }: { parsed: ParsedKaraoke }) {
+function KaraokeMetaSection({ header }: { header: XfLyricsHeader }) {
   return (
     <div className="card">
       <h3>XF Karaoke Message</h3>
-      {parsed.header && <KaraokeHeaderInfo header={parsed.header} />}
-      <div className="style-subsection">
-        <h4>解析結果</h4>
-        <div className="style-summary">
-          <span>トークン: {parsed.tokens.length.toLocaleString()}</span>
-          <span>音節: {parsed.syllables.length.toLocaleString()}</span>
-        </div>
-      </div>
+      <KaraokeHeaderInfo header={header} />
     </div>
   );
 }
