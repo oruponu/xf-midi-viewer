@@ -1570,3 +1570,16 @@
     grid-row: span 2;
   }
 }
+
+.meta-event-row {
+  row-gap: 4px;
+}
+
+.meta-event-row:not(:last-child) {
+  margin-bottom: 8px;
+}
+
+.info-row .meta-event-list {
+  grid-column: 1 / -1;
+  min-width: 0;
+}

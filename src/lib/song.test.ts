@@ -45,6 +45,17 @@ describe('buildSong', () => {
     expect('timing' in song.xf).toBe(false);
   });
 
+  test('keeps SMF meta events without defaults', () => {
+    const song = buildSong(makeSmf([meta(0, 0x03, ascii('Test Song')), noteOn(0, 60)]));
+
+    expect(song.metaEvents).toEqual({
+      trackName: 'Test Song',
+      timeSignatures: [],
+      tempos: [],
+      keySignatures: [],
+    });
+  });
+
   test('parses lyrics and builds karaoke pages', () => {
     const song = buildSong(
       makeSmf([meta(0, 0x05, ascii('Hel')), meta(240, 0x05, ascii('lo')), meta(240, 0x05, [0x0d])]),

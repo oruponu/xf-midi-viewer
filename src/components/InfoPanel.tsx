@@ -3,9 +3,11 @@ import type { ReactNode } from 'react';
 import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import type { KeyShiftChange } from '../lib/smf/fixedKey.ts';
+import { formatTempo, formatTimeSignature } from '../lib/smf/metaEvents.ts';
+import type { SmfMetaEvents } from '../lib/smf/metaEvents.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
-import { formatTickAsBarBeat } from '../lib/smf/timing.ts';
+import { formatKeySignature, formatTickAsBarBeat } from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 import type { Song } from '../lib/song.ts';
 import type { FileSummary } from '../lib/songLoader.ts';
@@ -72,6 +74,7 @@ function ActiveView({
   playbackRate = 1,
 }: InfoPanelProps) {
   const { xf: data, karaoke: parsedKaraoke, chords, rehearsals, timing, sequence } = song;
+  const { metaEvents } = song;
   const hasKaraoke = data.karaoke.header !== null || data.karaoke.events.length > 0;
   const hasStyle = data.style.events.length > 0;
   const empty =
@@ -85,6 +88,7 @@ function ActiveView({
     return activeTab === 'details' ? (
       <div className="details-view">
         {file && <FileSection file={file} />}
+        <SmfMetaSection events={metaEvents} timing={timing} />
         <div className="card">
           <p className="muted">XFデータは含まれていません</p>
         </div>
@@ -145,6 +149,7 @@ function ActiveView({
       {activeTab === 'details' && (
         <DetailsView
           file={file}
+          metaEvents={metaEvents}
           data={data}
           timing={timing}
           parsedKaraoke={parsedKaraoke}
@@ -157,12 +162,14 @@ function ActiveView({
 
 function DetailsView({
   file,
+  metaEvents,
   data,
   timing,
   parsedKaraoke,
   hasStyle,
 }: {
   file: FileSummary | null;
+  metaEvents: SmfMetaEvents;
   data: XfData;
   timing: SmfTiming;
   parsedKaraoke: ParsedKaraoke;
@@ -175,6 +182,7 @@ function DetailsView({
   return (
     <div className="details-view">
       {file && <FileSection file={file} />}
+      <SmfMetaSection events={metaEvents} timing={timing} />
       {data.version && <VersionSection version={data.version} />}
       {data.commonHeader && <CommonSection header={data.commonHeader} />}
       {data.languageHeaders.map((h, i) => (
@@ -206,6 +214,65 @@ function FileSection({ file }: { file: FileSummary }) {
         <Field label="サイズ" value={`${file.size.toLocaleString()} bytes`} />
         <Field label="更新日時" value={new Date(file.lastModified).toLocaleString()} />
       </FieldList>
+    </div>
+  );
+}
+
+function SmfMetaSection({ events, timing }: { events: SmfMetaEvents; timing: SmfTiming }) {
+  return (
+    <div className="card">
+      <h3>SMF Meta-Event</h3>
+      <FieldList>
+        <Field label="曲名" value={events.trackName ?? '（なし）'} />
+        <MetaEventField
+          label="拍子"
+          events={events.timeSignatures}
+          format={formatTimeSignature}
+          timing={timing}
+        />
+        <MetaEventField
+          label="テンポ"
+          events={events.tempos}
+          format={(ev) => formatTempo(ev.microsecondsPerQuarter)}
+          timing={timing}
+        />
+        <MetaEventField
+          label="調性情報"
+          events={events.keySignatures}
+          format={(ev) => formatKeySignature(ev.signature)}
+          timing={timing}
+        />
+      </FieldList>
+    </div>
+  );
+}
+
+function MetaEventField<T extends { tick: number }>({
+  label,
+  events,
+  format,
+  timing,
+}: {
+  label: string;
+  events: readonly T[];
+  format: (ev: T) => string;
+  timing: SmfTiming;
+}) {
+  return (
+    <div className="info-row meta-event-row">
+      <dt>{label}</dt>
+      {events.length === 0 ? (
+        <dd>（なし）</dd>
+      ) : (
+        <dd className="style-list meta-event-list">
+          {events.map((ev, i) => (
+            <div key={i} className="style-list-row">
+              <span className="tick">{formatTickAsBarBeat(ev.tick, timing)}</span>
+              <span>{format(ev)}</span>
+            </div>
+          ))}
+        </dd>
+      )}
     </div>
   );
 }
