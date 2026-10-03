@@ -9,12 +9,11 @@ import { formatTickAsBarBeat } from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 import type { Song } from '../lib/song.ts';
 import type { FileSummary } from '../lib/songLoader.ts';
-import { formatChord } from '../lib/xf/format.ts';
+import { formatStyleDetail } from '../lib/xf/format.ts';
 import { computeKaraokeSectionBreaks } from '../lib/xf/lyricSections.ts';
 import type { LyricRun, LyricSyllable, LyricToken, ParsedKaraoke } from '../lib/xf/lyrics.ts';
 import type {
   ChordMessage,
-  GuitarPart,
   RehearsalMessage,
   StyleMessage,
   VocalPart,
@@ -531,13 +530,6 @@ function renderRun(run: LyricRun, index: number): ReactNode {
   );
 }
 
-const GUITAR_PART_LABELS: Record<GuitarPart, string> = {
-  guitar: 'ギター',
-  bass: 'ベース',
-  ukulele: 'ウクレレ',
-  reserved: '不明',
-};
-
 type GuideTrackMsg = Extract<StyleMessage, { kind: 'guideTrack' }>;
 type GuitarInfoMsg = Extract<StyleMessage, { kind: 'guitarInfo' }>;
 type MaxPhraseMsg = Extract<StyleMessage, { kind: 'maxPhraseMark' }>;
@@ -664,35 +656,6 @@ const STYLE_KIND_LABELS: Record<StyleMessage['kind'], string> = {
   guitarVoicing: 'ギター用コードヴォイシング',
   fingering: '運指番号',
 };
-
-function formatStyleDetail(ev: StyleMessage): string {
-  switch (ev.kind) {
-    case 'chord':
-      return formatChord(ev.root, ev.type, ev.bass);
-    case 'rehearsal':
-      return `${ev.letter}${"'".repeat(ev.variation)}`;
-    case 'phraseMark':
-      return `${ev.hand === 'right' ? '右手' : '左手'}, CH ${
-        ev.channel ?? '全'
-      }, level ${ev.level}`;
-    case 'maxPhraseMark':
-      return `最大フレーズ数 ${ev.maxPhraseCount}`;
-    case 'fingering':
-      return `CH ${ev.channel}, note ${ev.noteNumber}, finger ${ev.fingering}, ${
-        ev.hand === 'right' ? '右手' : '左手'
-      }, ${ev.context}`;
-    case 'guideTrack':
-      return `右手: ${ev.rightHandChannel ?? 'なし'} / 左手: ${ev.leftHandChannel ?? 'なし'}`;
-    case 'guitarInfo':
-      return `${GUITAR_PART_LABELS[ev.part]} (CH ${
-        ev.channel ?? '全'
-      }), カポ ${ev.capo}, チューニング: ${ev.stringNotes.join(', ')}`;
-    case 'guitarVoicing':
-      return `CH ${ev.channel ?? '全'}, ${ev.strings
-        .map((s, i) => `${i + 1}弦 fret ${s.fret} finger ${s.finger}`)
-        .join(' / ')}`;
-  }
-}
 
 function StyleSubSection({ title, children }: { title: string; children: ReactNode }) {
   return (
