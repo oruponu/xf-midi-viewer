@@ -253,6 +253,29 @@ function tokenizeLyricEvent(
         };
         break;
       }
+      const previous =
+        buffer.length === 0 && currentSyllable === null && close !== i + 1
+          ? previousTrailingText(tokens)
+          : null;
+      if (previous !== null) {
+        previous.syllable.runs.pop();
+        if (close !== -1) {
+          previous.syllable.runs.push({
+            kind: 'ruby',
+            base: previous.text,
+            reading: text.slice(i + 1, close),
+          });
+          i = close + 1;
+          continue;
+        }
+        ruby = {
+          mode: 'bracket',
+          base: previous.text,
+          reading: text.slice(i + 1),
+          baseSyllable: previous.syllable,
+        };
+        break;
+      }
       buffer += ch;
       i += 1;
       continue;
@@ -264,6 +287,15 @@ function tokenizeLyricEvent(
 
   flushBuffer();
   return ruby;
+}
+
+function previousTrailingText(
+  tokens: readonly LyricToken[],
+): { syllable: SyllableToken; text: string } | null {
+  const last = tokens.at(-1);
+  if (last?.kind !== 'syllable') return null;
+  const run = last.runs.at(-1);
+  return run?.kind === 'text' ? { syllable: last, text: run.text } : null;
 }
 
 function finalizeUnclosedRuby(ruby: RubyState): void {

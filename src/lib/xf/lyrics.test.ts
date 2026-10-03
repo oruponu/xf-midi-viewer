@@ -172,6 +172,125 @@ describe('parseKaraoke', () => {
     ]);
   });
 
+  test('leading bracket ruby attaches to previous event string', () => {
+    const r = parseKaraoke(
+      karaoke([
+        { kind: 'lyric', tick: 10, text: '一瞬' },
+        { kind: 'lyric', tick: 20, text: '[いっしゅん]' },
+      ]),
+    );
+    expect(r.tokens).toEqual([
+      {
+        kind: 'syllable',
+        tick: 10,
+        runs: [{ kind: 'ruby', base: '一瞬', reading: 'いっしゅん' }],
+      },
+    ]);
+  });
+
+  test('leading bracket ruby attaches to trailing text of previous syllable', () => {
+    const r = parseKaraoke(
+      karaoke([
+        { kind: 'lyric', tick: 10, text: '一[いっ]瞬' },
+        { kind: 'lyric', tick: 20, text: '[しゅん]' },
+        { kind: 'lyric', tick: 30, text: 'だ' },
+      ]),
+    );
+    expect(r.tokens).toEqual([
+      {
+        kind: 'syllable',
+        tick: 10,
+        runs: [
+          { kind: 'ruby', base: '一', reading: 'いっ' },
+          { kind: 'ruby', base: '瞬', reading: 'しゅん' },
+        ],
+      },
+      { kind: 'syllable', tick: 30, runs: [{ kind: 'text', text: 'だ' }] },
+    ]);
+    expect(r.syllables.map((s) => [s.tick, s.endTick])).toEqual([
+      [10, 30],
+      [30, null],
+    ]);
+  });
+
+  test('leading bracket ruby spanning events closes on previous syllable', () => {
+    const r = parseKaraoke(
+      karaoke([
+        { kind: 'lyric', tick: 10, text: '一瞬' },
+        { kind: 'lyric', tick: 20, text: '[いっ' },
+        { kind: 'lyric', tick: 30, text: 'しゅん]' },
+      ]),
+    );
+    expect(r.tokens).toEqual([
+      {
+        kind: 'syllable',
+        tick: 10,
+        runs: [{ kind: 'ruby', base: '一瞬', reading: 'いっしゅん' }],
+      },
+    ]);
+  });
+
+  test('unclosed leading bracket ruby falls back to literal on previous syllable', () => {
+    const r = parseKaraoke(
+      karaoke([
+        { kind: 'lyric', tick: 10, text: '一瞬' },
+        { kind: 'lyric', tick: 20, text: '[いっ' },
+        { kind: 'lyric', tick: 30, text: 'しゅん' },
+      ]),
+    );
+    expect(r.tokens).toEqual([
+      { kind: 'syllable', tick: 10, runs: [{ kind: 'text', text: '一瞬[いっしゅん' }] },
+    ]);
+  });
+
+  test('text after leading bracket ruby starts a new syllable', () => {
+    const r = parseKaraoke(
+      karaoke([
+        { kind: 'lyric', tick: 10, text: '一瞬' },
+        { kind: 'lyric', tick: 20, text: '[いっしゅん]だ' },
+      ]),
+    );
+    expect(r.tokens).toEqual([
+      {
+        kind: 'syllable',
+        tick: 10,
+        runs: [{ kind: 'ruby', base: '一瞬', reading: 'いっしゅん' }],
+      },
+      { kind: 'syllable', tick: 20, runs: [{ kind: 'text', text: 'だ' }] },
+    ]);
+  });
+
+  test('leading bracket after line break stays literal', () => {
+    const r = parseKaraoke(
+      karaoke([
+        { kind: 'lyric', tick: 10, text: '一瞬/' },
+        { kind: 'lyric', tick: 20, text: '[いっしゅん]' },
+      ]),
+    );
+    expect(r.tokens).toEqual([
+      { kind: 'syllable', tick: 10, runs: [{ kind: 'text', text: '一瞬' }] },
+      { kind: 'lineBreak', tick: 10, source: 'controlChar' },
+      { kind: 'syllable', tick: 20, runs: [{ kind: 'text', text: '[いっしゅん]' }] },
+    ]);
+  });
+
+  test('leading bracket after ruby-ending syllable stays literal', () => {
+    const r = parseKaraoke(
+      karaoke([
+        { kind: 'lyric', tick: 10, text: '一瞬[いっしゅん]' },
+        { kind: 'lyric', tick: 20, text: '[しゅん]' },
+      ]),
+    );
+    expect(r.tokens).toEqual([
+      {
+        kind: 'syllable',
+        tick: 10,
+        runs: [{ kind: 'ruby', base: '一瞬', reading: 'いっしゅん' }],
+      },
+      { kind: 'syllable', tick: 20, runs: [{ kind: 'text', text: '[しゅん]' }] },
+    ]);
+  });
+
   test('unclosed paren ruby at end falls back to literal on base syllable', () => {
     const r = parseKaraoke(
       karaoke([
