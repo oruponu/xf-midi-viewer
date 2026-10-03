@@ -519,7 +519,7 @@ function KaraokeHeaderInfo({ header }: { header: XfLyricsHeader }) {
         label="メロディパートのMIDIチャンネル"
         value={header.melodyChannels.length > 0 ? header.melodyChannels.join(', ') : '（なし）'}
       />
-      <Field label="歌詞表示オフセット値" value={`${header.displayOffset} ticks`} />
+      <Field label="歌詞表示オフセット値" value={header.displayOffset} />
       <Field label="言語情報" value={header.language ?? '（未指定 / Latin-1）'} />
     </FieldList>
   );
