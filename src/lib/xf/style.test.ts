@@ -124,11 +124,11 @@ describe('parseStyleMessage - phrase mark (0x03)', () => {
 });
 
 describe('parseStyleMessage - max phrase mark (0x04)', () => {
-  test('count = stored value + 1', () => {
+  test('keeps stored max phrase count as is', () => {
     expect(parseStyleMessage(u8(0x43, 0x7b, 0x04, 0x07), 0)).toEqual({
       kind: 'maxPhraseMark',
       tick: 0,
-      count: 8,
+      maxPhraseCount: 7,
     });
   });
 });

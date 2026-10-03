@@ -165,7 +165,7 @@ function parsePhrase(data: Uint8Array, tick: number): StyleMessage | null {
 
 function parseMaxPhrase(data: Uint8Array, tick: number): StyleMessage | null {
   if (data.length < 4) return null;
-  return { kind: 'maxPhraseMark', tick, count: data[3]! + 1 };
+  return { kind: 'maxPhraseMark', tick, maxPhraseCount: data[3]! };
 }
 
 function parseFingering(data: Uint8Array, tick: number): StyleMessage | null {

@@ -9,12 +9,11 @@ import { formatTickAsBarBeat } from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 import type { Song } from '../lib/song.ts';
 import type { FileSummary } from '../lib/songLoader.ts';
-import { formatChord } from '../lib/xf/format.ts';
+import { formatStyleDetail } from '../lib/xf/format.ts';
 import { computeKaraokeSectionBreaks } from '../lib/xf/lyricSections.ts';
 import type { LyricRun, LyricSyllable, LyricToken, ParsedKaraoke } from '../lib/xf/lyrics.ts';
 import type {
   ChordMessage,
-  GuitarPart,
   RehearsalMessage,
   StyleMessage,
   VocalPart,
@@ -220,7 +219,7 @@ function VersionSection({ version }: { version: XfVersion }) {
   ];
   return (
     <div className="card">
-      <h3>XF Version</h3>
+      <h3>XF Version ID</h3>
       <div className="version-row">
         <span className="badge">{version.versionString}</span>
         <ul className="flag-list">
@@ -236,24 +235,24 @@ function VersionSection({ version }: { version: XfVersion }) {
 }
 
 const COMMON_FIELDS: ReadonlyArray<readonly [Exclude<keyof XfInfoHeaderCommon, 'kind'>, string]> = [
-  ['date', '発表日'],
+  ['date', '発表年月日'],
   ['country', '制作地'],
-  ['category', 'ジャンル'],
-  ['beat', 'ビート'],
-  ['instrumentOnMelody', 'メロディ楽器（GM#）'],
+  ['category', '曲のジャンル'],
+  ['beat', 'リズムのビート'],
+  ['instrumentOnMelody', 'メロディパートの主な楽器'],
   ['vocalType', '歌唱タイプ'],
   ['composer', '作曲者'],
   ['lyricist', '作詞者'],
   ['arranger', '編曲者'],
-  ['performer', '演奏者'],
-  ['programmer', '制作者'],
+  ['performer', '演奏者／歌唱者'],
+  ['programmer', '楽曲データ制作者'],
   ['keyword', 'キーワード'],
 ];
 
 function CommonSection({ header }: { header: XfInfoHeaderCommon }) {
   return (
     <div className="card">
-      <h3>共通ヘッダー (XFhd)</h3>
+      <h3>XF Information Header (Common)</h3>
       <FieldList>
         {COMMON_FIELDS.map(([key, label]) => {
           const value = header[key];
@@ -265,22 +264,21 @@ function CommonSection({ header }: { header: XfInfoHeaderCommon }) {
 }
 
 const LANG_FIELDS: ReadonlyArray<
-  readonly [Exclude<keyof XfInfoHeaderLanguageSpecific, 'kind' | 'language'>, string]
+  readonly [Exclude<keyof XfInfoHeaderLanguageSpecific, 'kind'>, string]
 > = [
+  ['language', '言語情報'],
   ['songName', '曲名'],
   ['composer', '作曲者'],
   ['lyricist', '作詞者'],
   ['arranger', '編曲者'],
-  ['performer', '演奏者'],
-  ['programmer', '制作者'],
+  ['performer', '演奏者／歌唱者'],
+  ['programmer', '楽曲データ制作者'],
 ];
 
 function LanguageSection({ header }: { header: XfInfoHeaderLanguageSpecific }) {
   return (
     <div className="card">
-      <h3>
-        言語別ヘッダー (XFln) <span className="badge-small">{header.language}</span>
-      </h3>
+      <h3>XF Information Header (Language Specific)</h3>
       <FieldList>
         {LANG_FIELDS.map(([key, label]) => {
           const value = header[key];
@@ -455,12 +453,12 @@ function buildKaraokeBlocks(
 function KaraokeHeaderInfo({ header }: { header: XfLyricsHeader }) {
   return (
     <FieldList>
-      <Field label="言語" value={header.language ?? '（未指定 / Latin-1）'} />
       <Field
-        label="メロディCH"
+        label="メロディパートのMIDIチャンネル"
         value={header.melodyChannels.length > 0 ? header.melodyChannels.join(', ') : '（なし）'}
       />
-      <Field label="表示オフセット" value={`${header.displayOffset} ticks`} />
+      <Field label="歌詞表示オフセット値" value={`${header.displayOffset} ticks`} />
+      <Field label="言語情報" value={header.language ?? '（未指定 / Latin-1）'} />
     </FieldList>
   );
 }
@@ -531,13 +529,6 @@ function renderRun(run: LyricRun, index: number): ReactNode {
     </ruby>
   );
 }
-
-const GUITAR_PART_LABELS: Record<GuitarPart, string> = {
-  guitar: 'ギター',
-  bass: 'ベース',
-  ukulele: 'ウクレレ',
-  reserved: '不明',
-};
 
 type GuideTrackMsg = Extract<StyleMessage, { kind: 'guideTrack' }>;
 type GuitarInfoMsg = Extract<StyleMessage, { kind: 'guitarInfo' }>;
@@ -624,14 +615,18 @@ function StyleSection({ data, timing }: { data: XfStyleData; timing: SmfTiming }
       {showSummary && (
         <StyleSubSection title="概要">
           <div className="style-summary">
-            {g.chords.length > 0 && <span>コード: {g.chords.length}</span>}
-            {g.rehearsals.length > 0 && <span>リハーサル: {g.rehearsals.length}</span>}
-            {g.guideTracks.length > 0 && <span>ガイドトラック: {g.guideTracks.length}</span>}
-            {g.guitarInfos.length > 0 && <span>ギター情報: {g.guitarInfos.length}</span>}
+            {g.chords.length > 0 && <span>コード名: {g.chords.length}</span>}
+            {g.rehearsals.length > 0 && <span>リハーサルマーク: {g.rehearsals.length}</span>}
             {g.phraseCount > 0 && <span>フレーズマーク: {g.phraseCount}</span>}
-            {g.maxPhrases[0] && <span>最大レベル8フレーズ数: {g.maxPhrases[0].count}</span>}
+            {g.maxPhrases[0] && <span>最大フレーズ数: {g.maxPhrases[0].maxPhraseCount}</span>}
+            {g.guideTracks.length > 0 && <span>ガイドトラックフラグ: {g.guideTracks.length}</span>}
+            {g.guitarInfos.length > 0 && (
+              <span>ギターインフォメーションフラグ: {g.guitarInfos.length}</span>
+            )}
+            {g.guitarVoicingCount > 0 && (
+              <span>ギター用コードヴォイシング: {g.guitarVoicingCount}</span>
+            )}
             {g.fingeringCount > 0 && <span>運指番号: {g.fingeringCount}</span>}
-            {g.guitarVoicingCount > 0 && <span>ギター押弦: {g.guitarVoicingCount}</span>}
           </div>
         </StyleSubSection>
       )}
@@ -652,44 +647,15 @@ function StyleSection({ data, timing }: { data: XfStyleData; timing: SmfTiming }
 }
 
 const STYLE_KIND_LABELS: Record<StyleMessage['kind'], string> = {
-  chord: 'コード',
-  rehearsal: 'リハーサル',
-  phraseMark: 'フレーズ',
-  maxPhraseMark: '最大フレーズ',
-  fingering: '運指',
-  guideTrack: 'ガイド',
-  guitarInfo: 'ギター情報',
-  guitarVoicing: '押弦',
+  chord: 'コード名',
+  rehearsal: 'リハーサルマーク',
+  phraseMark: 'フレーズマーク',
+  maxPhraseMark: '最大レベル8フレーズマーク',
+  guideTrack: 'ガイドトラックフラグ',
+  guitarInfo: 'ギターインフォメーションフラグ',
+  guitarVoicing: 'ギター用コードヴォイシング',
+  fingering: '運指番号',
 };
-
-function formatStyleDetail(ev: StyleMessage): string {
-  switch (ev.kind) {
-    case 'chord':
-      return formatChord(ev.root, ev.type, ev.bass);
-    case 'rehearsal':
-      return `${ev.letter}${"'".repeat(ev.variation)}`;
-    case 'phraseMark':
-      return `${ev.hand === 'right' ? '右手' : '左手'}, CH ${
-        ev.channel ?? '全'
-      }, level ${ev.level}`;
-    case 'maxPhraseMark':
-      return `${ev.count} phrases`;
-    case 'fingering':
-      return `CH ${ev.channel}, note ${ev.noteNumber}, finger ${ev.fingering}, ${
-        ev.hand === 'right' ? '右手' : '左手'
-      }, ${ev.context}`;
-    case 'guideTrack':
-      return `右手: ${ev.rightHandChannel ?? 'なし'} / 左手: ${ev.leftHandChannel ?? 'なし'}`;
-    case 'guitarInfo':
-      return `${GUITAR_PART_LABELS[ev.part]} (CH ${
-        ev.channel ?? '全'
-      }), カポ ${ev.capo}, チューニング: ${ev.stringNotes.join(', ')}`;
-    case 'guitarVoicing':
-      return `CH ${ev.channel ?? '全'}, ${ev.strings
-        .map((s, i) => `${i + 1}弦 fret ${s.fret} finger ${s.finger}`)
-        .join(' / ')}`;
-  }
-}
 
 function StyleSubSection({ title, children }: { title: string; children: ReactNode }) {
   return (

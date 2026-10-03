@@ -119,7 +119,7 @@ export type StyleMessage =
   | {
       kind: 'maxPhraseMark';
       tick: number;
-      count: number;
+      maxPhraseCount: number;
     }
   | {
       kind: 'fingering';
