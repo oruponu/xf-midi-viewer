@@ -1,3 +1,5 @@
+import { extractMetaEvents } from './smf/metaEvents.ts';
+import type { SmfMetaEvents } from './smf/metaEvents.ts';
 import { buildPlaybackSequence } from './smf/playback.ts';
 import type { PlaybackSequence } from './smf/playback.ts';
 import { extractTiming } from './smf/timing.ts';
@@ -16,6 +18,7 @@ import type { ChordMessage, RehearsalMessage, XfData } from './xf/types.ts';
 export interface Song {
   sequence: PlaybackSequence;
   timing: SmfTiming;
+  metaEvents: SmfMetaEvents;
   xf: XfData;
   xfError: string | null;
   karaoke: ParsedKaraoke;
@@ -40,6 +43,7 @@ export function buildSong(smf: SmfFile): Song {
   return {
     sequence,
     timing,
+    metaEvents: extractMetaEvents(smf),
     xf,
     xfError,
     karaoke,
