@@ -39,7 +39,7 @@ export function extractMetaEvents(smf: SmfFile): SmfMetaEvents {
       const d = ev.data;
       if (ev.metaType === TRACK_NAME && trackIndex === 0 && trackName === null) {
         trackName = new TextDecoder('iso-8859-1').decode(d);
-      } else if (ev.metaType === TIME_SIGNATURE && d.length >= 2) {
+      } else if (ev.metaType === TIME_SIGNATURE && d.length >= 4) {
         timeSignatures.push({ tick, numerator: d[0]!, denominator: 2 ** d[1]! });
       } else if (ev.metaType === SET_TEMPO && d.length >= 3) {
         tempos.push({ tick, microsecondsPerQuarter: (d[0]! << 16) | (d[1]! << 8) | d[2]! });

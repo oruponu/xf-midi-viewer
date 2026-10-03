@@ -90,7 +90,15 @@ describe('extractMetaEvents', () => {
 
   test('skips truncated events', () => {
     const smf = makeSmf([
-      { events: [meta(0, 0x58, [4]), meta(0, 0x51, [0x07, 0xa1]), meta(0, 0x59, [2])] },
+      {
+        events: [
+          meta(0, 0x58, [4]),
+          meta(0, 0x58, [4, 2]),
+          meta(0, 0x58, [4, 2, 24]),
+          meta(0, 0x51, [0x07, 0xa1]),
+          meta(0, 0x59, [2]),
+        ],
+      },
     ]);
     const result = extractMetaEvents(smf);
     expect(result.timeSignatures).toEqual([]);
