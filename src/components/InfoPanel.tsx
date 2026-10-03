@@ -626,7 +626,7 @@ function StyleSection({ data, timing }: { data: XfStyleData; timing: SmfTiming }
             {g.chords.length > 0 && <span>コード名: {g.chords.length}</span>}
             {g.rehearsals.length > 0 && <span>リハーサルマーク: {g.rehearsals.length}</span>}
             {g.phraseCount > 0 && <span>フレーズマーク: {g.phraseCount}</span>}
-            {g.maxPhrases[0] && <span>最大レベル8フレーズ数: {g.maxPhrases[0].count}</span>}
+            {g.maxPhrases[0] && <span>最大フレーズ数: {g.maxPhrases[0].maxPhraseCount}</span>}
             {g.guideTracks.length > 0 && <span>ガイドトラックフラグ: {g.guideTracks.length}</span>}
             {g.guitarInfos.length > 0 && (
               <span>ギターインフォメーションフラグ: {g.guitarInfos.length}</span>
@@ -658,7 +658,7 @@ const STYLE_KIND_LABELS: Record<StyleMessage['kind'], string> = {
   chord: 'コード名',
   rehearsal: 'リハーサルマーク',
   phraseMark: 'フレーズマーク',
-  maxPhraseMark: '最大フレーズ',
+  maxPhraseMark: '最大レベル8フレーズマーク',
   guideTrack: 'ガイドトラックフラグ',
   guitarInfo: 'ギターインフォメーションフラグ',
   guitarVoicing: 'ギター用コードヴォイシング',
@@ -676,7 +676,7 @@ function formatStyleDetail(ev: StyleMessage): string {
         ev.channel ?? '全'
       }, level ${ev.level}`;
     case 'maxPhraseMark':
-      return `${ev.count} phrases`;
+      return `最大フレーズ数 ${ev.maxPhraseCount}`;
     case 'fingering':
       return `CH ${ev.channel}, note ${ev.noteNumber}, finger ${ev.fingering}, ${
         ev.hand === 'right' ? '右手' : '左手'
