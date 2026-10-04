@@ -116,6 +116,7 @@ export class MidiScheduler {
   private sequence: PlaybackSequence | null = null;
   private output: MidiOutputLike | null = null;
   private drumChannels: ReadonlySet<number> = new Set();
+  private noteSince: number[] = new Array<number>(16).fill(0);
   private transposedMessages: PlaybackMidiMessage[] | null = null;
   private nextMessageIndex = 0;
   private intervalHandle: TimerHandle | null = null;
@@ -142,6 +143,8 @@ export class MidiScheduler {
 
   getPositionSnapshot = (): number => this.positionSnapshot;
 
+  getNoteSince = (): readonly number[] => this.noteSince;
+
   getPosition = (): number =>
     this.intervalHandle === null ? this.position : this.audiblePosition(this.now());
 
@@ -155,6 +158,7 @@ export class MidiScheduler {
     this.sequence = sequence;
     this.drumChannels = sequence?.drumChannels ?? new Set();
     this.transposedMessages = null;
+    this.noteSince = new Array<number>(16).fill(0);
     this.setState({ playbackRate: 1, keyShift: 0, mutedChannels: 0, soloChannels: 0 });
     this.notify();
   }
@@ -279,6 +283,13 @@ export class MidiScheduler {
         this.send(output, [0xb0 | channel, 120, 0], sendAt, this.reportSendFailure);
         this.send(output, [0xb0 | channel, 123, 0], sendAt, this.reportSendFailure);
       }
+      const unsilenced = silencedChannels(muted, solo, mutedChannels, soloChannels);
+      if (unsilenced.length > 0 && this.sequence) {
+        const next = this.midiMessages(this.sequence)[this.nextMessageIndex]?.seconds ?? Infinity;
+        this.noteSince = this.noteSince.map((since, channel) =>
+          unsilenced.includes(channel) ? next : since,
+        );
+      }
     }
     this.setState({ mutedChannels: muted, soloChannels: solo });
     if (this.state.sendError !== null && this.intervalHandle !== null) {
@@ -297,6 +308,7 @@ export class MidiScheduler {
     this.displayFloor = startOffset;
     const messages = this.midiMessages(sequence);
     this.nextMessageIndex = firstMidiMessageIndexAtOrAfter(messages, startOffset);
+    this.noteSince = new Array<number>(16).fill(startOffset);
     for (const message of collectChaseMessages(messages, this.nextMessageIndex)) {
       this.scheduleMessage(output, message);
     }

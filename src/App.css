@@ -1736,6 +1736,29 @@
   color: var(--text);
 }
 
+.part-lamp {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border: 1.5px solid var(--border);
+  border-radius: 50%;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.part-lamp--on {
+  border-color: var(--accent);
+  background: var(--accent);
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .part-lamp {
+    transition: none;
+  }
+}
+
 .part-channel {
   width: 20px;
   flex: none;

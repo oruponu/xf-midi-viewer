@@ -469,6 +469,7 @@ function PlayerScope({
         <PartPanel
           id={PART_PANEL_ID}
           parts={song.channelParts}
+          activity={song.noteActivity}
           melodyChannels={song.xf.karaoke.header?.melodyChannels ?? []}
           scheduler={scheduler}
           onClose={onClosePartPanel}

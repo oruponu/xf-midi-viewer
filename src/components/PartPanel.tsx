@@ -5,11 +5,14 @@ import { isChannelAudible } from '../lib/player/channelMask.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import { activeVoiceIndex } from '../lib/smf/channelVoices.ts';
 import type { ChannelPart } from '../lib/smf/channelVoices.ts';
+import { soundingChannels } from '../lib/smf/noteActivity.ts';
+import type { NoteActivity } from '../lib/smf/noteActivity.ts';
 import { voiceName } from '../lib/xg/voiceNames.ts';
 
 interface PartPanelProps {
   id: string;
   parts: readonly ChannelPart[];
+  activity: NoteActivity;
   melodyChannels: readonly number[];
   scheduler: MidiScheduler;
   onClose: () => void;
@@ -17,10 +20,20 @@ interface PartPanelProps {
 
 const NO_SOUND = 'No Sound';
 
-export function PartPanel({ id, parts, melodyChannels, scheduler, onClose }: PartPanelProps) {
-  const { mutedChannels, soloChannels } = useSyncExternalStore(
+export function PartPanel({
+  id,
+  parts,
+  activity,
+  melodyChannels,
+  scheduler,
+  onClose,
+}: PartPanelProps) {
+  const { mutedChannels, soloChannels, isPlaying } = useSyncExternalStore(
     scheduler.subscribe,
     scheduler.getState,
+  );
+  const sounding = usePlaybackPosition(scheduler, (seconds) =>
+    soundingChannels(activity, seconds, scheduler.getNoteSince()),
   );
   const voiceKey = usePlaybackPosition(scheduler, (seconds) =>
     parts.map((part) => activeVoiceIndex(part, seconds)).join(','),
@@ -113,8 +126,10 @@ export function PartPanel({ id, parts, melodyChannels, scheduler, onClose }: Par
           const bit = 1 << channel;
           const label = `チャンネル ${channel + 1}`;
           const audible = isChannelAudible(mutedChannels, soloChannels, channel);
+          const lit = isPlaying && audible && (sounding & bit) !== 0;
           return (
             <li key={channel} className={audible ? 'part-row' : 'part-row part-row--silent'}>
+              <span className={lit ? 'part-lamp part-lamp--on' : 'part-lamp'} aria-hidden="true" />
               <span className="part-channel">{channel + 1}</span>
               <span
                 className={names[i] === null ? 'part-voice part-voice--none' : 'part-voice'}

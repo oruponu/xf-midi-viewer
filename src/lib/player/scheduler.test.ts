@@ -1417,3 +1417,92 @@ describe('MidiScheduler channel masks', () => {
     expect(scheduler.getState().sendError).not.toBeNull();
   });
 });
+
+describe('MidiScheduler note since', () => {
+  const twoChannels = () => [
+    msg(0, [0x90, 60, 100]),
+    msg(0.3, [0x91, 64, 100]),
+    msg(0.5, [0x80, 60, 0]),
+    msg(0.6, [0x81, 64, 0]),
+    msg(0.8, [0x91, 65, 100]),
+    msg(0.9, [0x81, 65, 0]),
+  ];
+  const all = (value: number) => new Array<number>(16).fill(value);
+
+  test('starts every channel at 0', () => {
+    const { scheduler } = setup(twoChannels(), 1);
+
+    expect(scheduler.getNoteSince()).toEqual(all(0));
+  });
+
+  test('sets every channel to the restart position on play and seek', () => {
+    const { clock, scheduler } = setup(twoChannels(), 1);
+    scheduler.seek(0.25);
+    scheduler.play();
+
+    expect(scheduler.getNoteSince()).toEqual(all(0.25));
+
+    clock.advance(5);
+    scheduler.seek(0.7);
+
+    expect(scheduler.getNoteSince()).toEqual(all(0.7));
+  });
+
+  test('sets every channel to the restart position after a key shift', () => {
+    const { clock, scheduler } = setup(twoChannels(), 1);
+    scheduler.play();
+    clock.advance(100);
+    const position = scheduler.getPosition();
+
+    scheduler.setKeyShift(1);
+
+    expect(scheduler.getNoteSince()).toEqual(all(position));
+  });
+
+  test('unmuting while playing moves only that channel to the next message', () => {
+    const { clock, scheduler, out } = setup(twoChannels(), 1);
+    scheduler.toggleMute(1);
+    scheduler.play();
+    clock.advance(5);
+
+    scheduler.toggleMute(1);
+
+    const since = scheduler.getNoteSince();
+    expect(since[0]).toBe(0);
+    expect(since[1]).toBe(0.3);
+    clock.advance(500);
+    expect(playbackOnly(out.sent).map((m) => m.data)).toContainEqual([0x91, 64, 100]);
+  });
+
+  test('uses Infinity when no message is left to send', () => {
+    const { clock, scheduler } = setup([msg(0, [0x91, 64, 100]), msg(0.01, [0x81, 64, 0])], 1);
+    scheduler.toggleMute(1);
+    scheduler.play();
+    clock.advance(5);
+
+    scheduler.toggleMute(1);
+
+    expect(scheduler.getNoteSince()[1]).toBe(Infinity);
+  });
+
+  test('keeps the since when the masks change while stopped', () => {
+    const { scheduler } = setup(twoChannels(), 1);
+    scheduler.seek(0.25);
+    scheduler.play();
+    scheduler.pause();
+    scheduler.toggleMute(1);
+    scheduler.toggleMute(1);
+
+    expect(scheduler.getNoteSince()).toEqual(all(0.25));
+  });
+
+  test('setSequence() resets every channel to 0', () => {
+    const { scheduler } = setup(twoChannels(), 1);
+    scheduler.seek(0.25);
+    scheduler.play();
+
+    scheduler.setSequence(makeSequence(twoChannels(), 1));
+
+    expect(scheduler.getNoteSince()).toEqual(all(0));
+  });
+});
