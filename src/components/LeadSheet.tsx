@@ -443,10 +443,10 @@ function formatTransposedChord(
   keyShifts: readonly KeyShiftChange[],
 ): string {
   const keyShift = keyShiftAt(chord.tick, keyShifts);
-  if (keyShift === 0) return formatChord(chord.root, chord.type, chord.bass);
+  if (keyShift === 0) return formatChord(chord.root, chord.typeIndex, chord.bass);
   const key = shiftKeySignature(findKeySignatureAt(chord.tick, timing.keySignatures), keyShift);
-  const { root, bass } = transposeChord(chord.root, chord.type, chord.bass, keyShift, key);
-  return formatChord(root, chord.type, bass);
+  const { root, bass } = transposeChord(chord.root, chord.typeIndex, chord.bass, keyShift, key);
+  return formatChord(root, chord.typeIndex, bass);
 }
 
 function barPositionAt(tick: number, timing: SmfTiming): number {

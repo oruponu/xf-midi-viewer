@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { KeySignature } from '../smf/timing.ts';
-import { formatChord } from './format.ts';
+import { formatChord, LEAD_SHEET_CHORD_TYPES } from './format.ts';
 import { transposeChord } from './transpose.ts';
 import type { ChordBass, ChordRoot } from './types.ts';
 
@@ -17,24 +17,25 @@ function root(name: string): ChordRoot {
 function transposed(name: string, semitones: number, key: KeySignature): string {
   const [main, bassName] = name.split('/');
   const match = /^([A-G][#b]*)(.*)$/.exec(main!)!;
-  const type = match[2]!;
-  const bass: ChordBass | null = bassName ? { root: root(bassName), type: '' } : null;
-  const result = transposeChord(root(match[1]!), type, bass, semitones, key);
-  return formatChord(result.root, type, result.bass);
+  const typeIndex = LEAD_SHEET_CHORD_TYPES.indexOf(match[2]!);
+  expect(typeIndex).toBeGreaterThanOrEqual(0);
+  const bass: ChordBass | null = bassName ? { root: root(bassName), typeIndex: null } : null;
+  const result = transposeChord(root(match[1]!), typeIndex, bass, semitones, key);
+  return formatChord(result.root, typeIndex, result.bass);
 }
 
 describe('transposeChord', () => {
   test('returns the same root and bass when semitones is 0', () => {
     const r = root('Bb');
-    const bass = { root: root('D'), type: '' };
-    const result = transposeChord(r, '', bass, 0, C_MAJOR);
+    const bass = { root: root('D'), typeIndex: null };
+    const result = transposeChord(r, 0, bass, 0, C_MAJOR);
     expect(result.root).toBe(r);
     expect(result.bass).toBe(bass);
   });
 
   test('preserves the reserved root', () => {
     const r: ChordRoot = { note: 'reserved', accidental: 'natural' };
-    expect(transposeChord(r, '', null, 5, C_MAJOR).root).toBe(r);
+    expect(transposeChord(r, 0, null, 5, C_MAJOR).root).toBe(r);
   });
 
   test.each([
@@ -74,6 +75,16 @@ describe('transposeChord', () => {
     ['C/G', C_MAJOR, 'F/C'],
   ])('spells the bass of %s from the chord root', (name, key, expected) => {
     expect(transposed(name, 5, key)).toBe(expected);
+  });
+
+  test.each([
+    ['Cdim/Gb', 'Ddim/Ab'],
+    ['Cm7(b5)/Gb', 'Dm7(b5)/Ab'],
+    ['C7(b5)/Gb', 'D7(b5)/Ab'],
+    ['Caug/G#', 'Daug/A#'],
+    ['Caug7/G#', 'Daug7/A#'],
+  ])('spells the altered fifth bass of %s as %s', (name, expected) => {
+    expect(transposed(name, 2, C_MAJOR)).toBe(expected);
   });
 
   test('keeps the key letters for diatonic notes', () => {

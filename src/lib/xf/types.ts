@@ -65,7 +65,7 @@ export interface ChordRoot {
 
 export interface ChordBass {
   root: ChordRoot;
-  type: string;
+  typeIndex: number | null;
 }
 
 export type RehearsalLetter =
@@ -100,7 +100,7 @@ export type StyleMessage =
       kind: 'chord';
       tick: number;
       root: ChordRoot;
-      type: string;
+      typeIndex: number;
       bass: ChordBass | null;
     }
   | {
