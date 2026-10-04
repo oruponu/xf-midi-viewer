@@ -58,6 +58,7 @@ interface LeadSheetProps {
   scheduler: MidiScheduler;
   autoScroll: boolean;
   keyShifts: readonly KeyShiftChange[];
+  playbackRate: number;
 }
 
 export const LeadSheet = memo(function LeadSheet({
@@ -69,6 +70,7 @@ export const LeadSheet = memo(function LeadSheet({
   scheduler,
   autoScroll,
   keyShifts,
+  playbackRate,
 }: LeadSheetProps) {
   const renderable = useMemo(() => syllables.filter((s) => s.runs.length > 0), [syllables]);
 
@@ -119,8 +121,8 @@ export const LeadSheet = memo(function LeadSheet({
   }, [timing, totalBars]);
 
   const barTempoBpms = useMemo(
-    () => barTempos(sequence.tempos, timing, totalBars),
-    [sequence.tempos, timing, totalBars],
+    () => barTempos(sequence.tempos, timing, totalBars, playbackRate),
+    [sequence.tempos, timing, totalBars, playbackRate],
   );
 
   const scoreRef = useRef<HTMLDivElement | null>(null);
