@@ -6,6 +6,7 @@ export function barTempos(
   tempos: readonly PlaybackTempoChange[],
   timing: SmfTiming,
   totalBars: number,
+  playbackRate = 1,
 ): Map<number, number> {
   const atBarStart = new Map<number, number>();
   for (const change of tempos) {
@@ -14,7 +15,7 @@ export function barTempos(
     const onBarStart = bb.beat === 1 && bb.tickInBeat === 0;
     const bar = onBarStart ? bb.bar : bb.bar + 1;
     if (bar > totalBars) break;
-    atBarStart.set(bar, Math.round(change.bpm));
+    atBarStart.set(bar, Math.round(change.bpm * playbackRate));
   }
 
   const shown = new Map<number, number>();

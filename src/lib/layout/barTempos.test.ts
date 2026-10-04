@@ -93,4 +93,22 @@ describe('barTempos', () => {
   test('returns nothing without tempos', () => {
     expect(barTempos([], timing, 8)).toEqual(new Map());
   });
+
+  test('scales tempos by the playback rate', () => {
+    expect(barTempos(tempos([0, 120], [BAR * 2, 90]), timing, 8, 0.5)).toEqual(
+      new Map([
+        [1, 60],
+        [3, 45],
+      ]),
+    );
+  });
+
+  test('rounds tempos after scaling by the playback rate', () => {
+    expect(barTempos(tempos([0, 120], [BAR, 120.4]), timing, 8, 1.5)).toEqual(
+      new Map([
+        [1, 180],
+        [2, 181],
+      ]),
+    );
+  });
 });
