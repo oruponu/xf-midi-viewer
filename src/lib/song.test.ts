@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { soundingChannels } from './smf/noteActivity.ts';
 import { buildSong } from './song.ts';
 import type { SmfChunk, SmfFile, TrackEvent } from './smf/types.ts';
 
@@ -11,6 +12,13 @@ const noteOn = (deltaTime: number, note: number): TrackEvent => ({
   deltaTime,
   event: { kind: 'noteOn', channel: 0, note, velocity: 100 },
 });
+
+const noteOff = (deltaTime: number, note: number): TrackEvent => ({
+  deltaTime,
+  event: { kind: 'noteOff', channel: 0, note, velocity: 0 },
+});
+
+const NO_SINCE: readonly number[] = new Array<number>(16).fill(0);
 
 const ascii = (text: string): number[] => Array.from(text, (c) => c.charCodeAt(0));
 
@@ -170,5 +178,15 @@ describe('buildSong', () => {
         voices: [{ tick: 0, seconds: 0, bankMSB: 0, bankLSB: 0, program: 0, isDrum: false }],
       },
     ]);
+  });
+
+  test('lights a short note for 0.12 seconds and a long note until its note-off', () => {
+    const short = buildSong(makeSmf([noteOn(0, 60), noteOff(10, 60)]));
+    const long = buildSong(makeSmf([noteOn(0, 60), noteOff(480, 60)]));
+
+    expect(soundingChannels(short.noteActivity, 0.1, NO_SINCE)).toBe(1);
+    expect(soundingChannels(short.noteActivity, 0.12, NO_SINCE)).toBe(0);
+    expect(soundingChannels(long.noteActivity, 0.49, NO_SINCE)).toBe(1);
+    expect(soundingChannels(long.noteActivity, 0.5, NO_SINCE)).toBe(0);
   });
 });
