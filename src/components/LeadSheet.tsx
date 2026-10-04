@@ -1,6 +1,6 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useMediaQuery } from '../hooks/useMediaQuery.ts';
-import { buildScoreRows } from '../lib/layout/scoreRows.ts';
+import { buildScoreRows, countScoreBars } from '../lib/layout/scoreRows.ts';
 import type { ScoreRowSpec } from '../lib/layout/scoreRows.ts';
 import { labelSpan, spreadLabels } from '../lib/layout/spread.ts';
 import type { SpreadItem } from '../lib/layout/spread.ts';
@@ -70,15 +70,15 @@ export const LeadSheet = memo(function LeadSheet({
 }: LeadSheetProps) {
   const renderable = useMemo(() => syllables.filter((s) => s.runs.length > 0), [syllables]);
 
-  const totalBars = useMemo(() => {
-    if (chords.length === 0 && rehearsals.length === 0 && syllables.length === 0) return 0;
-    let maxTick = 0;
-    for (const c of chords) if (c.tick > maxTick) maxTick = c.tick;
-    for (const r of rehearsals) if (r.tick > maxTick) maxTick = r.tick;
-    for (const s of syllables) if (s.tick > maxTick) maxTick = s.tick;
-    const bb = tickToBarBeat(maxTick, timing);
-    return bb ? bb.bar : 1;
-  }, [chords, rehearsals, syllables, timing]);
+  const totalBars = useMemo(
+    () =>
+      countScoreBars(
+        [...chords, ...rehearsals, ...syllables].map((m) => m.tick),
+        sequence.durationTicks,
+        timing,
+      ),
+    [chords, rehearsals, syllables, sequence.durationTicks, timing],
+  );
 
   const isNarrow = useMediaQuery('(max-width: 720px)');
   const barsPerRow = isNarrow ? NARROW_BARS_PER_ROW : BARS_PER_ROW;

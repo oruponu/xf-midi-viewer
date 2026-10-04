@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { buildScoreRows } from './scoreRows.ts';
+import type { SmfTiming } from '../smf/timing.ts';
+import { buildScoreRows, countScoreBars } from './scoreRows.ts';
 
 const rows = (...specs: [number, number][]) =>
   specs.map(([startBar, barCount]) => ({ startBar, barCount }));
@@ -33,5 +34,40 @@ describe('buildScoreRows', () => {
 
   test('ignores section starts at bar 1 or outside the score', () => {
     expect(buildScoreRows(6, 4, [1, 0, 7, 12])).toEqual(rows([1, 4], [5, 2]));
+  });
+});
+
+const timing: SmfTiming = {
+  ppq: 480,
+  timeSignatures: [
+    {
+      tick: 0,
+      signature: {
+        numerator: 4,
+        denominator: 4,
+        clocksPerClick: 24,
+        thirtySecondNotesPerQuarter: 8,
+      },
+    },
+  ],
+  keySignatures: [],
+};
+const BAR = 1920;
+
+describe('countScoreBars', () => {
+  test('returns 0 without chords, rehearsal marks or lyrics', () => {
+    expect(countScoreBars([], BAR * 3, timing)).toBe(0);
+  });
+
+  test('ends at the bar of the last mark when the song ends earlier', () => {
+    expect(countScoreBars([0, BAR * 4], BAR, timing)).toBe(5);
+  });
+
+  test('extends to the bar containing the end of the song', () => {
+    expect(countScoreBars([0, BAR * 4], BAR * 6 + 240, timing)).toBe(7);
+  });
+
+  test('does not add a bar for a song ending on a bar line', () => {
+    expect(countScoreBars([0], BAR * 2, timing)).toBe(2);
   });
 });
