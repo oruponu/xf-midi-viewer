@@ -1,5 +1,6 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
+import { bottomAlignedScrollTop } from '../lib/layout/panelCover.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { secondsToTick } from '../lib/smf/playback.ts';
@@ -83,6 +84,24 @@ export const KaraokeView = memo(function KaraokeView({
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
+  }, []);
+
+  useLayoutEffect(() => {
+    const screen = screenRef.current;
+    if (!screen) return;
+    const observer = new ResizeObserver(() => {
+      const cover =
+        parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue('--part-panel-cover'),
+        ) || 0;
+      if (cover <= 0) return;
+      const bottom = screen.getBoundingClientRect().bottom;
+      window.scrollTo({
+        top: bottomAlignedScrollTop(window.scrollY, bottom, window.innerHeight - cover),
+      });
+    });
+    observer.observe(screen);
+    return () => observer.disconnect();
   }, []);
 
   useLayoutEffect(() => {

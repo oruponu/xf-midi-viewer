@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
+import { centeredScrollTop } from '../lib/layout/panelCover.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import type { KeyShiftChange } from '../lib/smf/fixedKey.ts';
 import { formatTempo, formatTimeSignature } from '../lib/smf/metaEvents.ts';
@@ -399,8 +400,17 @@ function KaraokeSection({
     if (!el) return;
     // WebKit's scrollIntoView targets a different box for spans containing ruby.
     const rect = el.getBoundingClientRect();
+    const rootStyle = getComputedStyle(document.documentElement);
+    const insetTop = parseFloat(rootStyle.getPropertyValue('--part-panel-top-inset')) || 0;
+    const cover = parseFloat(rootStyle.getPropertyValue('--part-panel-cover')) || 0;
     window.scrollTo({
-      top: window.scrollY + rect.top + rect.height / 2 - window.innerHeight / 2,
+      top: centeredScrollTop(
+        window.scrollY,
+        rect.top,
+        rect.height,
+        insetTop,
+        window.innerHeight - cover,
+      ),
       behavior,
     });
   }, [activeSyllableIndex, autoScroll]);

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
+import { bottomCover } from '../lib/layout/panelCover.ts';
 import { isChannelAudible } from '../lib/player/channelMask.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import { activeVoiceIndex } from '../lib/smf/channelVoices.ts';
@@ -31,6 +32,32 @@ export function PartPanel({ id, parts, melodyChannels, scheduler, onClose }: Par
   const melody = useMemo(() => new Set(melodyChannels.map((ch) => ch - 1)), [melodyChannels]);
   const hasMask = mutedChannels !== 0 || soloChannels !== 0;
 
+  const panelRef = useRef<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    const el = panelRef.current;
+    const root = document.documentElement;
+    if (!el) return;
+    const update = () => {
+      const cover = bottomCover(el.getBoundingClientRect(), window.innerHeight);
+      const chrome = document.querySelector('.viewer-chrome')?.getBoundingClientRect().bottom ?? 0;
+      root.style.setProperty('--part-panel-cover', `${cover}px`);
+      root.style.setProperty('--part-panel-top-inset', `${cover > 0 ? chrome : 0}px`);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    const dock = document.querySelector('.player-dock');
+    if (dock) observer.observe(dock);
+    window.addEventListener('resize', update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+      root.style.removeProperty('--part-panel-cover');
+      root.style.removeProperty('--part-panel-top-inset');
+    };
+  }, []);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
@@ -42,7 +69,7 @@ export function PartPanel({ id, parts, melodyChannels, scheduler, onClose }: Par
   }, [onClose]);
 
   return (
-    <section id={id} className="part-panel" aria-labelledby={`${id}-title`}>
+    <section id={id} ref={panelRef} className="part-panel" aria-labelledby={`${id}-title`}>
       <header className="part-panel-header">
         <h2 id={`${id}-title`} className="part-panel-title">
           パート

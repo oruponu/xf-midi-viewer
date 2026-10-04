@@ -5,7 +5,7 @@
 .app {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 14px 24px calc(var(--dock-height, 0px) + 32px);
+  padding: 14px 24px calc(max(var(--dock-height, 0px), var(--part-panel-cover, 0px)) + 32px);
 }
 
 .app--dragging::after {
@@ -1331,7 +1331,10 @@
     max(
       280px,
       calc(
-        (100dvh - var(--karaoke-top, 0px) - var(--dock-height, 0px) - 32px) *
+        (
+            100dvh - var(--karaoke-top, 0px) -
+              max(var(--dock-height, 0px), var(--part-panel-cover, 0px)) - 32px
+          ) *
           16 / 9
       )
     )
@@ -1557,7 +1560,7 @@
 
 @media (max-width: 720px) {
   .app {
-    padding: 12px 14px calc(var(--dock-height, 0px) + 24px);
+    padding: 12px 14px calc(max(var(--dock-height, 0px), var(--part-panel-cover, 0px)) + 24px);
   }
 
   .app-bar-inner {
