@@ -3,6 +3,7 @@ import {
   clampKeyShift,
   clampPlaybackRate,
   firstMidiMessageIndexAtOrAfter,
+  LOOKAHEAD_SECONDS,
   MidiScheduler,
   scheduleDueMidiMessages,
 } from './scheduler.ts';
@@ -1205,5 +1206,214 @@ describe('MidiScheduler output latency', () => {
     clock.advance(200);
     expect(scheduler.getState().isPlaying).toBe(false);
     expect(scheduler.getPosition()).toBe(1);
+  });
+});
+
+describe('MidiScheduler channel masks', () => {
+  const twoChannels = () => [
+    msg(0, [0xc0, 1]),
+    msg(0, [0xc1, 2]),
+    msg(0.02, [0x90, 60, 100]),
+    msg(0.02, [0x91, 64, 100]),
+    msg(0.2, [0x80, 60, 0]),
+    msg(0.2, [0x81, 64, 0]),
+    msg(0.3, [0xb0, 7, 90]),
+    msg(0.3, [0x90, 62, 100]),
+    msg(0.3, [0x91, 65, 100]),
+    msg(0.4, [0x80, 62, 0]),
+    msg(0.4, [0x81, 65, 0]),
+  ];
+  const noteOns = (sent: SentMessage[]) =>
+    playbackOnly(sent)
+      .filter((m) => (m.data[0]! & 0xf0) === 0x90)
+      .map((m) => m.data);
+
+  test('does not send note-ons of a muted channel but sends its other messages', () => {
+    const { clock, scheduler, out } = setup(twoChannels(), 1);
+    scheduler.toggleMute(0);
+    scheduler.play();
+    clock.advance(500);
+
+    expect(playbackOnly(out.sent).map((m) => m.data)).toEqual([
+      [0xc0, 1],
+      [0xc1, 2],
+      [0x91, 64, 100],
+      [0x80, 60, 0],
+      [0x81, 64, 0],
+      [0xb0, 7, 90],
+      [0x91, 65, 100],
+      [0x80, 62, 0],
+      [0x81, 65, 0],
+    ]);
+  });
+
+  test('plays only soloed channels, even when they are muted', () => {
+    const { clock, scheduler, out } = setup(twoChannels(), 1);
+    scheduler.toggleSolo(1);
+    scheduler.toggleMute(1);
+    scheduler.play();
+    clock.advance(500);
+
+    expect(noteOns(out.sent)).toEqual([
+      [0x91, 64, 100],
+      [0x91, 65, 100],
+    ]);
+  });
+
+  test('muting while playing stops that channel at the fence and skips its later note-ons', () => {
+    const { clock, scheduler, out } = setup(twoChannels(), 1);
+    scheduler.play();
+    clock.advance(5);
+    const before = out.sent.length;
+
+    scheduler.toggleMute(0);
+
+    expect(out.sent.slice(before)).toEqual([
+      { data: [0xb0, 120, 0], timestamp: 1020 },
+      { data: [0xb0, 123, 0], timestamp: 1020 },
+    ]);
+    clock.advance(500);
+    expect(noteOns(out.sent)).toEqual([
+      [0x90, 60, 100],
+      [0x91, 64, 100],
+      [0x91, 65, 100],
+    ]);
+  });
+
+  test('sends the stop messages within the lookahead even with a note queued at its end', () => {
+    const { clock, scheduler, out } = setup(
+      [msg(0.05, [0x90, 60, 100]), msg(0.5, [0x80, 60, 0])],
+      1,
+    );
+    scheduler.play();
+    const before = out.sent.length;
+    const mutedAt = clock.now;
+
+    scheduler.toggleMute(0);
+
+    const stops = out.sent.slice(before);
+    expect(stops.map((m) => m.data)).toEqual([
+      [0xb0, 120, 0],
+      [0xb0, 123, 0],
+    ]);
+    for (const m of stops) {
+      expect(m.timestamp).toBeGreaterThanOrEqual(1050);
+      expect(m.timestamp).toBeLessThanOrEqual(mutedAt + LOOKAHEAD_SECONDS * 1000);
+    }
+  });
+
+  test('unmuting while playing skips note-ons already passed over in the lookahead', () => {
+    const { clock, scheduler, out } = setup(twoChannels(), 1);
+    scheduler.toggleMute(0);
+    scheduler.play();
+    clock.advance(5);
+    const before = out.sent.length;
+
+    scheduler.toggleMute(0);
+
+    expect(out.sent.slice(before)).toEqual([]);
+    clock.advance(500);
+    expect(noteOns(out.sent)).toEqual([
+      [0x91, 64, 100],
+      [0x90, 62, 100],
+      [0x91, 65, 100],
+    ]);
+  });
+
+  test('soloing while playing stops every channel that was audible except the soloed one', () => {
+    const { clock, scheduler, out } = setup(
+      [...twoChannels(), msg(0.3, [0x92, 67, 100]), msg(0.4, [0x82, 67, 0])],
+      1,
+    );
+    scheduler.toggleMute(2);
+    scheduler.play();
+    clock.advance(5);
+    const before = out.sent.length;
+
+    scheduler.toggleSolo(0);
+
+    const stopped = Array.from({ length: 16 }, (_, c) => c).filter((c) => c !== 0 && c !== 2);
+    expect(out.sent.slice(before).map((m) => m.data)).toEqual(
+      stopped.flatMap((c) => [
+        [0xb0 | c, 120, 0],
+        [0xb0 | c, 123, 0],
+      ]),
+    );
+  });
+
+  test.each(['seeking', 'shifting the key', 'changing the playback rate', 'switching the output'])(
+    'keeps a muted channel silent after %s',
+    (operation) => {
+      const { clock, scheduler, out } = setup(twoChannels(), 1);
+      const other = createOutput({ now: () => clock.now });
+      scheduler.toggleMute(0);
+      scheduler.play();
+      clock.advance(5);
+      const before = out.sent.length;
+
+      if (operation === 'seeking') scheduler.seek(0.25);
+      else if (operation === 'shifting the key') scheduler.setKeyShift(1);
+      else if (operation === 'changing the playback rate') scheduler.setPlaybackRate(1.5);
+      else scheduler.setOutput(other.output);
+      clock.advance(500);
+
+      const after = [...out.sent.slice(before), ...other.sent];
+      const channels = noteOns(after).map((d) => d[0]! & 0x0f);
+      expect(channels).not.toContain(0);
+      expect(channels).toContain(1);
+    },
+  );
+
+  test('changing the masks while stopped sends nothing but notifies', () => {
+    const { scheduler, out } = setup(twoChannels(), 1);
+    let notified = 0;
+    scheduler.subscribe(() => {
+      notified += 1;
+    });
+
+    scheduler.toggleMute(3);
+    scheduler.toggleSolo(4);
+
+    expect(out.sent).toEqual([]);
+    expect(notified).toBe(2);
+    expect(scheduler.getState()).toMatchObject({ mutedChannels: 0b1000, soloChannels: 0b10000 });
+  });
+
+  test('clearChannelMasks() clears both masks and skips notification when already clear', () => {
+    const { scheduler } = setup(twoChannels(), 1);
+    scheduler.toggleMute(0);
+    scheduler.toggleSolo(1);
+    let notified = 0;
+    scheduler.subscribe(() => {
+      notified += 1;
+    });
+
+    scheduler.clearChannelMasks();
+    scheduler.clearChannelMasks();
+
+    expect(scheduler.getState()).toMatchObject({ mutedChannels: 0, soloChannels: 0 });
+    expect(notified).toBe(1);
+  });
+
+  test('setSequence() clears both masks', () => {
+    const { scheduler } = setup(twoChannels(), 1);
+    scheduler.toggleMute(0);
+    scheduler.toggleSolo(1);
+
+    scheduler.setSequence(makeSequence(twoChannels(), 1));
+
+    expect(scheduler.getState()).toMatchObject({ mutedChannels: 0, soloChannels: 0 });
+  });
+
+  test('a send failure while muting stops playback', () => {
+    const { clock, scheduler, out } = setup(twoChannels(), 1);
+    scheduler.play();
+    clock.advance(5);
+    out.failWith(new Error('port closed'));
+
+    scheduler.toggleMute(0);
+
+    expect(scheduler.getState().isPlaying).toBe(false);
+    expect(scheduler.getState().sendError).not.toBeNull();
   });
 });

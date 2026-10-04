@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { CSSProperties, RefObject } from 'react';
 import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
 import { isPlaybackAdvance } from '../lib/player/advance.ts';
@@ -32,6 +32,10 @@ interface PlaybackPanelProps {
   isKeyFixed: boolean;
   outputReady: boolean;
   onPlay: () => void;
+  partCount: number;
+  isPartPanelOpen: boolean;
+  partPanelId: string;
+  onTogglePartPanel: () => void;
 }
 
 export function PlaybackPanel({
@@ -45,6 +49,10 @@ export function PlaybackPanel({
   isKeyFixed,
   outputReady,
   onPlay,
+  partCount,
+  isPartPanelOpen,
+  partPanelId,
+  onTogglePartPanel,
 }: PlaybackPanelProps) {
   const hasMidiMessages = sequence.midiMessages.length > 0 && sequence.durationSeconds > 0;
   const canPlay = hasMidiMessages && outputReady;
@@ -86,6 +94,10 @@ export function PlaybackPanel({
         keyShifts={keyShifts}
         isKeyFixed={isKeyFixed}
         canPlay={canPlay}
+        partCount={partCount}
+        isPartPanelOpen={isPartPanelOpen}
+        partPanelId={partPanelId}
+        onTogglePartPanel={onTogglePartPanel}
       />
     </section>
   );
@@ -100,6 +112,10 @@ interface PlaybackReadoutProps {
   keyShifts: readonly KeyShiftChange[];
   isKeyFixed: boolean;
   canPlay: boolean;
+  partCount: number;
+  isPartPanelOpen: boolean;
+  partPanelId: string;
+  onTogglePartPanel: () => void;
 }
 
 function PlaybackReadout({
@@ -111,6 +127,10 @@ function PlaybackReadout({
   keyShifts,
   isKeyFixed,
   canPlay,
+  partCount,
+  isPartPanelOpen,
+  partPanelId,
+  onTogglePartPanel,
 }: PlaybackReadoutProps) {
   const playbackSeconds = usePlaybackPosition(scheduler, (seconds) => seconds);
   const [dragSeconds, setDragSeconds] = useState<number | null>(null);
@@ -349,8 +369,51 @@ function PlaybackReadout({
           onChange={(e) => setDragSeconds(e.currentTarget.valueAsNumber)}
         />
         <span className="timecode">{formatTime(sequence.durationSeconds)}</span>
+        <PartPanelButton
+          scheduler={scheduler}
+          disabled={partCount === 0}
+          expanded={isPartPanelOpen}
+          controls={partPanelId}
+          onClick={onTogglePartPanel}
+        />
       </div>
     </>
+  );
+}
+
+function PartPanelButton({
+  scheduler,
+  disabled,
+  expanded,
+  controls,
+  onClick,
+}: {
+  scheduler: MidiScheduler;
+  disabled: boolean;
+  expanded: boolean;
+  controls: string;
+  onClick: () => void;
+}) {
+  const { mutedChannels, soloChannels } = useSyncExternalStore(
+    scheduler.subscribe,
+    scheduler.getState,
+  );
+  const hasMask = mutedChannels !== 0 || soloChannels !== 0;
+  const label = hasMask ? 'パート (ミュートまたはソロあり)' : 'パート';
+  return (
+    <button
+      type="button"
+      className="transport-button part-panel-button"
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      aria-expanded={expanded}
+      aria-controls={expanded ? controls : undefined}
+      onClick={onClick}
+    >
+      <MixerIcon />
+      {hasMask && <span className="part-panel-button-dot" aria-hidden="true" />}
+    </button>
   );
 }
 
@@ -436,6 +499,27 @@ function StopIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
       <rect x="3.5" y="3.5" width="9" height="9" rx="0.8" />
+    </svg>
+  );
+}
+
+function MixerIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 4v5M6 13v7M12 4v9M12 17v3M18 4v3M18 11v9" />
+      <circle cx="6" cy="11" r="2" />
+      <circle cx="12" cy="15" r="2" />
+      <circle cx="18" cy="9" r="2" />
     </svg>
   );
 }

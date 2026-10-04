@@ -1,3 +1,5 @@
+import { buildChannelParts } from './smf/channelVoices.ts';
+import type { ChannelPart } from './smf/channelVoices.ts';
 import { extractMetaEvents } from './smf/metaEvents.ts';
 import type { SmfMetaEvents } from './smf/metaEvents.ts';
 import { buildPlaybackSequence } from './smf/playback.ts';
@@ -17,6 +19,7 @@ import type { ChordMessage, RehearsalMessage, XfData } from './xf/types.ts';
 
 export interface Song {
   sequence: PlaybackSequence;
+  channelParts: ChannelPart[];
   timing: SmfTiming;
   metaEvents: SmfMetaEvents;
   xf: XfData;
@@ -42,6 +45,7 @@ export function buildSong(smf: SmfFile): Song {
   }
   return {
     sequence,
+    channelParts: buildChannelParts(sequence.midiMessages),
     timing,
     metaEvents: extractMetaEvents(smf),
     xf,

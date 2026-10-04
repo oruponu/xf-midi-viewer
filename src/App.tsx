@@ -4,6 +4,7 @@ import './App.css';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { InfoPanel } from './components/InfoPanel.tsx';
 import type { InfoPanelTab } from './components/InfoPanel.tsx';
+import { PartPanel } from './components/PartPanel.tsx';
 import { PlaybackPanel } from './components/PlaybackPanel.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
 import { useMidiPlayer } from './hooks/useMidiPlayer.ts';
@@ -22,6 +23,7 @@ import { nextTheme } from './lib/theme.ts';
 import type { Theme } from './lib/theme.ts';
 
 const APP_NAME = 'XF MIDI Viewer';
+const PART_PANEL_ID = 'part-panel';
 const MIDI_EXTENSIONS = ['.mid', '.midi', '.kar', '.xih', '.xkm'];
 const FILE_ACCEPT = [...MIDI_EXTENSIONS, 'audio/midi'].join(',');
 
@@ -35,6 +37,9 @@ function App() {
   const { state: songState, loadFile } = useSongLoader();
   const [isDragging, setIsDragging] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isPartPanelOpen, setIsPartPanelOpen] = useState(false);
+  const togglePartPanel = useCallback(() => setIsPartPanelOpen((open) => !open), []);
+  const closePartPanel = useCallback(() => setIsPartPanelOpen(false), []);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { settings, updateSettings } = useSettings();
   useTheme(settings.theme);
@@ -242,6 +247,9 @@ function App() {
             fixedKeyShifts={fixedKeyShifts}
             outputReady={outputReady}
             onPlay={play}
+            isPartPanelOpen={isPartPanelOpen}
+            onTogglePartPanel={togglePartPanel}
+            onClosePartPanel={closePartPanel}
           />
         </ErrorBoundary>
       </main>
@@ -374,6 +382,9 @@ function PlayerScope({
   fixedKeyShifts,
   outputReady,
   onPlay,
+  isPartPanelOpen,
+  onTogglePartPanel,
+  onClosePartPanel,
 }: {
   file: FileSummary | null;
   song: Song | null;
@@ -385,6 +396,9 @@ function PlayerScope({
   fixedKeyShifts: readonly KeyShiftChange[] | null;
   outputReady: boolean;
   onPlay: () => void;
+  isPartPanelOpen: boolean;
+  onTogglePartPanel: () => void;
+  onClosePartPanel: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
   const dockRef = useRef<HTMLDivElement | null>(null);
@@ -444,9 +458,22 @@ function PlayerScope({
             isKeyFixed={fixedKeyShifts !== null}
             outputReady={outputReady}
             onPlay={onPlay}
+            partCount={song.channelParts.length}
+            isPartPanelOpen={isPartPanelOpen}
+            partPanelId={PART_PANEL_ID}
+            onTogglePartPanel={onTogglePartPanel}
           />
         </div>
       </div>
+      {isPartPanelOpen && song.channelParts.length > 0 && (
+        <PartPanel
+          id={PART_PANEL_ID}
+          parts={song.channelParts}
+          melodyChannels={song.xf.karaoke.header?.melodyChannels ?? []}
+          scheduler={scheduler}
+          onClose={onClosePartPanel}
+        />
+      )}
     </>
   );
 }

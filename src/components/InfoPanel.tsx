@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
+import { centeredScrollTop, PANEL_INSET_CHANGE_EVENT } from '../lib/layout/panelCover.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import type { KeyShiftChange } from '../lib/smf/fixedKey.ts';
 import { formatTempo, formatTimeSignature } from '../lib/smf/metaEvents.ts';
@@ -396,14 +397,17 @@ function KaraokeSection({
     if (!autoScroll) return;
     if (activeSyllableIndex < 0) return;
     const el = streamRef.current?.querySelector('.lyric--active');
-    if (!el) return;
-    // WebKit's scrollIntoView targets a different box for spans containing ruby.
-    const rect = el.getBoundingClientRect();
-    window.scrollTo({
-      top: window.scrollY + rect.top + rect.height / 2 - window.innerHeight / 2,
-      behavior,
-    });
+    if (el) scrollToCenter(el, behavior);
   }, [activeSyllableIndex, autoScroll]);
+  useEffect(() => {
+    if (!autoScroll) return;
+    const onInsetChange = () => {
+      const el = streamRef.current?.querySelector('.lyric--active');
+      if (el) scrollToCenter(el, 'smooth');
+    };
+    window.addEventListener(PANEL_INSET_CHANGE_EVENT, onInsetChange);
+    return () => window.removeEventListener(PANEL_INSET_CHANGE_EVENT, onInsetChange);
+  }, [autoScroll]);
 
   return (
     <div className="card">
@@ -434,6 +438,24 @@ function KaraokeSection({
 
 type KaraokeBlock =
   { kind: 'divider' } | { kind: 'lyrics'; part: VocalPart | null; tokens: ReactNode[] };
+
+function scrollToCenter(el: Element, behavior: ScrollBehavior): void {
+  // WebKit's scrollIntoView targets a different box for spans containing ruby.
+  const rect = el.getBoundingClientRect();
+  const rootStyle = getComputedStyle(document.documentElement);
+  const insetTop = parseFloat(rootStyle.getPropertyValue('--part-panel-top-inset')) || 0;
+  const cover = parseFloat(rootStyle.getPropertyValue('--part-panel-cover')) || 0;
+  window.scrollTo({
+    top: centeredScrollTop(
+      window.scrollY,
+      rect.top,
+      rect.height,
+      insetTop,
+      window.innerHeight - cover,
+    ),
+    behavior,
+  });
+}
 
 function buildKaraokeBlocks(
   tokens: LyricToken[],
