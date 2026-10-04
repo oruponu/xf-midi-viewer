@@ -1,6 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useMediaQuery } from '../hooks/useMediaQuery.ts';
 import { barTempos } from '../lib/layout/barTempos.ts';
+import { PANEL_INSET_CHANGE_EVENT } from '../lib/layout/panelCover.ts';
 import { buildScoreRows, countScoreBars } from '../lib/layout/scoreRows.ts';
 import type { ScoreRowSpec } from '../lib/layout/scoreRows.ts';
 import { labelSpan, spreadLabels } from '../lib/layout/spread.ts';
@@ -190,9 +191,15 @@ export const LeadSheet = memo(function LeadSheet({
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
+    const onInsetChange = () => {
+      lastPos = NaN;
+      lastActiveRowIdx = -2;
+    };
+    window.addEventListener(PANEL_INSET_CHANGE_EVENT, onInsetChange);
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
+      window.removeEventListener(PANEL_INSET_CHANGE_EVENT, onInsetChange);
       markProgress(chordEls, chordTicks, -1, 'score-chord');
       markProgress(lyricEls, lyricTicks, -1, 'score-lyric');
     };

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
-import { bottomCover } from '../lib/layout/panelCover.ts';
+import { bottomCover, PANEL_INSET_CHANGE_EVENT } from '../lib/layout/panelCover.ts';
 import { isChannelAudible } from '../lib/player/channelMask.ts';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import { activeVoiceIndex } from '../lib/smf/channelVoices.ts';
@@ -38,11 +38,18 @@ export function PartPanel({ id, parts, melodyChannels, scheduler, onClose }: Par
     const el = panelRef.current;
     const root = document.documentElement;
     if (!el) return;
+    let lastCover = 0;
+    let lastInset = 0;
     const update = () => {
       const cover = bottomCover(el.getBoundingClientRect(), window.innerHeight);
       const chrome = document.querySelector('.viewer-chrome')?.getBoundingClientRect().bottom ?? 0;
+      const inset = cover > 0 ? chrome : 0;
+      if (cover === lastCover && inset === lastInset) return;
+      lastCover = cover;
+      lastInset = inset;
       root.style.setProperty('--part-panel-cover', `${cover}px`);
-      root.style.setProperty('--part-panel-top-inset', `${cover > 0 ? chrome : 0}px`);
+      root.style.setProperty('--part-panel-top-inset', `${inset}px`);
+      window.dispatchEvent(new Event(PANEL_INSET_CHANGE_EVENT));
     };
     update();
     // Wait a frame for the dock's observer to update --dock-height.
@@ -62,6 +69,7 @@ export function PartPanel({ id, parts, melodyChannels, scheduler, onClose }: Par
       window.removeEventListener('resize', scheduleUpdate);
       root.style.removeProperty('--part-panel-cover');
       root.style.removeProperty('--part-panel-top-inset');
+      if (lastCover > 0) window.dispatchEvent(new Event(PANEL_INSET_CHANGE_EVENT));
     };
   }, []);
 

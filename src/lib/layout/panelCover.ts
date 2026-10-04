@@ -24,3 +24,5 @@ export function bottomAlignedScrollTop(
 ): number {
   return scrollY + targetBottom - visibleBottom;
 }
+
+export const PANEL_INSET_CHANGE_EVENT = 'part-panel-inset-change';
