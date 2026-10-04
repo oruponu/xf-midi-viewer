@@ -1052,7 +1052,8 @@
 }
 
 .score-key,
-.score-timesig {
+.score-timesig,
+.score-tempo {
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
@@ -1071,8 +1072,19 @@
   letter-spacing: 0.12em;
 }
 
-.score-timesig {
+.score-timesig,
+.score-tempo {
   font-variant-numeric: lining-nums tabular-nums;
+}
+
+.score-tempo {
+  gap: 0;
+}
+
+.score-tempo-note {
+  margin-right: 0.1em;
+  font-family: 'Noto Sans Symbols', var(--sans);
+  line-height: 0;
 }
 
 .score-chords {
