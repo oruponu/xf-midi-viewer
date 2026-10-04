@@ -158,4 +158,17 @@ describe('buildSong', () => {
     expect(song.xf.karaoke.events).toEqual([]);
     expect(song.sequence.midiMessages.map((m) => m.data)).toEqual([[0x90, 60, 100]]);
   });
+
+  test('collects the voices of each channel that has notes', () => {
+    const song = buildSong(makeSmf([noteOn(0, 60)]));
+
+    expect(song.channelParts).toEqual([
+      {
+        channel: 0,
+        firstNoteSeconds: 0,
+        firstNoteVoiceIndex: 0,
+        voices: [{ tick: 0, seconds: 0, bankMSB: 0, bankLSB: 0, program: 0, isDrum: false }],
+      },
+    ]);
+  });
 });
