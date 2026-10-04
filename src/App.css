@@ -336,7 +336,7 @@
 
 .playback-timeline {
   display: grid;
-  grid-template-columns: 42px 1fr 42px;
+  grid-template-columns: 42px 1fr 42px auto;
   align-items: center;
   gap: 10px;
 }
@@ -1640,6 +1640,25 @@
 .info-row .meta-event-list {
   grid-column: 1 / -1;
   min-width: 0;
+}
+
+.part-panel-button {
+  position: relative;
+}
+
+.part-panel-button[aria-expanded='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.part-panel-button-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 .part-panel {
