@@ -1727,10 +1727,13 @@
   padding: 4px 12px 4px 16px;
 }
 
-.part-row--silent .part-channel,
-.part-row--silent .part-voice,
+.part-row--silent .part-voice {
+  color: var(--text);
+}
+
 .part-row--silent .part-melody {
-  opacity: 0.4;
+  border-color: var(--border);
+  color: var(--text);
 }
 
 .part-channel {
