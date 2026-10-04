@@ -114,6 +114,7 @@ function ActiveView({
             scheduler={scheduler}
             autoScroll={autoScrollLeadSheet}
             keyShifts={keyShifts}
+            playbackRate={playbackRate}
           />
         ) : (
           <EmptyView title="リードシート情報はありません" />

@@ -1,5 +1,6 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useMediaQuery } from '../hooks/useMediaQuery.ts';
+import { barTempos } from '../lib/layout/barTempos.ts';
 import { buildScoreRows, countScoreBars } from '../lib/layout/scoreRows.ts';
 import type { ScoreRowSpec } from '../lib/layout/scoreRows.ts';
 import { labelSpan, spreadLabels } from '../lib/layout/spread.ts';
@@ -57,6 +58,7 @@ interface LeadSheetProps {
   scheduler: MidiScheduler;
   autoScroll: boolean;
   keyShifts: readonly KeyShiftChange[];
+  playbackRate: number;
 }
 
 export const LeadSheet = memo(function LeadSheet({
@@ -68,6 +70,7 @@ export const LeadSheet = memo(function LeadSheet({
   scheduler,
   autoScroll,
   keyShifts,
+  playbackRate,
 }: LeadSheetProps) {
   const renderable = useMemo(() => syllables.filter((s) => s.runs.length > 0), [syllables]);
 
@@ -116,6 +119,11 @@ export const LeadSheet = memo(function LeadSheet({
     }
     return map;
   }, [timing, totalBars]);
+
+  const barTempoBpms = useMemo(
+    () => barTempos(sequence.tempos, timing, totalBars, playbackRate),
+    [sequence.tempos, timing, totalBars, playbackRate],
+  );
 
   const scoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -208,6 +216,7 @@ export const LeadSheet = memo(function LeadSheet({
             timing={timing}
             barTimeSignatures={barTimeSignatures}
             barKeySignatures={barKeySignatures}
+            barTempoBpms={barTempoBpms}
             keyShifts={keyShifts}
           />
         ))}
@@ -245,6 +254,7 @@ function ScoreRow({
   timing,
   barTimeSignatures,
   barKeySignatures,
+  barTempoBpms,
   keyShifts,
 }: {
   startBar: number;
@@ -256,6 +266,7 @@ function ScoreRow({
   timing: SmfTiming;
   barTimeSignatures: Map<number, TimeSignature>;
   barKeySignatures: Map<number, KeySignatureChange>;
+  barTempoBpms: Map<number, number>;
   keyShifts: readonly KeyShiftChange[];
 }) {
   const startPos = startBar - 1;
@@ -340,6 +351,7 @@ function ScoreRow({
           {bars.map((bar) => {
             const sig = barTimeSignatures.get(bar);
             const key = barKeySignatures.get(bar);
+            const bpm = barTempoBpms.get(bar);
             return (
               <div key={bar} className="score-bar-cell">
                 <div className="score-bar-head">
@@ -367,6 +379,11 @@ function ScoreRow({
                       aria-label={`Time signature ${sig.numerator}/${sig.denominator}`}
                     >
                       {sig.numerator}/{sig.denominator}
+                    </span>
+                  )}
+                  {bpm !== undefined && (
+                    <span className="score-tempo" aria-label={`Tempo ${bpm} BPM`}>
+                      <span className="score-tempo-note">♩</span>={bpm}
                     </span>
                   )}
                 </div>
