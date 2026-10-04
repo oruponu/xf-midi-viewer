@@ -1,5 +1,7 @@
+import { XF_CHORD_TYPES } from './style.ts';
 import type {
   ChordBass,
+  ChordMessage,
   ChordRoot,
   FingeringContext,
   GuitarPart,
@@ -61,6 +63,18 @@ export function formatChord(root: ChordRoot, typeIndex: number, bass: ChordBass 
   return s;
 }
 
+function formatChordDetail({ root, typeIndex, bass }: ChordMessage): string {
+  const parts = [
+    `コードルート ${formatChordRoot(root)}`,
+    `コードタイプ ${XF_CHORD_TYPES[typeIndex]!}`,
+  ];
+  if (bass) {
+    parts.push(`オンベースノート ${formatChordRoot(bass.root)}`);
+    if (bass.typeIndex !== null) parts.push(`ベースコード ${XF_CHORD_TYPES[bass.typeIndex]!}`);
+  }
+  return parts.join(', ');
+}
+
 const GUITAR_PART_LABELS: Record<GuitarPart, string> = {
   guitar: 'ギター',
   bass: 'ベース',
@@ -114,7 +128,7 @@ function formatVoicingString({ fret, finger }: GuitarStringVoicing, index: numbe
 export function formatStyleDetail(ev: StyleMessage): string {
   switch (ev.kind) {
     case 'chord':
-      return formatChord(ev.root, ev.typeIndex, ev.bass);
+      return formatChordDetail(ev);
     case 'rehearsal':
       return `${ev.letter}${"'".repeat(ev.variation)}`;
     case 'phraseMark':

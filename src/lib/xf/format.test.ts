@@ -16,16 +16,52 @@ const fingering = (overrides: Partial<Fingering>): Fingering => ({
 });
 
 describe('formatStyleDetail - chord and rehearsal', () => {
-  test('formats chord with bass', () => {
+  test('formats chord with spec type names', () => {
+    expect(
+      formatStyleDetail({
+        kind: 'chord',
+        tick: 0,
+        root: { note: 'F', accidental: '#' },
+        typeIndex: 11,
+        bass: null,
+      }),
+    ).toBe('コードルート F#, コードタイプ min7b5');
+  });
+
+  test('formats chord with bass note and bass chord type', () => {
     expect(
       formatStyleDetail({
         kind: 'chord',
         tick: 0,
         root: { note: 'C', accidental: 'natural' },
-        typeIndex: 2,
-        bass: { root: { note: 'G', accidental: 'natural' }, typeIndex: 0 },
+        typeIndex: 0,
+        bass: { root: { note: 'E', accidental: 'natural' }, typeIndex: 0 },
       }),
-    ).toBe('CM7/G');
+    ).toBe('コードルート C, コードタイプ Maj, オンベースノート E, ベースコード Maj');
+  });
+
+  test('omits bass chord type when bt is 127', () => {
+    expect(
+      formatStyleDetail({
+        kind: 'chord',
+        tick: 0,
+        root: { note: 'C', accidental: 'natural' },
+        typeIndex: 5,
+        bass: { root: { note: 'G', accidental: 'natural' }, typeIndex: null },
+      }),
+    ).toBe('コードルート C, コードタイプ Maj7(9), オンベースノート G');
+  });
+
+  test('keeps the root of a cancel chord', () => {
+    expect(
+      formatStyleDetail({
+        kind: 'chord',
+        tick: 0,
+        root: { note: 'C', accidental: 'natural' },
+        typeIndex: 34,
+        bass: null,
+      }),
+    ).toBe('コードルート C, コードタイプ cc');
   });
 
   test('formats rehearsal variation with primes', () => {
