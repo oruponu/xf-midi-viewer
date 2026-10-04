@@ -180,6 +180,23 @@ describe('buildChannelParts', () => {
     ]);
   });
 
+  test('keeps a previous SFX kit for a drum kit outside XG Level 1', () => {
+    const parts = buildChannelParts([
+      at(0, [0xb9, 0, 126]),
+      at(0, [0xc9, 1]),
+      at(10, [0xb9, 0, 127]),
+      at(10, [0xc9, 86]),
+      at(20, [0x99, 36, 100]),
+    ]);
+
+    expect(lastVoice(partOf(parts, 9))).toMatchObject({
+      tick: 10,
+      bankMSB: 126,
+      program: 1,
+      isDrum: true,
+    });
+  });
+
   test('keeps an unknown SFX kit as received', () => {
     const parts = buildChannelParts([
       at(0, [0xb2, 0, 126]),

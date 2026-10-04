@@ -1,6 +1,6 @@
 import { isResetSysex } from '../player/chase.ts';
 import { isLiveNoteOn } from '../player/messages.ts';
-import { isXgDrumKit } from '../xg/voiceNames.ts';
+import { isXgDrumKit, isXgSfxKit } from '../xg/voiceNames.ts';
 import { xgPartModeChange } from './playback.ts';
 import type { PlaybackMidiMessage } from './playback.ts';
 
@@ -26,7 +26,7 @@ interface ChannelState {
   bankMSB: number;
   bankLSB: number;
   program: number;
-  lastKit: number;
+  lastKit: { bankMSB: number; program: number };
   drumMode: boolean | null;
   voices: ChannelVoice[];
   firstNote: { seconds: number; voiceIndex: number } | null;
@@ -107,7 +107,7 @@ function createChannelState(channel: number): ChannelState {
     bankMSB: 0,
     bankLSB: 0,
     program: 0,
-    lastKit: 0,
+    lastKit: { bankMSB: DRUM_KIT_BANK_MSB, program: 0 },
     drumMode: null,
     voices: [],
     firstNote: null,
@@ -123,7 +123,7 @@ function resetChannel(state: ChannelState, channel: number, tick: number, second
   state.bankMSB = bankMSB;
   state.bankLSB = 0;
   state.program = 0;
-  state.lastKit = 0;
+  state.lastKit = { bankMSB: DRUM_KIT_BANK_MSB, program: 0 };
   state.drumMode = null;
   pushVoice(state, tick, seconds);
 }
@@ -131,19 +131,17 @@ function resetChannel(state: ChannelState, channel: number, tick: number, second
 // An unsupported drum kit keeps the previous kit (XG Format Specifications, Bank Select Note 4).
 function pushVoice(state: ChannelState, tick: number, seconds: number): void {
   const isDrum = state.drumMode ?? DRUM_BANK_MSBS.has(state.bankMSB);
+  let bankMSB = state.bankMSB;
   let program = state.program;
-  if (isDrum && state.bankMSB !== SFX_KIT_BANK_MSB) {
-    if (isXgDrumKit(program)) state.lastKit = program;
-    else program = state.lastKit;
+  if (isDrum) {
+    const isSfxKit = bankMSB === SFX_KIT_BANK_MSB;
+    if (isSfxKit ? isXgSfxKit(program) : isXgDrumKit(program)) {
+      state.lastKit = { bankMSB, program };
+    } else if (!isSfxKit) {
+      ({ bankMSB, program } = state.lastKit);
+    }
   }
-  state.voices.push({
-    tick,
-    seconds,
-    bankMSB: state.bankMSB,
-    bankLSB: state.bankLSB,
-    program,
-    isDrum,
-  });
+  state.voices.push({ tick, seconds, bankMSB, bankLSB: state.bankLSB, program, isDrum });
 }
 
 function applySysex(channels: ChannelState[], message: PlaybackMidiMessage): void {

@@ -39,6 +39,10 @@ export function isXgDrumKit(program: number): boolean {
   return DRUM_KITS.has(program);
 }
 
+export function isXgSfxKit(program: number): boolean {
+  return SFX_KITS.has(program);
+}
+
 export function voiceName(voice: VoiceSelection): string | null {
   const { bankMSB, bankLSB, program } = voice;
   if (voice.isDrum) {

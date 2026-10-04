@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { XG_NORMAL_VOICES, XG_SFX_VOICES } from './voiceList.ts';
-import { isXgDrumKit, voiceName } from './voiceNames.ts';
+import { isXgDrumKit, isXgSfxKit, voiceName } from './voiceNames.ts';
 
 const normal = (bankMSB: number, bankLSB: number, program: number) => ({
   bankMSB,
@@ -67,6 +67,14 @@ describe('isXgDrumKit', () => {
     expect(isXgDrumKit(25)).toBe(true);
     expect(isXgDrumKit(2)).toBe(false);
     expect(isXgDrumKit(86)).toBe(false);
+  });
+});
+
+describe('isXgSfxKit', () => {
+  test('accepts only SFX 1 and SFX 2', () => {
+    expect(isXgSfxKit(0)).toBe(true);
+    expect(isXgSfxKit(1)).toBe(true);
+    expect(isXgSfxKit(2)).toBe(false);
   });
 });
 
