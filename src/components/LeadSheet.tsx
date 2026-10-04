@@ -21,6 +21,7 @@ import { formatChord } from '../lib/xf/format.ts';
 import type { LyricSyllable } from '../lib/xf/lyrics.ts';
 import { transposeChord } from '../lib/xf/transpose.ts';
 import type { ChordMessage, RehearsalMessage } from '../lib/xf/types.ts';
+import { AccidentalText } from './AccidentalText.tsx';
 
 const BARS_PER_ROW = 4;
 const NARROW_BARS_PER_ROW = 2;
@@ -381,7 +382,7 @@ function ScoreRow({
               data-bar={p.barIndex}
               style={{ left: `${p.xPercent}%` }}
             >
-              {formatTransposedChord(p.msg, timing, keyShifts)}
+              <AccidentalText text={formatTransposedChord(p.msg, timing, keyShifts)} />
             </span>
           ))}
         </div>
