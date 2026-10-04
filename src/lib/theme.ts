@@ -8,7 +8,7 @@ export function isTheme(value: unknown): value is Theme {
 }
 
 export function nextTheme(theme: Theme): Theme {
-  return THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+  return THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length]!;
 }
 
 export function resolveTheme(theme: Theme, prefersDark: boolean): ResolvedTheme {

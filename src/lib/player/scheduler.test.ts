@@ -28,7 +28,7 @@ describe('scheduleDueMidiMessages', () => {
       return false;
     });
 
-    expect(attempts).toEqual([messages[0]]);
+    expect(attempts).toEqual([messages[0]!]);
     expect(result).toEqual({ nextIndex: 1, failed: true });
   });
 
