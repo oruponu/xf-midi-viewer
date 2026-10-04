@@ -119,6 +119,28 @@
   font-size: 14px;
 }
 
+/* Fit the Noto Sans Symbols glyphs between the baseline and the cap height
+   without enlarging the line box */
+.accidental-sharp,
+.accidental-flat {
+  position: relative;
+  font-family: 'Noto Sans Symbols', var(--sans);
+  line-height: 0;
+}
+
+.accidental-sharp {
+  top: -0.22em;
+  margin: 0 0.02em 0 0.03em;
+  font-size: 0.87em;
+}
+
+/* Extra side space offsets the solid edges of the flat glyph */
+.accidental-flat {
+  top: -0.03em;
+  margin: 0 0.028em 0 0.033em;
+  font-size: 1.12em;
+}
+
 .empty-state {
   margin-top: 48px;
   display: flex;
