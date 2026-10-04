@@ -45,14 +45,21 @@ export function PartPanel({ id, parts, melodyChannels, scheduler, onClose }: Par
       root.style.setProperty('--part-panel-top-inset', `${cover > 0 ? chrome : 0}px`);
     };
     update();
-    const observer = new ResizeObserver(update);
+    // Wait a frame for the dock's observer to update --dock-height.
+    let frame = 0;
+    const scheduleUpdate = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(update);
+    };
+    const observer = new ResizeObserver(scheduleUpdate);
     observer.observe(el);
     const dock = document.querySelector('.player-dock');
     if (dock) observer.observe(dock);
-    window.addEventListener('resize', update);
+    window.addEventListener('resize', scheduleUpdate);
     return () => {
+      cancelAnimationFrame(frame);
       observer.disconnect();
-      window.removeEventListener('resize', update);
+      window.removeEventListener('resize', scheduleUpdate);
       root.style.removeProperty('--part-panel-cover');
       root.style.removeProperty('--part-panel-top-inset');
     };
