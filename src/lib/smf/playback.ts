@@ -52,7 +52,7 @@ interface ActiveNote {
   startTick: number;
 }
 
-interface XgPartModeChange {
+export interface XgPartModeChange {
   channel: number;
   isDrum: boolean;
 }
@@ -151,7 +151,7 @@ export function detectDrumChannels(smf: SmfFile): Set<number> {
   return drums;
 }
 
-function xgPartModeChange(data: Uint8Array): XgPartModeChange | null {
+export function xgPartModeChange(data: ArrayLike<number>): XgPartModeChange | null {
   if (data.length < 8) return null;
   if (data[0] !== 0x43) return null;
   if ((data[1]! & 0xf0) !== 0x10) return null;
