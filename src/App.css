@@ -191,6 +191,8 @@
   padding: 12px 16px;
   border-radius: var(--radius-md);
   font-size: 14px;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .error-detail {
@@ -688,6 +690,8 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .card {
@@ -1131,6 +1135,8 @@
   background: var(--bg);
   color: var(--text-h);
   box-shadow: 0 24px 60px -20px color-mix(in srgb, black 50%, transparent);
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .settings-dialog::backdrop {
