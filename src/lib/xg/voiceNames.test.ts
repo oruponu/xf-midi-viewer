@@ -42,6 +42,12 @@ describe('voiceName', () => {
     expect(voiceName(normal(64, 0, 7))).toBeNull();
   });
 
+  test('names the extension SFX voices that the MU50 has', () => {
+    expect(voiceName(normal(64, 0, 37))).toBe('Feed');
+    expect(voiceName(normal(64, 0, 64))).toBe('Tel.Dial');
+    expect(voiceName(normal(64, 0, 68))).toBe('Scratch 2');
+  });
+
   test('names drum kits', () => {
     expect(voiceName(drum(127, 0))).toBe('Standard Kit');
     expect(voiceName(drum(127, 8))).toBe('Room Kit');
@@ -65,9 +71,9 @@ describe('isXgDrumKit', () => {
 });
 
 describe('XG voice list', () => {
-  test('has the XG minimum requirement voices without duplicates', () => {
+  test('has the XG minimum requirement voices and the MU50 SFX voices without duplicates', () => {
     expect(XG_NORMAL_VOICES).toHaveLength(440);
-    expect(XG_SFX_VOICES).toHaveLength(39);
+    expect(XG_SFX_VOICES).toHaveLength(42);
     const normalKeys = new Set(XG_NORMAL_VOICES.map(([program, lsb]) => `${program}/${lsb}`));
     expect(normalKeys.size).toBe(XG_NORMAL_VOICES.length);
     const sfxKeys = new Set(XG_SFX_VOICES.map(([program]) => program));

@@ -1,4 +1,5 @@
-// XG Level 1 voices from the XG Format Specifications ver. 1.26 (entries without [Ext.]).
+// XG Level 1 voices from the XG Format Specifications ver. 1.26 (entries without [Ext.]),
+// plus the [Ext.] SFX voices that the MU50 has (Feed, Tel.Dial, Scratch 2).
 // Programs are 0-based; the specification numbers them from 1.
 
 export const XG_NORMAL_VOICES: readonly (readonly [
@@ -458,14 +459,17 @@ export const XG_SFX_VOICES: readonly (readonly [program: number, name: string])[
   [34, 'Wind'],
   [35, 'Stream'],
   [36, 'Bubble'],
+  [37, 'Feed'],
   [48, 'Dog'],
   [49, 'Horse'],
   [50, 'Bird 2'],
   [54, 'Ghost'],
   [55, 'Maou'],
+  [64, 'Tel.Dial'],
   [65, 'DoorSqek'],
   [66, 'Door Slam'],
   [67, 'Scratch'],
+  [68, 'Scratch 2'],
   [69, 'WindChm'],
   [70, 'Telphon2'],
   [80, 'CarEngin'],
