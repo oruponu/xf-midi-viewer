@@ -12,11 +12,51 @@ export function formatChordRoot(r: ChordRoot): string {
   return r.note + (r.accidental === 'natural' ? '' : r.accidental);
 }
 
-export function formatChord(root: ChordRoot, type: string, bass: ChordBass | null): string {
+export const LEAD_SHEET_CHORD_TYPES: readonly string[] = [
+  '',
+  '6',
+  'M7',
+  'M7(#11)',
+  'add9',
+  'M9',
+  '69',
+  'aug',
+  'm',
+  'm6',
+  'm7',
+  'm7(b5)',
+  'madd9',
+  'm9',
+  'm11',
+  'mM7',
+  'mM9',
+  'dim',
+  'dim7',
+  '7',
+  '7sus4',
+  '7(b5)',
+  '9',
+  '7(#11)',
+  '13',
+  '7(b9)',
+  '7(b13)',
+  '7(#9)',
+  'augM7',
+  'aug7',
+  '1+8',
+  '5',
+  'sus4',
+  'sus2',
+  'N.C.',
+];
+
+export function formatChord(root: ChordRoot, typeIndex: number, bass: ChordBass | null): string {
+  const type = LEAD_SHEET_CHORD_TYPES[typeIndex]!;
   if (type === 'N.C.') return 'N.C.';
   let s = formatChordRoot(root) + type;
   if (bass) {
-    s += '/' + formatChordRoot(bass.root) + bass.type;
+    s += '/' + formatChordRoot(bass.root);
+    if (bass.typeIndex !== null) s += LEAD_SHEET_CHORD_TYPES[bass.typeIndex]!;
   }
   return s;
 }
@@ -74,7 +114,7 @@ function formatVoicingString({ fret, finger }: GuitarStringVoicing, index: numbe
 export function formatStyleDetail(ev: StyleMessage): string {
   switch (ev.kind) {
     case 'chord':
-      return formatChord(ev.root, ev.type, ev.bass);
+      return formatChord(ev.root, ev.typeIndex, ev.bass);
     case 'rehearsal':
       return `${ev.letter}${"'".repeat(ev.variation)}`;
     case 'phraseMark':

@@ -17,43 +17,43 @@ const NOTE_NAMES: ChordRoot['note'][] = ['reserved', 'C', 'D', 'E', 'F', 'G', 'A
 
 const ACCIDENTALS: ChordRoot['accidental'][] = ['bbb', 'bb', 'b', 'natural', '#', '##', '###'];
 
-export const CHORD_TYPES = [
-  '',
-  '6',
-  'M7',
-  'M7(#11)',
-  'add9',
-  'M9',
-  '69',
+export const XF_CHORD_TYPES: readonly string[] = [
+  'Maj',
+  'Maj6',
+  'Maj7',
+  'Maj7(#11)',
+  'Maj(9)',
+  'Maj7(9)',
+  'Maj6(9)',
   'aug',
-  'm',
-  'm6',
-  'm7',
-  'm7(b5)',
-  'madd9',
-  'm9',
-  'm11',
-  'mM7',
-  'mM9',
+  'min',
+  'min6',
+  'min7',
+  'min7b5',
+  'min(9)',
+  'min7(9)',
+  'min7(11)',
+  'minMaj7',
+  'minMaj7(9)',
   'dim',
   'dim7',
-  '7',
+  '7th',
   '7sus4',
-  '7(b5)',
-  '9',
+  '7b5',
+  '7(9)',
   '7(#11)',
-  '13',
+  '7(13)',
   '7(b9)',
   '7(b13)',
   '7(#9)',
-  'augM7',
-  'aug7',
+  'Maj7aug',
+  '7aug',
   '1+8',
-  '5',
+  '1+5',
   'sus4',
-  'sus2',
-  'N.C.',
-] as const;
+  '1+2+5',
+  'cc',
+];
 
 const REHEARSAL_LETTERS: RehearsalLetter[] = [
   'Intro',
@@ -119,9 +119,8 @@ function parseChord(data: Uint8Array, tick: number): StyleMessage | null {
   if (data.length < 7) return null;
   const root = decodeChordRoot(data[3]!);
   if (root === null) return null;
-  const typeIdx = data[4]!;
-  if (typeIdx >= CHORD_TYPES.length) return null;
-  const type = CHORD_TYPES[typeIdx]!;
+  const typeIndex = data[4]!;
+  if (typeIndex >= XF_CHORD_TYPES.length) return null;
 
   const bn = data[5]!;
   const bt = data[6]!;
@@ -129,12 +128,11 @@ function parseChord(data: Uint8Array, tick: number): StyleMessage | null {
   if (bn !== 127) {
     const bassRoot = decodeChordRoot(bn);
     if (bassRoot !== null) {
-      const btType = bt !== 127 && bt < CHORD_TYPES.length ? CHORD_TYPES[bt]! : '';
-      bass = { root: bassRoot, type: btType };
+      bass = { root: bassRoot, typeIndex: bt < XF_CHORD_TYPES.length ? bt : null };
     }
   }
 
-  return { kind: 'chord', tick, root, type, bass };
+  return { kind: 'chord', tick, root, typeIndex, bass };
 }
 
 function parseRehearsal(data: Uint8Array, tick: number): StyleMessage | null {

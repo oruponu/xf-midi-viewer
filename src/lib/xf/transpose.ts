@@ -1,4 +1,5 @@
 import type { KeySignature } from '../smf/timing.ts';
+import { XF_CHORD_TYPES } from './style.ts';
 import type { ChordBass, ChordRoot } from './types.ts';
 
 type Letter = Exclude<ChordRoot['note'], 'reserved'>;
@@ -29,17 +30,23 @@ const OFFSET_TO_ACCIDENTAL: Record<number, ChordRoot['accidental']> = {
 const MAJOR_SCALE: readonly number[] = [0, 2, 4, 5, 7, 9, 11];
 const MINOR_SCALE: readonly number[] = [0, 2, 3, 5, 7, 8, 10];
 
-const DIMINISHED_TYPES: ReadonlySet<string> = new Set(['dim', 'dim7', 'm7(b5)']);
-const MINOR_TYPES: ReadonlySet<string> = new Set([
-  'm',
-  'm6',
-  'm7',
-  'madd9',
-  'm9',
-  'm11',
-  'mM7',
-  'mM9',
-]);
+function chordTypes(...names: string[]): ReadonlySet<number> {
+  return new Set(names.map((name) => XF_CHORD_TYPES.indexOf(name)));
+}
+
+const DIMINISHED_TYPES = chordTypes('dim', 'dim7', 'min7b5');
+const MINOR_TYPES = chordTypes(
+  'min',
+  'min6',
+  'min7',
+  'min(9)',
+  'min7(9)',
+  'min7(11)',
+  'minMaj7',
+  'minMaj7(9)',
+);
+const FLAT_FIFTH_TYPES = chordTypes('dim', 'dim7', 'min7b5', '7b5');
+const AUGMENTED_TYPES = chordTypes('aug', 'Maj7aug', '7aug');
 
 const AWKWARD_NAMES: ReadonlySet<string> = new Set(['Cb', 'Fb', 'E#', 'B#']);
 
@@ -118,9 +125,9 @@ function keyOf(signature: KeySignature): Key {
   };
 }
 
-function prefersSharp(key: Key, interval: number, type: string): boolean {
-  if (DIMINISHED_TYPES.has(type)) return true;
-  if (!MINOR_TYPES.has(type)) return false;
+function prefersSharp(key: Key, interval: number, typeIndex: number): boolean {
+  if (DIMINISHED_TYPES.has(typeIndex)) return true;
+  if (!MINOR_TYPES.has(typeIndex)) return false;
   return key.minor ? interval !== 1 : interval === 6;
 }
 
@@ -136,17 +143,17 @@ function spellInKey(key: Key, semitone: number, sharp: (interval: number) => boo
 
 const BASS_LETTER_STEPS: readonly number[] = [0, 1, 1, 2, 2, 3, 3, 4, 5, 5, 6, 6];
 
-function bassLetterStep(interval: number, type: string): number {
-  if (interval === 6 && (type.includes('b5') || type.startsWith('dim'))) return 4;
-  if (interval === 8 && type.includes('aug')) return 4;
+function bassLetterStep(interval: number, typeIndex: number): number {
+  if (interval === 6 && FLAT_FIFTH_TYPES.has(typeIndex)) return 4;
+  if (interval === 8 && AUGMENTED_TYPES.has(typeIndex)) return 4;
   return BASS_LETTER_STEPS[interval]!;
 }
 
-function spellBass(key: Key, root: ChordRoot, type: string, semitone: number): ChordRoot {
+function spellBass(key: Key, root: ChordRoot, typeIndex: number, semitone: number): ChordRoot {
   const interval = mod(semitone - key.semitone, 12);
   if (key.scale.includes(interval)) return spellInKey(key, semitone, () => false);
   const rootLetter = LETTERS.indexOf(root.note as Letter);
-  const step = bassLetterStep(mod(semitone - semitoneOf(root), 12), type);
+  const step = bassLetterStep(mod(semitone - semitoneOf(root), 12), typeIndex);
   const spelled = spell(mod(rootLetter + step, 7), semitone);
   if (!isAwkward(spelled)) return spelled;
   return spellInKey(key, semitone, (i) => (key.minor ? i !== 1 : i === 6));
@@ -154,7 +161,7 @@ function spellBass(key: Key, root: ChordRoot, type: string, semitone: number): C
 
 export function transposeChord(
   root: ChordRoot,
-  type: string,
+  typeIndex: number,
   bass: ChordBass | null,
   semitones: number,
   key: KeySignature,
@@ -162,12 +169,12 @@ export function transposeChord(
   if (semitones === 0 || root.note === 'reserved') return { root, bass };
   const k = keyOf(key);
   const newRoot = spellInKey(k, mod(semitoneOf(root) + semitones, 12), (interval) =>
-    prefersSharp(k, interval, type),
+    prefersSharp(k, interval, typeIndex),
   );
   if (bass === null || bass.root.note === 'reserved') return { root: newRoot, bass };
   const bassSemitone = mod(semitoneOf(bass.root) + semitones, 12);
   return {
     root: newRoot,
-    bass: { root: spellBass(k, newRoot, type, bassSemitone), type: bass.type },
+    bass: { root: spellBass(k, newRoot, typeIndex, bassSemitone), typeIndex: bass.typeIndex },
   };
 }

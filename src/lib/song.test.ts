@@ -129,9 +129,9 @@ describe('buildSong', () => {
       ]),
     );
 
-    expect(song.chords.map((c) => [c.tick, c.root.note, c.type])).toEqual([
-      [0, 'C', ''],
-      [960, 'G', '7'],
+    expect(song.chords.map((c) => [c.tick, c.root.note, c.typeIndex])).toEqual([
+      [0, 'C', 0],
+      [960, 'G', 19],
     ]);
     expect(song.rehearsals.map((r) => [r.tick, r.letter])).toEqual([[480, 'A']]);
   });

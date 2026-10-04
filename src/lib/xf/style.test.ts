@@ -31,7 +31,7 @@ describe('parseStyleMessage - chord (0x01)', () => {
       kind: 'chord',
       tick: 100,
       root: { note: 'C', accidental: 'natural' },
-      type: '',
+      typeIndex: 0,
       bass: null,
     });
   });
@@ -40,8 +40,8 @@ describe('parseStyleMessage - chord (0x01)', () => {
     const msg = parseStyleMessage(u8(0x43, 0x7b, 0x01, 0x31, 0x02, 0x35, 0x00), 0);
     expect(msg).toMatchObject({
       kind: 'chord',
-      type: 'M7',
-      bass: { root: { note: 'G', accidental: 'natural' }, type: '' },
+      typeIndex: 2,
+      bass: { root: { note: 'G', accidental: 'natural' }, typeIndex: 0 },
     });
   });
 
@@ -70,8 +70,8 @@ describe('parseStyleMessage - chord (0x01)', () => {
     const msg = parseStyleMessage(u8(0x43, 0x7b, 0x01, 0x31, 0x02, 0x35, 0x7f), 0);
     expect(msg).toMatchObject({
       kind: 'chord',
-      type: 'M7',
-      bass: { root: { note: 'G', accidental: 'natural' }, type: '' },
+      typeIndex: 2,
+      bass: { root: { note: 'G', accidental: 'natural' }, typeIndex: null },
     });
   });
 });

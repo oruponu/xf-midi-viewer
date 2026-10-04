@@ -22,8 +22,8 @@ describe('formatStyleDetail - chord and rehearsal', () => {
         kind: 'chord',
         tick: 0,
         root: { note: 'C', accidental: 'natural' },
-        type: 'M7',
-        bass: { root: { note: 'G', accidental: 'natural' }, type: '' },
+        typeIndex: 2,
+        bass: { root: { note: 'G', accidental: 'natural' }, typeIndex: 0 },
       }),
     ).toBe('CM7/G');
   });
