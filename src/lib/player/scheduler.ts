@@ -2,6 +2,7 @@ import { transposeMessages } from '../smf/fixedKey.ts';
 import type { KeyShiftChange } from '../smf/fixedKey.ts';
 import { transposeMidiData } from '../smf/playback.ts';
 import type { PlaybackMidiMessage, PlaybackSequence } from '../smf/playback.ts';
+import { isChannelAudible, silencedChannels } from './channelMask.ts';
 import { collectChaseMessages } from './chase.ts';
 import { isLiveNoteOn, sendMidiPanic, sendMidiReset, trySendMidiMessage } from './messages.ts';
 import type { MidiOutputLike, MidiSendFailure } from './messages.ts';
@@ -83,6 +84,8 @@ export interface SchedulerState {
   isPlaying: boolean;
   playbackRate: number;
   keyShift: number;
+  mutedChannels: number;
+  soloChannels: number;
   sendError: MidiSendFailure | null;
 }
 
@@ -100,6 +103,8 @@ const INITIAL_STATE: SchedulerState = {
   isPlaying: false,
   playbackRate: 1,
   keyShift: 0,
+  mutedChannels: 0,
+  soloChannels: 0,
   sendError: null,
 };
 
@@ -150,7 +155,7 @@ export class MidiScheduler {
     this.sequence = sequence;
     this.drumChannels = sequence?.drumChannels ?? new Set();
     this.transposedMessages = null;
-    this.setState({ playbackRate: 1, keyShift: 0 });
+    this.setState({ playbackRate: 1, keyShift: 0, mutedChannels: 0, soloChannels: 0 });
     this.notify();
   }
 
@@ -240,6 +245,18 @@ export class MidiScheduler {
     if (isPlaying) this.restart(position);
   }
 
+  toggleMute(channel: number): void {
+    this.setChannelMasks(this.state.mutedChannels ^ (1 << channel), this.state.soloChannels);
+  }
+
+  toggleSolo(channel: number): void {
+    this.setChannelMasks(this.state.mutedChannels, this.state.soloChannels ^ (1 << channel));
+  }
+
+  clearChannelMasks(): void {
+    this.setChannelMasks(0, 0);
+  }
+
   sendReset(): void {
     const output = this.output;
     if (!output) return;
@@ -250,6 +267,25 @@ export class MidiScheduler {
 
   dispose(): void {
     this.stopInternal(false);
+  }
+
+  private setChannelMasks(muted: number, solo: number): void {
+    const { mutedChannels, soloChannels } = this.state;
+    if (muted === mutedChannels && solo === soloChannels) return;
+    const output = this.output;
+    if (this.intervalHandle !== null && output) {
+      const sendAt = Math.max(this.now(), this.fences.get(output) ?? 0);
+      for (const channel of silencedChannels(mutedChannels, soloChannels, muted, solo)) {
+        this.send(output, [0xb0 | channel, 120, 0], sendAt, this.reportSendFailure);
+        this.send(output, [0xb0 | channel, 123, 0], sendAt, this.reportSendFailure);
+      }
+    }
+    this.setState({ mutedChannels: muted, soloChannels: solo });
+    if (this.state.sendError !== null && this.intervalHandle !== null) {
+      this.stopInternal(false);
+      return;
+    }
+    this.notify();
   }
 
   private restart(position: number): void {
@@ -335,6 +371,7 @@ export class MidiScheduler {
   }
 
   private scheduleMessage(output: MidiOutputLike, message: PlaybackMidiMessage): boolean {
+    if (isLiveNoteOn(message.data) && !this.isAudible(message.data[0]! & 0x0f)) return true;
     const keyShift = this.transposedMessages ? 0 : this.state.keyShift;
     const data = transposeMidiData(message.data, keyShift, this.drumChannels);
     if (!data) return true;
@@ -342,6 +379,10 @@ export class MidiScheduler {
     const scheduledAt = timeAtPosition(segment, Math.max(message.seconds, segment.position));
     const sendAt = Math.max(scheduledAt, this.fences.get(output) ?? 0);
     return this.send(output, data, sendAt, this.reportSendFailure);
+  }
+
+  private isAudible(channel: number): boolean {
+    return isChannelAudible(this.state.mutedChannels, this.state.soloChannels, channel);
   }
 
   private midiMessages(sequence: PlaybackSequence): readonly PlaybackMidiMessage[] {
@@ -395,6 +436,8 @@ export class MidiScheduler {
       next.isPlaying === this.state.isPlaying &&
       next.playbackRate === this.state.playbackRate &&
       next.keyShift === this.state.keyShift &&
+      next.mutedChannels === this.state.mutedChannels &&
+      next.soloChannels === this.state.soloChannels &&
       next.sendError === this.state.sendError
     ) {
       return;
