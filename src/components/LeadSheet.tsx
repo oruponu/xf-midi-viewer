@@ -355,7 +355,9 @@ function ScoreRow({
                       return (
                         <span className="score-key" aria-label={`Key ${label}`}>
                           <span className="score-key-label">KEY</span>
-                          <span className="score-key-value">{label}</span>
+                          <span className="score-key-value">
+                            <AccidentalText text={label} />
+                          </span>
                         </span>
                       );
                     })()}

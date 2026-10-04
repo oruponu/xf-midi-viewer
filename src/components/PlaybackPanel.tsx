@@ -17,6 +17,7 @@ import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatKeySignature, shiftKeySignature, tickToBarBeat } from '../lib/smf/timing.ts';
 import type { KeySignature, SmfTiming } from '../lib/smf/timing.ts';
+import { AccidentalText } from './AccidentalText.tsx';
 
 const FIXED_KEY_NOTICE_MS = 4000;
 
@@ -290,7 +291,7 @@ function PlaybackReadout({
                     : 'playback-key-value'
                 }
               >
-                {keyLabel ?? '—'}
+                {keyLabel ? <AccidentalText text={keyLabel} /> : '—'}
               </span>
             </span>
             <span className="playback-key-shift">
