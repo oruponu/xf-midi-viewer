@@ -30,6 +30,18 @@ export function buildScoreRows(
   return rows;
 }
 
+export function sameScoreRows(a: readonly ScoreRowSpec[], b: readonly ScoreRowSpec[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every(
+      (row, i) =>
+        row.startBar === b[i]!.startBar &&
+        row.barCount === b[i]!.barCount &&
+        row.barsPerRow === b[i]!.barsPerRow,
+    )
+  );
+}
+
 function pushFittedRows(
   rows: ScoreRowSpec[],
   startBar: number,

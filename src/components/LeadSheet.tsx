@@ -5,7 +5,7 @@ import { barDemands, barFits, labelScale } from '../lib/layout/barFit.ts';
 import type { LabelDemands, MeasuredLabel } from '../lib/layout/barFit.ts';
 import { barTempos } from '../lib/layout/barTempos.ts';
 import { PANEL_INSET_CHANGE_EVENT } from '../lib/layout/panelCover.ts';
-import { buildScoreRows, countScoreBars } from '../lib/layout/scoreRows.ts';
+import { buildScoreRows, countScoreBars, sameScoreRows } from '../lib/layout/scoreRows.ts';
 import type { ScoreRowSpec } from '../lib/layout/scoreRows.ts';
 import { labelSpan, spreadLabels } from '../lib/layout/spread.ts';
 import type { SpreadItem } from '../lib/layout/spread.ts';
@@ -128,7 +128,7 @@ export const LeadSheet = memo(function LeadSheet({
     };
   }, [chords, renderable, timing, keyShifts, totalBars]);
 
-  const rows = useMemo<ScoreRowSpec[]>(() => {
+  const builtRows = useMemo<ScoreRowSpec[]>(() => {
     const sectionStartBars = rehearsals.flatMap((r) => tickToBarBeat(r.tick, timing)?.bar ?? []);
     const fit = labelFit !== null && labelFit.width > 0 ? labelFit : null;
     const fits = fit
@@ -136,6 +136,10 @@ export const LeadSheet = memo(function LeadSheet({
       : undefined;
     return buildScoreRows(totalBars, barsPerRow, sectionStartBars, fits);
   }, [rehearsals, timing, totalBars, barsPerRow, labelFit]);
+
+  // A new array for the same rows would restart the playhead effect, which auto-scrolls.
+  const [rows, setRows] = useState(builtRows);
+  if (rows !== builtRows && !sameScoreRows(rows, builtRows)) setRows(builtRows);
 
   const barTimeSignatures = useMemo(() => {
     const map = new Map<number, TimeSignature>();

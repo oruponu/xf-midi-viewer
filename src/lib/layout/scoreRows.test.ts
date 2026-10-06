@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { SmfTiming } from '../smf/timing.ts';
-import { buildScoreRows, countScoreBars } from './scoreRows.ts';
+import { buildScoreRows, countScoreBars, sameScoreRows } from './scoreRows.ts';
 import type { BarFit } from './scoreRows.ts';
 
 const rows = (barsPerRow: number, ...specs: [number, number][]) =>
@@ -117,6 +117,24 @@ const timing: SmfTiming = {
   keySignatures: [],
 };
 const BAR = 1920;
+
+describe('sameScoreRows', () => {
+  test('treats rows built again from the same layout as the same', () => {
+    expect(sameScoreRows(rows(4, [1, 4], [5, 2]), rows(4, [1, 4], [5, 2]))).toBe(true);
+  });
+
+  test('tells apart a different number of rows', () => {
+    expect(sameScoreRows(rows(4, [1, 4]), rows(4, [1, 4], [5, 2]))).toBe(false);
+  });
+
+  test('tells apart a row with another bar count', () => {
+    expect(sameScoreRows(rows(4, [1, 4], [5, 2]), rows(4, [1, 4], [5, 1]))).toBe(false);
+  });
+
+  test('tells apart a row with another bars-per-row', () => {
+    expect(sameScoreRows([row(1, 2, 4)], [row(1, 2, 2)])).toBe(false);
+  });
+});
 
 describe('countScoreBars', () => {
   test('returns 0 without chords, rehearsal marks or lyrics', () => {
