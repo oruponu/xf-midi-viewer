@@ -4,12 +4,16 @@ import type { SmfTiming } from '../smf/timing.ts';
 export interface ScoreRowSpec {
   startBar: number;
   barCount: number;
+  barsPerRow: number;
 }
+
+export type BarFit = (bar: number, barsPerRow: number) => boolean;
 
 export function buildScoreRows(
   totalBars: number,
   barsPerRow: number,
   sectionStartBars: Iterable<number>,
+  fits: BarFit = () => true,
 ): ScoreRowSpec[] {
   const breaks = [...new Set(sectionStartBars)]
     .filter((bar) => bar > 1 && bar <= totalBars)
@@ -19,11 +23,31 @@ export function buildScoreRows(
   let start = 1;
   for (const end of breaks) {
     for (let s = start; s < end; s += barsPerRow) {
-      rows.push({ startBar: s, barCount: Math.min(barsPerRow, end - s) });
+      pushFittedRows(rows, s, Math.min(barsPerRow, end - s), barsPerRow, fits);
     }
     start = end;
   }
   return rows;
+}
+
+function pushFittedRows(
+  rows: ScoreRowSpec[],
+  startBar: number,
+  barCount: number,
+  barsPerRow: number,
+  fits: BarFit,
+): void {
+  const end = startBar + barCount;
+  let allFit = true;
+  for (let bar = startBar; bar < end && allFit; bar += 1) allFit = fits(bar, barsPerRow);
+  if (allFit || barsPerRow <= 1) {
+    rows.push({ startBar, barCount, barsPerRow });
+    return;
+  }
+  const next = Math.floor(barsPerRow / 2);
+  for (let s = startBar; s < end; s += next) {
+    pushFittedRows(rows, s, Math.min(next, end - s), next, fits);
+  }
 }
 
 export function countScoreBars(

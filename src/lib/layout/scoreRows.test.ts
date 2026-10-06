@@ -1,9 +1,21 @@
 import { describe, expect, test } from 'bun:test';
 import type { SmfTiming } from '../smf/timing.ts';
 import { buildScoreRows, countScoreBars } from './scoreRows.ts';
+import type { BarFit } from './scoreRows.ts';
 
-const rows = (...specs: [number, number][]) =>
-  specs.map(([startBar, barCount]) => ({ startBar, barCount }));
+const rows = (barsPerRow: number, ...specs: [number, number][]) =>
+  specs.map(([startBar, barCount]) => ({ startBar, barCount, barsPerRow }));
+
+const row = (startBar: number, barCount: number, barsPerRow: number) => ({
+  startBar,
+  barCount,
+  barsPerRow,
+});
+
+const fitsUpTo =
+  (maxBarsPerRow: Record<number, number>): BarFit =>
+  (bar, barsPerRow) =>
+    barsPerRow <= (maxBarsPerRow[bar] ?? Infinity);
 
 describe('buildScoreRows', () => {
   test('returns no rows for an empty score', () => {
@@ -11,29 +23,81 @@ describe('buildScoreRows', () => {
   });
 
   test('splits the score into fixed rows without section starts', () => {
-    expect(buildScoreRows(10, 4, [])).toEqual(rows([1, 4], [5, 4], [9, 2]));
+    expect(buildScoreRows(10, 4, [])).toEqual(rows(4, [1, 4], [5, 4], [9, 2]));
   });
 
   test('starts a new row at each section start', () => {
-    expect(buildScoreRows(13, 4, [2, 6])).toEqual(rows([1, 1], [2, 4], [6, 4], [10, 4]));
+    expect(buildScoreRows(13, 4, [2, 6])).toEqual(rows(4, [1, 1], [2, 4], [6, 4], [10, 4]));
   });
 
   test('leaves a short row before the next section', () => {
     expect(buildScoreRows(22, 4, [10, 19])).toEqual(
-      rows([1, 4], [5, 4], [9, 1], [10, 4], [14, 4], [18, 1], [19, 4]),
+      rows(4, [1, 4], [5, 4], [9, 1], [10, 4], [14, 4], [18, 1], [19, 4]),
     );
   });
 
   test('counts rows of two bars on narrow screens', () => {
-    expect(buildScoreRows(8, 2, [3, 6])).toEqual(rows([1, 2], [3, 2], [5, 1], [6, 2], [8, 1]));
+    expect(buildScoreRows(8, 2, [3, 6])).toEqual(rows(2, [1, 2], [3, 2], [5, 1], [6, 2], [8, 1]));
   });
 
   test('ignores duplicate and unsorted section starts', () => {
-    expect(buildScoreRows(9, 4, [5, 2, 5])).toEqual(rows([1, 1], [2, 3], [5, 4], [9, 1]));
+    expect(buildScoreRows(9, 4, [5, 2, 5])).toEqual(rows(4, [1, 1], [2, 3], [5, 4], [9, 1]));
   });
 
   test('ignores section starts at bar 1 or outside the score', () => {
-    expect(buildScoreRows(6, 4, [1, 0, 7, 12])).toEqual(rows([1, 4], [5, 2]));
+    expect(buildScoreRows(6, 4, [1, 0, 7, 12])).toEqual(rows(4, [1, 4], [5, 2]));
+  });
+
+  test('keeps the fixed rows when every bar fits', () => {
+    expect(buildScoreRows(8, 4, [], () => true)).toEqual(rows(4, [1, 4], [5, 4]));
+  });
+
+  test('halves a row with a bar that does not fit', () => {
+    expect(buildScoreRows(8, 4, [], fitsUpTo({ 2: 2 }))).toEqual([
+      row(1, 2, 2),
+      row(3, 2, 2),
+      row(5, 4, 4),
+    ]);
+  });
+
+  test('halves only the half that still does not fit', () => {
+    expect(buildScoreRows(4, 4, [], fitsUpTo({ 1: 1 }))).toEqual([
+      row(1, 1, 1),
+      row(2, 1, 1),
+      row(3, 2, 2),
+    ]);
+  });
+
+  test('splits a three-bar row into two bars and one bar', () => {
+    expect(buildScoreRows(3, 4, [], fitsUpTo({ 3: 2 }))).toEqual([row(1, 2, 2), row(3, 1, 2)]);
+  });
+
+  test('widens a single-bar row instead of splitting it', () => {
+    expect(buildScoreRows(5, 4, [], fitsUpTo({ 5: 1 }))).toEqual([row(1, 4, 4), row(5, 1, 1)]);
+  });
+
+  test('gives a bar that fits nowhere a full row', () => {
+    expect(buildScoreRows(4, 4, [], fitsUpTo({ 2: 0 }))).toEqual([
+      row(1, 1, 1),
+      row(2, 1, 1),
+      row(3, 2, 2),
+    ]);
+  });
+
+  test('splits rows within each section', () => {
+    expect(buildScoreRows(8, 4, [5], fitsUpTo({ 6: 2 }))).toEqual([
+      row(1, 4, 4),
+      row(5, 2, 2),
+      row(7, 2, 2),
+    ]);
+  });
+
+  test('halves two-bar rows on narrow screens', () => {
+    expect(buildScoreRows(4, 2, [], fitsUpTo({ 3: 1 }))).toEqual([
+      row(1, 2, 2),
+      row(3, 1, 1),
+      row(4, 1, 1),
+    ]);
   });
 });
 
