@@ -1,5 +1,8 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useMediaQuery } from '../hooks/useMediaQuery.ts';
+import { barDemands, barFits, labelScale } from '../lib/layout/barFit.ts';
+import type { LabelDemands, MeasuredLabel } from '../lib/layout/barFit.ts';
 import { barTempos } from '../lib/layout/barTempos.ts';
 import { PANEL_INSET_CHANGE_EVENT } from '../lib/layout/panelCover.ts';
 import { buildScoreRows, countScoreBars } from '../lib/layout/scoreRows.ts';
@@ -32,6 +35,13 @@ const CHORD_PAD = 2;
 const CHORD_GAP = 8;
 const LYRIC_PAD = 6;
 const LYRIC_GAP = 2;
+
+const STAFF_BORDER = 2;
+
+interface LabelFit {
+  demands: LabelDemands;
+  width: number;
+}
 
 interface Placement {
   xPercent: number;
@@ -88,10 +98,44 @@ export const LeadSheet = memo(function LeadSheet({
   const isNarrow = useMediaQuery('(max-width: 720px)');
   const barsPerRow = isNarrow ? NARROW_BARS_PER_ROW : BARS_PER_ROW;
 
+  const scoreRef = useRef<HTMLDivElement | null>(null);
+  const measureRef = useRef<HTMLDivElement | null>(null);
+  const [labelFit, setLabelFit] = useState<LabelFit | null>(null);
+
+  useLayoutEffect(() => {
+    const score = scoreRef.current;
+    const layer = measureRef.current;
+    if (!score || !layer) return;
+    let cancelled = false;
+    let demands = measureDemands(layer);
+    const update = () => {
+      const width = score.clientWidth;
+      setLabelFit((prev) =>
+        prev?.demands === demands && prev.width === width ? prev : { demands, width },
+      );
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(score);
+    void document.fonts.ready.then(() => {
+      if (cancelled) return;
+      demands = measureDemands(layer);
+      update();
+    });
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [chords, renderable, timing, keyShifts, totalBars]);
+
   const rows = useMemo<ScoreRowSpec[]>(() => {
     const sectionStartBars = rehearsals.flatMap((r) => tickToBarBeat(r.tick, timing)?.bar ?? []);
-    return buildScoreRows(totalBars, barsPerRow, sectionStartBars);
-  }, [rehearsals, timing, totalBars, barsPerRow]);
+    const fit = labelFit !== null && labelFit.width > 0 ? labelFit : null;
+    const fits = fit
+      ? (bar: number, rowBars: number) => barFits(fit.demands, bar, barWidth(fit.width, rowBars))
+      : undefined;
+    return buildScoreRows(totalBars, barsPerRow, sectionStartBars, fits);
+  }, [rehearsals, timing, totalBars, barsPerRow, labelFit]);
 
   const barTimeSignatures = useMemo(() => {
     const map = new Map<number, TimeSignature>();
@@ -125,8 +169,6 @@ export const LeadSheet = memo(function LeadSheet({
     () => barTempos(sequence.tempos, timing, totalBars, playbackRate),
     [sequence.tempos, timing, totalBars, playbackRate],
   );
-
-  const scoreRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const container = scoreRef.current;
@@ -211,22 +253,45 @@ export const LeadSheet = memo(function LeadSheet({
   return (
     <div className="card lead-sheet">
       <div className="score" ref={scoreRef}>
-        {rows.map((row) => (
-          <ScoreRow
-            key={row.startBar}
-            startBar={row.startBar}
-            barCount={row.barCount}
-            barsPerRow={barsPerRow}
-            chords={chords}
-            rehearsals={rehearsals}
-            syllables={renderable}
-            timing={timing}
-            barTimeSignatures={barTimeSignatures}
-            barKeySignatures={barKeySignatures}
-            barTempoBpms={barTempoBpms}
-            keyShifts={keyShifts}
-          />
-        ))}
+        {rows.map((row) => {
+          const scales = rowScales(labelFit, row);
+          return (
+            <ScoreRow
+              key={row.startBar}
+              startBar={row.startBar}
+              barCount={row.barCount}
+              barsPerRow={row.barsPerRow}
+              chordScale={scales.chord}
+              lyricScale={scales.lyric}
+              chords={chords}
+              rehearsals={rehearsals}
+              syllables={renderable}
+              timing={timing}
+              barTimeSignatures={barTimeSignatures}
+              barKeySignatures={barKeySignatures}
+              barTempoBpms={barTempoBpms}
+              keyShifts={keyShifts}
+            />
+          );
+        })}
+      </div>
+      <div className="score-measure" ref={measureRef} aria-hidden="true">
+        <div className="score-measure-chords">
+          {chords.map((c, i) => (
+            <ChordLabel
+              key={i}
+              msg={c}
+              bar={barNumberAt(c.tick, timing)}
+              timing={timing}
+              keyShifts={keyShifts}
+            />
+          ))}
+        </div>
+        <div className="score-measure-lyrics">
+          {renderable.map((s, i) => (
+            <LyricLabel key={i} syllable={s} bar={barNumberAt(s.tick, timing)} />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -255,6 +320,8 @@ function ScoreRow({
   startBar,
   barCount,
   barsPerRow,
+  chordScale,
+  lyricScale,
   chords,
   rehearsals,
   syllables,
@@ -267,6 +334,8 @@ function ScoreRow({
   startBar: number;
   barCount: number;
   barsPerRow: number;
+  chordScale: number;
+  lyricScale: number;
   chords: ChordMessage[];
   rehearsals: RehearsalMessage[];
   syllables: LyricSyllable[];
@@ -328,7 +397,7 @@ function ScoreRow({
       cancelled = true;
       observer.disconnect();
     };
-  }, [placedChords, placedSyllables, barCount, keyShifts]);
+  }, [placedChords, placedSyllables, barCount, keyShifts, chordScale, lyricScale]);
 
   const bars = useMemo(
     () => Array.from({ length: barCount }, (_, i) => startBar + i),
@@ -399,48 +468,97 @@ function ScoreRow({
           })}
         </div>
 
-        <div className="score-chords" ref={chordsRef}>
+        <div
+          className="score-chords"
+          ref={chordsRef}
+          style={scaleStyle('--score-chord-scale', chordScale)}
+        >
           {placedChords.map((p, i) => (
-            <span
+            <ChordLabel
               key={i}
-              className="score-chord"
-              data-tick={p.msg.tick}
-              data-bar={p.barIndex}
-              style={{ left: `${p.xPercent}%` }}
-            >
-              <AccidentalText text={formatTransposedChord(p.msg, timing, keyShifts)} />
-            </span>
+              msg={p.msg}
+              bar={p.barIndex}
+              left={p.xPercent}
+              timing={timing}
+              keyShifts={keyShifts}
+            />
           ))}
         </div>
 
         {placedSyllables.length > 0 && (
-          <div className="score-lyrics" ref={lyricsRef}>
+          <div
+            className="score-lyrics"
+            ref={lyricsRef}
+            style={scaleStyle('--score-lyric-scale', lyricScale)}
+          >
             {placedSyllables.map((p, i) => (
-              <span
-                key={i}
-                className="score-lyric"
-                data-tick={p.syllable.tick}
-                data-bar={p.barIndex}
-                style={{ left: `${p.xPercent}%` }}
-              >
-                {p.syllable.runs.map((run, j) => {
-                  if (run.kind === 'text') {
-                    return <span key={j}>{run.text}</span>;
-                  }
-                  return (
-                    <ruby key={j}>
-                      <span>{run.base}</span>
-                      <rt>{run.reading}</rt>
-                    </ruby>
-                  );
-                })}
-              </span>
+              <LyricLabel key={i} syllable={p.syllable} bar={p.barIndex} left={p.xPercent} />
             ))}
           </div>
         )}
       </div>
     </div>
   );
+}
+
+function ChordLabel({
+  msg,
+  bar,
+  left,
+  timing,
+  keyShifts,
+}: {
+  msg: ChordMessage;
+  bar: number;
+  left?: number;
+  timing: SmfTiming;
+  keyShifts: readonly KeyShiftChange[];
+}) {
+  return (
+    <span
+      className="score-chord"
+      data-tick={msg.tick}
+      data-bar={bar}
+      style={left === undefined ? undefined : { left: `${left}%` }}
+    >
+      <AccidentalText text={formatTransposedChord(msg, timing, keyShifts)} />
+    </span>
+  );
+}
+
+function LyricLabel({
+  syllable,
+  bar,
+  left,
+}: {
+  syllable: LyricSyllable;
+  bar: number;
+  left?: number;
+}) {
+  return (
+    <span
+      className="score-lyric"
+      data-tick={syllable.tick}
+      data-bar={bar}
+      style={left === undefined ? undefined : { left: `${left}%` }}
+    >
+      {syllable.runs.map((run, j) => {
+        if (run.kind === 'text') {
+          return <span key={j}>{run.text}</span>;
+        }
+        return (
+          <ruby key={j}>
+            <span>{run.base}</span>
+            <rt>{run.reading}</rt>
+          </ruby>
+        );
+      })}
+    </span>
+  );
+}
+
+function scaleStyle(name: string, scale: number): CSSProperties | undefined {
+  return scale === 1 ? undefined : ({ [name]: scale } as CSSProperties);
 }
 
 function findSignatureAt(tick: number, signatures: TimeSignatureChange[]): TimeSignature {
@@ -544,4 +662,50 @@ function measureLabel(el: HTMLElement, x: number): SpreadItem {
     right = Math.max(right, r.right - rect.left);
   }
   return { x, left, right };
+}
+
+function barNumberAt(tick: number, timing: SmfTiming): number {
+  return Math.floor(barPositionAt(tick, timing)) + 1;
+}
+
+function barWidth(scoreWidth: number, barsPerRow: number): number {
+  return scoreWidth / barsPerRow - STAFF_BORDER;
+}
+
+function rowScales(fit: LabelFit | null, row: ScoreRowSpec): { chord: number; lyric: number } {
+  if (fit === null || fit.width <= 0) return { chord: 1, lyric: 1 };
+  const width = barWidth(fit.width, row.barsPerRow);
+  return {
+    chord: labelScale(fit.demands.chords, row.startBar, row.barCount, width),
+    lyric: labelScale(fit.demands.lyrics, row.startBar, row.barCount, width),
+  };
+}
+
+function measureDemands(layer: HTMLElement): LabelDemands {
+  return {
+    chords: barDemands(
+      measureLabels(layer.querySelector('.score-measure-chords')),
+      CHORD_PAD,
+      CHORD_GAP,
+    ),
+    lyrics: barDemands(
+      measureLabels(layer.querySelector('.score-measure-lyrics')),
+      LYRIC_PAD,
+      LYRIC_GAP,
+    ),
+  };
+}
+
+function measureLabels(layer: Element | null): MeasuredLabel[] {
+  if (!layer) return [];
+  return Array.from(layer.children as HTMLCollectionOf<HTMLElement>, (el) => {
+    const { left, right } = measureLabel(el, 0);
+    const style = getComputedStyle(el);
+    return {
+      bar: Number(el.dataset.bar ?? '0'),
+      left,
+      right,
+      fixed: parseFloat(style.paddingLeft) + parseFloat(style.paddingRight),
+    };
+  });
 }
