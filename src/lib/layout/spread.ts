@@ -4,7 +4,10 @@ export interface SpreadItem {
   right: number;
 }
 
-export function labelSpan(items: SpreadItem[], gap: number): number {
+export function labelSpan(
+  items: readonly Pick<SpreadItem, 'left' | 'right'>[],
+  gap: number,
+): number {
   let span = 0;
   items.forEach((item, i) => {
     span += item.right - item.left + (i > 0 ? gap : 0);
