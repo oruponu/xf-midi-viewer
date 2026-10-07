@@ -1,5 +1,5 @@
 import { isValidMidiMessage, splitMidiMessages } from '../player/messages.ts';
-import { xgPartModeChange } from './drumMode.ts';
+import { markDrumNotes, xgPartModeChange } from './drumMode.ts';
 import type { SmfFile, SmfTrack, TrackEvent } from './types.ts';
 
 export interface PlaybackNote {
@@ -22,6 +22,7 @@ export interface PlaybackMidiMessage {
   tick: number;
   seconds: number;
   data: number[];
+  isDrum?: boolean;
 }
 
 export interface PlaybackSequence {
@@ -82,6 +83,7 @@ export function buildPlaybackSequence(smf: SmfFile): PlaybackSequence {
   const midiMessages = absoluteTracks.flatMap((track) => collectMidiMessages(track, tickToSeconds));
   notes.sort((a, b) => a.startSeconds - b.startSeconds || a.channel - b.channel || a.note - b.note);
   midiMessages.sort((a, b) => a.tick - b.tick);
+  markDrumNotes(midiMessages);
 
   let durationSeconds = Math.max(tickToSeconds(durationTicks), 0);
   for (const note of notes) {

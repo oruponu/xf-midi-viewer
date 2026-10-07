@@ -1,4 +1,5 @@
 import { isResetSysex } from '../player/chase.ts';
+import { ALL_NOTES_OFF_CONTROLLERS } from '../player/messages.ts';
 import { transposeMidiData } from './playback.ts';
 import type { PlaybackMidiMessage } from './playback.ts';
 import type { SmfTiming } from './timing.ts';
@@ -7,8 +8,6 @@ export interface KeyShiftChange {
   tick: number;
   semitones: number;
 }
-
-const ALL_NOTES_OFF_CONTROLLERS: ReadonlySet<number> = new Set([120, 123, 124, 125, 126, 127]);
 
 function shiftToC(sharps: number): number {
   const semitones = (((-7 * sharps) % 12) + 12) % 12;

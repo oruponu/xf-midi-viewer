@@ -286,6 +286,31 @@ describe('buildPlaybackSequence', () => {
       },
     ]);
   });
+
+  test('marks the notes of drum sections in file order within a tick', () => {
+    const sequence = buildPlaybackSequence(
+      makeSmf([
+        track([
+          controlChange(0, 0, 127, 8),
+          programChange(0, 0, 8),
+          noteOn(0, 36, 100, 8),
+          noteOff(480, 36, 64, 8),
+          controlChange(0, 0, 0, 8),
+          programChange(0, 0, 8),
+          noteOn(0, 60, 100, 8),
+          noteOff(480, 60, 64, 8),
+        ]),
+      ]),
+    );
+
+    const notes = sequence.midiMessages.filter((m) => (m.data[0]! & 0xe0) === 0x80);
+    expect(notes.map((m) => [m.data[1], m.isDrum === true])).toEqual([
+      [36, true],
+      [36, true],
+      [60, false],
+      [60, false],
+    ]);
+  });
 });
 
 describe('tickToSeconds', () => {

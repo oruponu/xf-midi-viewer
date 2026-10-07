@@ -1,4 +1,6 @@
 import { isResetSysex } from '../player/chase.ts';
+import { ALL_NOTES_OFF_CONTROLLERS, isLiveNoteOn } from '../player/messages.ts';
+import type { PlaybackMidiMessage } from './playback.ts';
 
 export interface XgPartModeChange {
   channel: number;
@@ -63,6 +65,40 @@ export class DrumModeTracker {
 
   bankMSB(channel: number): number {
     return this.channels[channel]!.bankMSB;
+  }
+}
+
+export function markDrumNotes(messages: readonly PlaybackMidiMessage[]): void {
+  const drumMode = new DrumModeTracker();
+  const sounding = Array.from({ length: CHANNEL_COUNT }, () => new Map<number, boolean[]>());
+  for (const message of messages) {
+    const { data } = message;
+    const status = data[0]!;
+    if (status === 0xf0 && isResetSysex(data)) {
+      for (const notes of sounding) notes.clear();
+    }
+    drumMode.apply(data);
+    if (status >= 0xf0) continue;
+    const channel = status & 0x0f;
+    const notes = sounding[channel]!;
+    const kind = status & 0xf0;
+    if (kind === 0xb0 && ALL_NOTES_OFF_CONTROLLERS.has(data[1]!)) {
+      notes.clear();
+      continue;
+    }
+    if (kind !== 0x80 && kind !== 0x90 && kind !== 0xa0) continue;
+    const queue = notes.get(data[1]!);
+    let isDrum: boolean;
+    if (isLiveNoteOn(data)) {
+      isDrum = drumMode.isDrum(channel);
+      if (queue) queue.push(isDrum);
+      else notes.set(data[1]!, [isDrum]);
+    } else if (kind === 0xa0) {
+      isDrum = queue?.[0] ?? drumMode.isDrum(channel);
+    } else {
+      isDrum = queue?.shift() ?? drumMode.isDrum(channel);
+    }
+    if (isDrum) message.isDrum = true;
   }
 }
 
