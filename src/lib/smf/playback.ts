@@ -1,4 +1,5 @@
 import { isValidMidiMessage, splitMidiMessages } from '../player/messages.ts';
+import { xgPartModeChange } from './drumMode.ts';
 import type { SmfFile, SmfTrack, TrackEvent } from './types.ts';
 
 export interface PlaybackNote {
@@ -50,11 +51,6 @@ interface ActiveNote {
   note: number;
   velocity: number;
   startTick: number;
-}
-
-export interface XgPartModeChange {
-  channel: number;
-  isDrum: boolean;
 }
 
 const DEFAULT_MICROSECONDS_PER_QUARTER = 500_000;
@@ -149,19 +145,6 @@ export function detectDrumChannels(smf: SmfFile): Set<number> {
     }
   }
   return drums;
-}
-
-export function xgPartModeChange(data: ArrayLike<number>): XgPartModeChange | null {
-  if (data.length < 8) return null;
-  if (data[0] !== 0x43) return null;
-  if ((data[1]! & 0xf0) !== 0x10) return null;
-  if (data[2] !== 0x4c) return null;
-  if (data[3] !== 0x08) return null;
-  if (data[5] !== 0x07) return null;
-  const mode = data[6]!;
-  if (mode > 3) return null;
-  const part = data[4]!;
-  return part <= 15 ? { channel: part, isDrum: mode !== 0 } : null;
 }
 
 export function secondsToTick(seconds: number, sequence: PlaybackSequence): number {

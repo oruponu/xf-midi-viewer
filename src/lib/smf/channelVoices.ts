@@ -1,7 +1,7 @@
 import { isResetSysex } from '../player/chase.ts';
 import { isLiveNoteOn } from '../player/messages.ts';
 import { isXgDrumKit, isXgSfxKit } from '../xg/voiceNames.ts';
-import { xgPartModeChange } from './playback.ts';
+import { xgPartModeChange } from './drumMode.ts';
 import type { PlaybackMidiMessage } from './playback.ts';
 
 export interface ChannelVoice {
