@@ -31,8 +31,6 @@ function m(tick: number, data: number[]): PlaybackMidiMessage {
   return { tick, seconds: tick / 960, data };
 }
 
-const noDrums: ReadonlySet<number> = new Set();
-
 describe('buildFixedKeyShifts', () => {
   test('picks the nearer direction within -6 to +5', () => {
     expect(buildFixedKeyShifts(timingWith([[0, 0]]))).toEqual([{ tick: 0, semitones: 0 }]);
@@ -151,7 +149,6 @@ describe('transposeMessages', () => {
         m(2880, [0x80, 60, 0]),
       ],
       shifts,
-      noDrums,
     );
     expect(result.map((r) => r.data)).toEqual([
       [0x90, 62, 100],
@@ -162,11 +159,7 @@ describe('transposeMessages', () => {
   });
 
   test('shifts a note-off by the shift of its note-on across a key change', () => {
-    const result = transposeMessages(
-      [m(1000, [0x90, 60, 100]), m(2000, [0x80, 60, 0])],
-      shifts,
-      noDrums,
-    );
+    const result = transposeMessages([m(1000, [0x90, 60, 100]), m(2000, [0x80, 60, 0])], shifts);
     expect(result.map((r) => r.data)).toEqual([
       [0x90, 62, 100],
       [0x80, 62, 0],
@@ -174,11 +167,7 @@ describe('transposeMessages', () => {
   });
 
   test('treats a note-on with velocity 0 as a note-off', () => {
-    const result = transposeMessages(
-      [m(1000, [0x90, 60, 100]), m(2000, [0x90, 60, 0])],
-      shifts,
-      noDrums,
-    );
+    const result = transposeMessages([m(1000, [0x90, 60, 100]), m(2000, [0x90, 60, 0])], shifts);
     expect(result.map((r) => r.data)).toEqual([
       [0x90, 62, 100],
       [0x90, 62, 0],
@@ -194,7 +183,6 @@ describe('transposeMessages', () => {
         m(2100, [0x80, 60, 0]),
       ],
       shifts,
-      noDrums,
     );
     expect(result.map((r) => r.data)).toEqual([
       [0x90, 62, 100],
@@ -216,7 +204,6 @@ describe('transposeMessages', () => {
         { tick: 0, semitones: 2 },
         { tick: 1920, semitones: -1 },
       ],
-      noDrums,
     );
     expect(result.map((r) => r.data)).toEqual([
       [0x90, 59, 100],
@@ -230,7 +217,6 @@ describe('transposeMessages', () => {
     const result = transposeMessages(
       [m(1000, [0x90, 60, 100]), m(2000, [0xa0, 60, 50]), m(2000, [0xa0, 64, 50])],
       shifts,
-      noDrums,
     );
     expect(result.map((r) => r.data)).toEqual([
       [0x90, 62, 100],
@@ -250,7 +236,6 @@ describe('transposeMessages', () => {
         m(2100, [0x81, 60, 0]),
       ],
       shifts,
-      noDrums,
     );
     expect(result.map((r) => r.data)).toEqual([
       [0x90, 62, 100],
@@ -272,7 +257,6 @@ describe('transposeMessages', () => {
           m(2000, [0x80, 60, 0]),
         ],
         shifts,
-        noDrums,
       );
       expect(result.at(-1)!.data).toEqual([0x80, 59, 0]);
     }
@@ -291,7 +275,6 @@ describe('transposeMessages', () => {
         m(2000, [0x81, 60, 0]),
       ],
       shifts,
-      noDrums,
     );
     expect(result.slice(-2).map((r) => r.data)).toEqual([
       [0x80, 59, 0],
@@ -299,17 +282,26 @@ describe('transposeMessages', () => {
     ]);
   });
 
-  test('does not shift drum channels', () => {
-    const drum = m(0, [0x99, 36, 100]);
-    const result = transposeMessages([drum], shifts, new Set([9]));
-    expect(result[0]).toBe(drum);
+  test('does not shift notes marked as drums and keeps them as the same objects', () => {
+    const on = { ...m(0, [0x99, 36, 100]), isDrum: true };
+    const off = { ...m(960, [0x89, 36, 0]), isDrum: true };
+    const result = transposeMessages([on, off], shifts);
+    expect(result[0]).toBe(on);
+    expect(result[1]).toBe(off);
+  });
+
+  test('shifts notes on channel 10 that are not marked as drums', () => {
+    const result = transposeMessages([m(0, [0x99, 36, 100]), m(960, [0x89, 36, 0])], shifts);
+    expect(result.map((r) => r.data)).toEqual([
+      [0x99, 38, 100],
+      [0x89, 38, 0],
+    ]);
   });
 
   test('drops both the note-on and the note-off when the shifted pitch is out of range', () => {
     const result = transposeMessages(
       [m(0, [0x90, 127, 100]), m(10, [0xb0, 7, 100]), m(960, [0x80, 127, 0])],
       shifts,
-      noDrums,
     );
     expect(result.map((r) => r.data)).toEqual([[0xb0, 7, 100]]);
   });
@@ -317,7 +309,7 @@ describe('transposeMessages', () => {
   test('keeps non-note messages as the same objects and does not modify the input', () => {
     const cc = m(0, [0xb0, 7, 100]);
     const on = m(0, [0x90, 60, 100]);
-    const result = transposeMessages([cc, on], shifts, noDrums);
+    const result = transposeMessages([cc, on], shifts);
     expect(result[0]).toBe(cc);
     expect(on.data).toEqual([0x90, 60, 100]);
   });

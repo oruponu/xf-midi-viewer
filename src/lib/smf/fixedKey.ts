@@ -38,7 +38,6 @@ export function keyShiftAt(tick: number, shifts: readonly KeyShiftChange[]): num
 export function transposeMessages(
   messages: readonly PlaybackMidiMessage[],
   shifts: readonly KeyShiftChange[],
-  drumChannels: ReadonlySet<number>,
 ): PlaybackMidiMessage[] {
   const sounding = Array.from({ length: 16 }, () => new Map<number, number[]>());
   const out: PlaybackMidiMessage[] = [];
@@ -66,7 +65,7 @@ export function transposeMessages(
     } else {
       semitones = queue?.shift() ?? keyShiftAt(message.tick, shifts);
     }
-    const transposed = transposeMidiData(data, semitones, drumChannels);
+    const transposed = transposeMidiData(data, semitones, message.isDrum === true);
     if (!transposed) continue;
     out.push(transposed === data ? message : { ...message, data: transposed });
   }
