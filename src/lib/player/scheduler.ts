@@ -115,7 +115,6 @@ export class MidiScheduler {
   private readonly fences = new WeakMap<MidiOutputLike, number>();
   private sequence: PlaybackSequence | null = null;
   private output: MidiOutputLike | null = null;
-  private drumChannels: ReadonlySet<number> = new Set();
   private noteSince: number[] = new Array<number>(16).fill(0);
   private transposedMessages: PlaybackMidiMessage[] | null = null;
   private nextMessageIndex = 0;
@@ -156,7 +155,6 @@ export class MidiScheduler {
       this.positionSnapshot = 0;
     }
     this.sequence = sequence;
-    this.drumChannels = sequence?.drumChannels ?? new Set();
     this.transposedMessages = null;
     this.noteSince = new Array<number>(16).fill(0);
     this.setState({ playbackRate: 1, keyShift: 0, mutedChannels: 0, soloChannels: 0 });
@@ -243,9 +241,7 @@ export class MidiScheduler {
     const isPlaying = this.intervalHandle !== null;
     const position = this.getPosition();
     this.transposedMessages =
-      shifts && this.sequence
-        ? transposeMessages(this.sequence.midiMessages, shifts, this.drumChannels)
-        : null;
+      shifts && this.sequence ? transposeMessages(this.sequence.midiMessages, shifts) : null;
     if (isPlaying) this.restart(position);
   }
 
@@ -385,7 +381,7 @@ export class MidiScheduler {
   private scheduleMessage(output: MidiOutputLike, message: PlaybackMidiMessage): boolean {
     if (isLiveNoteOn(message.data) && !this.isAudible(message.data[0]! & 0x0f)) return true;
     const keyShift = this.transposedMessages ? 0 : this.state.keyShift;
-    const data = transposeMidiData(message.data, keyShift, this.drumChannels);
+    const data = transposeMidiData(message.data, keyShift, message.isDrum === true);
     if (!data) return true;
     const segment = this.timeline.at(-1)!;
     const scheduledAt = timeAtPosition(segment, Math.max(message.seconds, segment.position));

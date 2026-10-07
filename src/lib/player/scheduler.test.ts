@@ -15,6 +15,14 @@ function msg(seconds: number, data: number[] = [0xc0, 0]): PlaybackMidiMessage {
   return { tick: Math.round(seconds * 960), seconds, data };
 }
 
+function drumMsg(seconds: number, data: number[]): PlaybackMidiMessage {
+  return { ...msg(seconds, data), isDrum: true };
+}
+
+function noteOnsOf(sent: SentMessage[]): number[][] {
+  return sent.filter((m) => (m.data[0]! & 0xf0) === 0x90).map((m) => m.data);
+}
+
 describe('scheduleDueMidiMessages', () => {
   test('advances past a failed message so the same message is not retried forever', () => {
     const messages: PlaybackMidiMessage[] = [
@@ -201,11 +209,7 @@ function expectFenced(sent: SentMessage[], interruptedAt: number): void {
   for (const m of later.filter((m) => !isPanic(m))) expect(arrivesBefore(lastPanic, m)).toBe(true);
 }
 
-function makeSequence(
-  messages: PlaybackMidiMessage[],
-  durationSeconds: number,
-  drumChannels: number[] = [],
-): PlaybackSequence {
+function makeSequence(messages: PlaybackMidiMessage[], durationSeconds: number): PlaybackSequence {
   return {
     notes: [],
     midiMessages: messages,
@@ -213,7 +217,6 @@ function makeSequence(
     durationSeconds,
     durationTicks: Math.round(durationSeconds * 960),
     ticksPerQuarter: 480,
-    drumChannels: new Set(drumChannels),
   };
 }
 
@@ -636,7 +639,7 @@ describe('MidiScheduler key shift', () => {
       timers: clock.timers,
     });
     const out = createOutput();
-    scheduler.setSequence(makeSequence([msg(0, [0x90, 60, 100]), msg(0, [0x99, 36, 100])], 1, [9]));
+    scheduler.setSequence(makeSequence([msg(0, [0x90, 60, 100]), drumMsg(0, [0x99, 36, 100])], 1));
     scheduler.setOutput(out.output);
 
     scheduler.setKeyShift(2);
@@ -674,6 +677,42 @@ describe('MidiScheduler key shift', () => {
 
     scheduler.setKeyShift(6);
     expect(calls).toBe(1);
+  });
+
+  test('setKeyShift() transposes a channel only outside its drum sections', () => {
+    const { scheduler, out } = setup(
+      [
+        drumMsg(0, [0x98, 36, 100]),
+        drumMsg(0.01, [0x88, 36, 0]),
+        msg(0.02, [0x98, 60, 100]),
+        msg(0.03, [0x88, 60, 0]),
+      ],
+      1,
+    );
+    scheduler.setKeyShift(2);
+
+    scheduler.play();
+
+    expect(playbackOnly(out.sent).map((m) => m.data)).toEqual([
+      [0x98, 36, 100],
+      [0x88, 36, 0],
+      [0x98, 62, 100],
+      [0x88, 62, 0],
+    ]);
+  });
+
+  test('transposes from a seek position inside a melody section of a former drum channel', () => {
+    const { clock, scheduler, out } = setup(
+      [drumMsg(0, [0x98, 36, 100]), drumMsg(0.5, [0x88, 36, 0]), msg(5, [0x98, 60, 100])],
+      10,
+    );
+    scheduler.setKeyShift(2);
+    scheduler.seek(4.98);
+
+    scheduler.play();
+    clock.advance(100);
+
+    expect(noteOnsOf(out.sent)).toEqual([[0x98, 62, 100]]);
   });
 });
 
@@ -769,6 +808,28 @@ describe('MidiScheduler key shift map', () => {
     scheduler.play();
 
     expect(playbackOnly(out.sent).map((m) => m.data)).toEqual([[0x90, 60, 100]]);
+  });
+
+  test('setKeyShiftMap() leaves notes marked as drums', () => {
+    const { scheduler, out } = setup(
+      [
+        drumMsg(0, [0x98, 36, 100]),
+        drumMsg(0.01, [0x88, 36, 0]),
+        msg(0.02, [0x98, 60, 100]),
+        msg(0.03, [0x88, 60, 0]),
+      ],
+      1,
+    );
+    scheduler.setKeyShiftMap([{ tick: 0, semitones: 2 }]);
+
+    scheduler.play();
+
+    expect(playbackOnly(out.sent).map((m) => m.data)).toEqual([
+      [0x98, 36, 100],
+      [0x88, 36, 0],
+      [0x98, 62, 100],
+      [0x88, 62, 0],
+    ]);
   });
 });
 

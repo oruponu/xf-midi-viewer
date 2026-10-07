@@ -31,6 +31,10 @@ export function isNoteMessage(data: number[]): boolean {
   return status === 0x80 || status === 0x90 || status === 0xa0;
 }
 
+export const ALL_NOTES_OFF_CONTROLLERS: ReadonlySet<number> = new Set([
+  120, 123, 124, 125, 126, 127,
+]);
+
 export function isValidMidiMessage(data: readonly number[]): boolean {
   if (data.length === 0) return false;
   const status = data[0]!;

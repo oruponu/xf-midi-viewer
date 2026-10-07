@@ -1,10 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  buildPlaybackSequence,
-  detectDrumChannels,
-  tickToSeconds,
-  transposeMidiData,
-} from './playback.ts';
+import { buildPlaybackSequence, tickToSeconds, transposeMidiData } from './playback.ts';
 import type { SmfFile, SmfTrack, TrackEvent } from './types.ts';
 
 const makeSmf = (tracks: SmfTrack[], ppq = 480): SmfFile => ({
@@ -286,6 +281,31 @@ describe('buildPlaybackSequence', () => {
       },
     ]);
   });
+
+  test('marks the notes of drum sections in file order within a tick', () => {
+    const sequence = buildPlaybackSequence(
+      makeSmf([
+        track([
+          controlChange(0, 0, 127, 8),
+          programChange(0, 0, 8),
+          noteOn(0, 36, 100, 8),
+          noteOff(480, 36, 64, 8),
+          controlChange(0, 0, 0, 8),
+          programChange(0, 0, 8),
+          noteOn(0, 60, 100, 8),
+          noteOff(480, 60, 64, 8),
+        ]),
+      ]),
+    );
+
+    const notes = sequence.midiMessages.filter((m) => (m.data[0]! & 0xe0) === 0x80);
+    expect(notes.map((m) => [m.data[1], m.isDrum === true])).toEqual([
+      [36, true],
+      [36, true],
+      [60, false],
+      [60, false],
+    ]);
+  });
 });
 
 describe('tickToSeconds', () => {
@@ -337,107 +357,41 @@ describe('tickToSeconds', () => {
 });
 
 describe('transposeMidiData', () => {
-  const noDrums: ReadonlySet<number> = new Set();
-
   test('returns the same array when semitones is 0', () => {
     const data = [0x90, 60, 100];
-    expect(transposeMidiData(data, 0, noDrums)).toBe(data);
+    expect(transposeMidiData(data, 0, false)).toBe(data);
   });
 
   test('shifts Note On pitch upward', () => {
-    expect(transposeMidiData([0x90, 60, 100], 2, noDrums)).toEqual([0x90, 62, 100]);
+    expect(transposeMidiData([0x90, 60, 100], 2, false)).toEqual([0x90, 62, 100]);
   });
 
   test('shifts Note Off pitch downward', () => {
-    expect(transposeMidiData([0x80, 64, 0], -3, noDrums)).toEqual([0x80, 61, 0]);
+    expect(transposeMidiData([0x80, 64, 0], -3, false)).toEqual([0x80, 61, 0]);
   });
 
   test('shifts Poly Aftertouch pitch', () => {
-    expect(transposeMidiData([0xa3, 70, 64], 5, noDrums)).toEqual([0xa3, 75, 64]);
+    expect(transposeMidiData([0xa3, 70, 64], 5, false)).toEqual([0xa3, 75, 64]);
   });
 
-  test('does not shift any channel in the drum set', () => {
-    const drums = new Set<number>([9, 10]);
-    expect(transposeMidiData([0x99, 36, 110], 5, drums)).toEqual([0x99, 36, 110]);
-    expect(transposeMidiData([0x9a, 38, 100], 5, drums)).toEqual([0x9a, 38, 100]);
+  test('does not shift a message marked as a drum', () => {
+    const data = [0x92, 36, 110];
+    expect(transposeMidiData(data, 5, true)).toBe(data);
   });
 
-  test('shifts non-drum channels even when other channels are drums', () => {
-    const drums = new Set<number>([9, 10]);
-    expect(transposeMidiData([0x90, 60, 100], 5, drums)).toEqual([0x90, 65, 100]);
+  test('shifts a note on channel 10 when it is not marked as a drum', () => {
+    expect(transposeMidiData([0x99, 36, 110], 5, false)).toEqual([0x99, 41, 110]);
   });
 
   test('returns null when the resulting note is out of range', () => {
-    expect(transposeMidiData([0x90, 125, 100], 6, noDrums)).toBeNull();
-    expect(transposeMidiData([0x90, 2, 100], -6, noDrums)).toBeNull();
+    expect(transposeMidiData([0x90, 125, 100], 6, false)).toBeNull();
+    expect(transposeMidiData([0x90, 2, 100], -6, false)).toBeNull();
   });
 
   test('leaves non-note messages unchanged', () => {
     const cc = [0xb0, 7, 100];
-    expect(transposeMidiData(cc, 4, noDrums)).toBe(cc);
+    expect(transposeMidiData(cc, 4, false)).toBe(cc);
     const pitchBend = [0xe0, 0x00, 0x40];
-    expect(transposeMidiData(pitchBend, -4, noDrums)).toBe(pitchBend);
-  });
-});
-
-describe('detectDrumChannels', () => {
-  const cc = (deltaTime: number, controller: number, value: number, channel = 0): TrackEvent => ({
-    deltaTime,
-    event: { kind: 'controlChange', channel, controller, value },
-  });
-
-  const sysex = (deltaTime: number, body: number[]): TrackEvent => ({
-    deltaTime,
-    event: { kind: 'sysex', data: new Uint8Array(body) },
-  });
-
-  test('includes General MIDI channel 10 when there are no drum markers', () => {
-    expect(detectDrumChannels(makeSmf([]))).toEqual(new Set([9]));
-  });
-
-  test('adds a channel when Bank Select MSB is 127 (XG drum)', () => {
-    const smf = makeSmf([track([cc(0, 0, 127, 10)])]);
-    expect(detectDrumChannels(smf)).toEqual(new Set([9, 10]));
-  });
-
-  test('adds a channel when Bank Select MSB is 126 (XG SFX kit)', () => {
-    const smf = makeSmf([track([cc(0, 0, 126, 2)])]);
-    expect(detectDrumChannels(smf)).toEqual(new Set([2, 9]));
-  });
-
-  test('ignores Bank Select MSB values other than 126 and 127', () => {
-    const smf = makeSmf([track([cc(0, 0, 0, 3), cc(0, 0, 64, 4), cc(0, 0, 120, 5)])]);
-    expect(detectDrumChannels(smf)).toEqual(new Set([9]));
-  });
-
-  test('adds a channel from XG Part Mode SysEx (drum mode)', () => {
-    // F0 43 10 4C 08 04 07 02 F7 -> part 4, mode 2 (Drum S1)
-    const smf = makeSmf([track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x04, 0x07, 0x02, 0xf7])])]);
-    expect(detectDrumChannels(smf)).toEqual(new Set([4, 9]));
-  });
-
-  test('ignores XG Part Mode SysEx with Normal mode', () => {
-    const smf = makeSmf([track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x04, 0x07, 0x00, 0xf7])])]);
-    expect(detectDrumChannels(smf)).toEqual(new Set([9]));
-  });
-
-  test('removes General MIDI channel 10 when XG Part Mode sets it to Normal', () => {
-    const smf = makeSmf([track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x09, 0x07, 0x00, 0xf7])])]);
-    expect(detectDrumChannels(smf)).toEqual(new Set());
-  });
-
-  test('removes a detected XG drum channel when XG Part Mode sets it to Normal', () => {
-    const smf = makeSmf([
-      track([cc(0, 0, 127, 11), sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x0b, 0x07, 0x00, 0xf7])]),
-    ]);
-    expect(detectDrumChannels(smf)).toEqual(new Set([9]));
-  });
-
-  test('detects drum channels across multiple tracks', () => {
-    const smf = makeSmf([
-      track([cc(0, 0, 127, 11)]),
-      track([sysex(0, [0x43, 0x10, 0x4c, 0x08, 0x0c, 0x07, 0x01, 0xf7])]),
-    ]);
-    expect(detectDrumChannels(smf)).toEqual(new Set([9, 11, 12]));
+    expect(transposeMidiData(pitchBend, -4, false)).toBe(pitchBend);
   });
 });

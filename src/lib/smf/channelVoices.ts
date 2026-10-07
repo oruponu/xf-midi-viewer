@@ -1,7 +1,12 @@
 import { isResetSysex } from '../player/chase.ts';
 import { isLiveNoteOn } from '../player/messages.ts';
 import { isXgDrumKit, isXgSfxKit } from '../xg/voiceNames.ts';
-import { xgPartModeChange } from './playback.ts';
+import {
+  DRUM_KIT_BANK_MSB,
+  DrumModeTracker,
+  SFX_KIT_BANK_MSB,
+  xgPartModeChange,
+} from './drumMode.ts';
 import type { PlaybackMidiMessage } from './playback.ts';
 
 export interface ChannelVoice {
@@ -21,34 +26,29 @@ export interface ChannelPart {
 }
 
 interface ChannelState {
-  pendingBankMSB: number;
+  channel: number;
   pendingBankLSB: number;
-  bankMSB: number;
   bankLSB: number;
   program: number;
   lastKit: { bankMSB: number; program: number };
-  drumMode: boolean | null;
   voices: ChannelVoice[];
   firstNote: { seconds: number; voiceIndex: number } | null;
 }
 
 const CHANNEL_COUNT = 16;
-const DRUM_CHANNEL = 9;
-const SFX_KIT_BANK_MSB = 126;
-const DRUM_KIT_BANK_MSB = 127;
-const DRUM_BANK_MSBS: ReadonlySet<number> = new Set([SFX_KIT_BANK_MSB, DRUM_KIT_BANK_MSB]);
-const BANK_SELECT_MSB = 0;
 const BANK_SELECT_LSB = 32;
 
 export function buildChannelParts(messages: readonly PlaybackMidiMessage[]): ChannelPart[] {
+  const drumMode = new DrumModeTracker();
   const channels = Array.from({ length: CHANNEL_COUNT }, (_, channel) =>
-    createChannelState(channel),
+    createChannelState(channel, drumMode),
   );
   for (const message of messages) {
     const { data } = message;
     const status = data[0]!;
+    drumMode.apply(data);
     if (status === 0xf0) {
-      applySysex(channels, message);
+      applySysex(channels, drumMode, message);
       continue;
     }
     if (status > 0xf0) continue;
@@ -60,18 +60,12 @@ export function buildChannelParts(messages: readonly PlaybackMidiMessage[]): Cha
         }
         break;
       case 0xb0:
-        if (data[1] === BANK_SELECT_MSB) {
-          state.pendingBankMSB = data[2]!;
-          if (DRUM_BANK_MSBS.has(state.pendingBankMSB)) state.drumMode = null;
-        } else if (data[1] === BANK_SELECT_LSB) {
-          state.pendingBankLSB = data[2]!;
-        }
+        if (data[1] === BANK_SELECT_LSB) state.pendingBankLSB = data[2]!;
         break;
       case 0xc0:
-        state.bankMSB = state.pendingBankMSB;
         state.bankLSB = state.pendingBankLSB;
         state.program = data[1]!;
-        pushVoice(state, message.tick, message.seconds);
+        pushVoice(state, drumMode, message.tick, message.seconds);
         break;
       default:
         break;
@@ -100,38 +94,42 @@ export function activeVoiceIndex(part: ChannelPart, seconds: number): number {
   return index;
 }
 
-function createChannelState(channel: number): ChannelState {
+function createChannelState(channel: number, drumMode: DrumModeTracker): ChannelState {
   const state: ChannelState = {
-    pendingBankMSB: 0,
+    channel,
     pendingBankLSB: 0,
-    bankMSB: 0,
     bankLSB: 0,
     program: 0,
     lastKit: { bankMSB: DRUM_KIT_BANK_MSB, program: 0 },
-    drumMode: null,
     voices: [],
     firstNote: null,
   };
-  resetChannel(state, channel, 0, 0);
+  resetChannel(state, drumMode, 0, 0);
   return state;
 }
 
-function resetChannel(state: ChannelState, channel: number, tick: number, seconds: number): void {
-  const bankMSB = channel === DRUM_CHANNEL ? DRUM_KIT_BANK_MSB : 0;
-  state.pendingBankMSB = bankMSB;
+function resetChannel(
+  state: ChannelState,
+  drumMode: DrumModeTracker,
+  tick: number,
+  seconds: number,
+): void {
   state.pendingBankLSB = 0;
-  state.bankMSB = bankMSB;
   state.bankLSB = 0;
   state.program = 0;
   state.lastKit = { bankMSB: DRUM_KIT_BANK_MSB, program: 0 };
-  state.drumMode = null;
-  pushVoice(state, tick, seconds);
+  pushVoice(state, drumMode, tick, seconds);
 }
 
 // An unsupported drum kit keeps the previous kit (XG Format Specifications, Bank Select Note 4).
-function pushVoice(state: ChannelState, tick: number, seconds: number): void {
-  const isDrum = state.drumMode ?? DRUM_BANK_MSBS.has(state.bankMSB);
-  let bankMSB = state.bankMSB;
+function pushVoice(
+  state: ChannelState,
+  drumMode: DrumModeTracker,
+  tick: number,
+  seconds: number,
+): void {
+  const isDrum = drumMode.isDrum(state.channel);
+  let bankMSB = drumMode.bankMSB(state.channel);
   let program = state.program;
   if (isDrum) {
     const isSfxKit = bankMSB === SFX_KIT_BANK_MSB;
@@ -144,16 +142,16 @@ function pushVoice(state: ChannelState, tick: number, seconds: number): void {
   state.voices.push({ tick, seconds, bankMSB, bankLSB: state.bankLSB, program, isDrum });
 }
 
-function applySysex(channels: ChannelState[], message: PlaybackMidiMessage): void {
+function applySysex(
+  channels: ChannelState[],
+  drumMode: DrumModeTracker,
+  message: PlaybackMidiMessage,
+): void {
   if (isResetSysex(message.data)) {
-    channels.forEach((state, channel) =>
-      resetChannel(state, channel, message.tick, message.seconds),
-    );
+    for (const state of channels) resetChannel(state, drumMode, message.tick, message.seconds);
     return;
   }
   const change = xgPartModeChange(message.data.slice(1));
   if (!change) return;
-  const state = channels[change.channel]!;
-  state.drumMode = change.isDrum;
-  pushVoice(state, message.tick, message.seconds);
+  pushVoice(channels[change.channel]!, drumMode, message.tick, message.seconds);
 }

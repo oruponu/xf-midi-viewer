@@ -11,7 +11,6 @@ const sequence = (tempos: PlaybackSequence['tempos']): PlaybackSequence => ({
   durationSeconds: 60,
   durationTicks: 57_600,
   ticksPerQuarter: 480,
-  drumChannels: new Set(),
 });
 
 const at120 = sequence([{ tick: 0, seconds: 0, bpm: 120 }]);

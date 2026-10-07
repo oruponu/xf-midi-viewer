@@ -1,4 +1,5 @@
 import { isValidMidiMessage, splitMidiMessages } from '../player/messages.ts';
+import { markDrumNotes } from './drumMode.ts';
 import type { SmfFile, SmfTrack, TrackEvent } from './types.ts';
 
 export interface PlaybackNote {
@@ -21,6 +22,7 @@ export interface PlaybackMidiMessage {
   tick: number;
   seconds: number;
   data: number[];
+  isDrum?: boolean;
 }
 
 export interface PlaybackSequence {
@@ -30,7 +32,6 @@ export interface PlaybackSequence {
   durationSeconds: number;
   durationTicks: number;
   ticksPerQuarter: number;
-  drumChannels: Set<number>;
 }
 
 interface RawTempoChange {
@@ -50,11 +51,6 @@ interface ActiveNote {
   note: number;
   velocity: number;
   startTick: number;
-}
-
-export interface XgPartModeChange {
-  channel: number;
-  isDrum: boolean;
 }
 
 const DEFAULT_MICROSECONDS_PER_QUARTER = 500_000;
@@ -86,6 +82,7 @@ export function buildPlaybackSequence(smf: SmfFile): PlaybackSequence {
   const midiMessages = absoluteTracks.flatMap((track) => collectMidiMessages(track, tickToSeconds));
   notes.sort((a, b) => a.startSeconds - b.startSeconds || a.channel - b.channel || a.note - b.note);
   midiMessages.sort((a, b) => a.tick - b.tick);
+  markDrumNotes(midiMessages);
 
   let durationSeconds = Math.max(tickToSeconds(durationTicks), 0);
   for (const note of notes) {
@@ -110,58 +107,20 @@ export function buildPlaybackSequence(smf: SmfFile): PlaybackSequence {
     durationSeconds,
     durationTicks,
     ticksPerQuarter,
-    drumChannels: detectDrumChannels(smf),
   };
 }
-
-const GM_PERCUSSION_CHANNEL = 9;
-const XG_DRUM_BANK_MSBS: ReadonlySet<number> = new Set([126, 127]);
 
 export function transposeMidiData(
   data: number[],
   semitones: number,
-  drumChannels: ReadonlySet<number>,
+  isDrum: boolean,
 ): number[] | null {
-  if (semitones === 0 || data.length < 2) return data;
+  if (semitones === 0 || isDrum || data.length < 2) return data;
   const status = data[0]! & 0xf0;
   if (status !== 0x80 && status !== 0x90 && status !== 0xa0) return data;
-  const channel = data[0]! & 0x0f;
-  if (drumChannels.has(channel)) return data;
   const newNote = data[1]! + semitones;
   if (newNote < 0 || newNote > 127) return null;
   return [data[0]!, newNote, data[2]!];
-}
-
-export function detectDrumChannels(smf: SmfFile): Set<number> {
-  const drums = new Set<number>([GM_PERCUSSION_CHANNEL]);
-  for (const track of smf.tracks) {
-    for (const tev of track.events) {
-      const ev = tev.event;
-      if (ev.kind === 'controlChange' && ev.controller === 0) {
-        if (XG_DRUM_BANK_MSBS.has(ev.value)) drums.add(ev.channel);
-      } else if (ev.kind === 'sysex') {
-        const change = xgPartModeChange(ev.data);
-        if (change) {
-          if (change.isDrum) drums.add(change.channel);
-          else drums.delete(change.channel);
-        }
-      }
-    }
-  }
-  return drums;
-}
-
-export function xgPartModeChange(data: ArrayLike<number>): XgPartModeChange | null {
-  if (data.length < 8) return null;
-  if (data[0] !== 0x43) return null;
-  if ((data[1]! & 0xf0) !== 0x10) return null;
-  if (data[2] !== 0x4c) return null;
-  if (data[3] !== 0x08) return null;
-  if (data[5] !== 0x07) return null;
-  const mode = data[6]!;
-  if (mode > 3) return null;
-  const part = data[4]!;
-  return part <= 15 ? { channel: part, isDrum: mode !== 0 } : null;
 }
 
 export function secondsToTick(seconds: number, sequence: PlaybackSequence): number {
