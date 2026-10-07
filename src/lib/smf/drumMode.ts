@@ -60,7 +60,7 @@ export class DrumModeTracker {
 
   isDrum(channel: number): boolean {
     const state = this.channels[channel]!;
-    return state.partMode ?? DRUM_BANK_MSBS.has(state.bankMSB);
+    return state.partMode ?? (channel === DRUM_CHANNEL || DRUM_BANK_MSBS.has(state.bankMSB));
   }
 
   bankMSB(channel: number): number {

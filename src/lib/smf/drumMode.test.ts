@@ -48,6 +48,12 @@ describe('DrumModeTracker', () => {
     expect(tracker.isDrum(2)).toBe(false);
   });
 
+  test('keeps channel 10 as drums after a non-drum bank select', () => {
+    const tracker = trackerAfter([0xb9, 0, 0], [0xb9, 32, 0], [0xc9, 0]);
+    expect(tracker.isDrum(9)).toBe(true);
+    expect(tracker.bankMSB(9)).toBe(0);
+  });
+
   test('treats bank MSB 126 as drums', () => {
     expect(trackerAfter([0xb3, 0, 126], [0xc3, 0]).isDrum(3)).toBe(true);
   });
@@ -172,6 +178,16 @@ describe('markDrumNotes', () => {
 
   test('marks notes on channel 10 from the start', () => {
     expect(noteMarks([at(0, [0x99, 36, 100]), at(100, [0x89, 36, 0])])).toEqual([true, true]);
+  });
+
+  test('marks notes on channel 10 of a GM file that selects bank 0 there', () => {
+    const marks = noteMarks([
+      at(0, [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7]),
+      ...toMelody(0, 9),
+      at(480, [0x99, 36, 100]),
+      at(960, [0x89, 36, 0]),
+    ]);
+    expect(marks).toEqual([true, true]);
   });
 
   test('marks a note-off like its note-on across a switch to melody', () => {
