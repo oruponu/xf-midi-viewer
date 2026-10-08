@@ -2,6 +2,7 @@ import { WorkletSynthesizer } from 'spessasynth_lib';
 import processorUrl from 'spessasynth_lib/dist/spessasynth_processor.min.js?url';
 import { BuiltinSynthOutput, waitForClockStart } from './builtinOutput.ts';
 import { soundBankGain } from './soundBank.ts';
+import { SynthClockOffset, withClockOffset } from './synthClock.ts';
 
 export type SoundBankLoadResult = 'loaded' | 'fallback';
 
@@ -69,7 +70,20 @@ export async function createBuiltinSynthEngine(
     void context.close();
     throw error;
   }
-  const synth = new WorkletSynthesizer(context);
+  let workletNode: AudioWorkletNode | undefined;
+  const synth = new WorkletSynthesizer(context, {
+    audioNodeCreators: {
+      worklet: (ctx, name, options) => (workletNode = new AudioWorkletNode(ctx, name, options)),
+    },
+  });
+  const clockOffset = new SynthClockOffset();
+  const onWorkletMessage = (event: MessageEvent<unknown>) => {
+    const data = event.data;
+    if (typeof data !== 'object' || data === null || !('currentTime' in data)) return;
+    if (typeof data.currentTime === 'number')
+      clockOffset.observe(context.currentTime, data.currentTime);
+  };
+  workletNode?.port.addEventListener('message', onWorkletMessage);
   synth.setSystemParameter('gain', MASTER_GAIN);
   const gain = context.createGain();
   const limiter = new DynamicsCompressorNode(context, LIMITER_OPTIONS);
@@ -77,7 +91,7 @@ export async function createBuiltinSynthEngine(
   gain.connect(limiter);
   limiter.connect(context.destination);
   const output = new BuiltinSynthOutput({
-    synth,
+    synth: withClockOffset(synth, clockOffset),
     clock: context,
     gain: gain.gain,
     onStall,
@@ -151,6 +165,7 @@ export async function createBuiltinSynthEngine(
 
   const destroy = () => {
     context.removeEventListener('statechange', onStateChange);
+    workletNode?.port.removeEventListener('message', onWorkletMessage);
     synth.destroy();
     void context.close();
   };
