@@ -33,6 +33,7 @@ interface ChannelState {
   controllers: (Slot | null)[];
   pendingBank: BankState;
   program: ProgramState | null;
+  kitHistory: ProgramState[];
   registers: Record<ParameterKind, RegisterState>;
   selected: ParameterKind | null;
   parameters: Map<string, ParameterEntry>;
@@ -43,6 +44,7 @@ interface ChannelState {
 export interface ChaseState {
   channels: ChannelState[];
   sysex: Slot[];
+  xg: boolean;
 }
 
 interface Group {
@@ -52,6 +54,8 @@ interface Group {
 
 const CHANNEL_COUNT = 16;
 const CONTROLLER_COUNT = 128;
+const DRUM_CHANNEL = 9;
+const DRUM_KIT_BANK_MSB = 127;
 
 const BANK_SELECT_MSB = 0;
 const DATA_ENTRY_MSB = 6;
@@ -99,9 +103,14 @@ export function reduceChaseState(
       case 0xb0:
         applyControlChange(channel, slot);
         break;
-      case 0xc0:
-        channel.program = { slot, bank: { ...channel.pendingBank } };
+      case 0xc0: {
+        const program: ProgramState = { slot, bank: { ...channel.pendingBank } };
+        channel.program = program;
+        if (state.xg && bankMSBOf(program.bank, status & 0x0f) === DRUM_KIT_BANK_MSB) {
+          recordKit(channel, program);
+        }
         break;
+      }
       case 0xd0:
         channel.pressure = slot;
         break;
@@ -181,7 +190,8 @@ function isGsSystemModeSet(data: readonly number[]): boolean {
 }
 
 function createChaseState(): ChaseState {
-  return { channels: createChannels(), sysex: [] };
+  // The player sends XG System On when it opens a file.
+  return { channels: createChannels(), sysex: [], xg: true };
 }
 
 function createChannels(): ChannelState[] {
@@ -193,6 +203,7 @@ function createChannelState(): ChannelState {
     controllers: new Array<Slot | null>(CONTROLLER_COUNT).fill(null),
     pendingBank: { msb: null, lsb: null },
     program: null,
+    kitHistory: [],
     registers: createRegisters(),
     selected: null,
     parameters: new Map(),
@@ -209,9 +220,23 @@ function applySysex(state: ChaseState, slot: Slot): void {
   if (isResetSysex(slot.message.data)) {
     state.channels = createChannels();
     state.sysex = [slot];
+    state.xg = isXgSystemReset(slot.message.data);
   } else {
     state.sysex.push(slot);
   }
+}
+
+// XG ignores a kit it does not have, so keeping the last occurrence of each program ends on
+// the same kit as the full history on any device.
+function recordKit(channel: ChannelState, program: ProgramState): void {
+  const number = program.slot.message.data[1];
+  channel.kitHistory = channel.kitHistory.filter((kit) => kit.slot.message.data[1] !== number);
+  channel.kitHistory.push(program);
+}
+
+function bankMSBOf(bank: BankState, channelNumber: number): number {
+  if (bank.msb) return bank.msb.message.data[2]!;
+  return channelNumber === DRUM_CHANNEL ? DRUM_KIT_BANK_MSB : 0;
 }
 
 function applyControlChange(channel: ChannelState, slot: Slot): void {
@@ -312,10 +337,10 @@ function collectChannelGroups(groups: Group[], channel: ChannelState, channelNum
   for (const slot of channel.controllers) {
     if (slot) groups.push(singleGroup(slot));
   }
-  if (channel.program) {
-    const { slot, bank } = channel.program;
-    groups.push({ index: slot.index, messages: presentMessages([bank.msb, bank.lsb, slot]) });
+  for (const kit of channel.kitHistory) {
+    if (kit !== channel.program) groups.push(programGroup(kit));
   }
+  if (channel.program) groups.push(programGroup(channel.program));
   for (const pending of [channel.pendingBank.msb, channel.pendingBank.lsb]) {
     if (pending && (!channel.program || pending.index > channel.program.slot.index)) {
       groups.push(singleGroup(pending));
@@ -370,6 +395,10 @@ function createPrelude(): PlaybackMidiMessage[] {
   return Array.from({ length: CHANNEL_COUNT }, (_, channel) =>
     synthesizeAtStart([0xb0 | channel, RESET_ALL_CONTROLLERS, 0]),
   );
+}
+
+function programGroup({ slot, bank }: ProgramState): Group {
+  return { index: slot.index, messages: presentMessages([bank.msb, bank.lsb, slot]) };
 }
 
 function singleGroup(slot: Slot): Group {
