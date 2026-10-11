@@ -73,8 +73,12 @@ describe('BuiltinSynthOutput', () => {
 
     output.activate();
 
-    expect(calls).toHaveLength(32);
-    expect(calls.every((c) => isPanic(c) && c.time === 10)).toBe(true);
+    expect(calls).toHaveLength(34);
+    expect(calls.slice(0, 32).every((c) => isPanic(c) && c.time === 10)).toBe(true);
+    expect(calls.slice(32)).toEqual([
+      { data: [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7], time: 10 },
+      { data: [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7], time: 10 },
+    ]);
     expect(gainCalls).toEqual(['cancel 10', 'set 1 10']);
     output.send([0x90, 60, 100], 1020);
     expect(calls.at(-1)!.data).toEqual([0x90, 60, 100]);
@@ -192,12 +196,15 @@ describe('BuiltinSynthOutput', () => {
     ]);
   });
 
-  test('does not reset the synth on activate() without a stall', () => {
+  test('resets the synth only on the first activate() without a stall', () => {
     const { output, calls } = setupOutput();
     output.activate();
     output.activate();
 
-    expect(calls.some((c) => c.data[0] === 0xf0)).toBe(false);
+    expect(calls.filter((c) => c.data[0] === 0xf0).map((c) => c.data)).toEqual([
+      [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7],
+      [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7],
+    ]);
   });
 
   test('checkClock() detects a frozen audio clock without any message', () => {

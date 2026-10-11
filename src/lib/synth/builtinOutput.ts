@@ -69,7 +69,7 @@ export class BuiltinSynthOutput implements MidiOutputLike {
   private anchorLead = 0;
   private lastQueuedTime = 0;
   private active = false;
-  private resetPending = false;
+  private resetPending = true;
 
   constructor(options: BuiltinSynthOutputOptions) {
     this.synth = options.synth;
