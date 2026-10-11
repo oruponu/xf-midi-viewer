@@ -140,7 +140,7 @@ function isGmSystemMessage(data: readonly number[]): boolean {
   );
 }
 
-function isXgSystemReset(data: readonly number[]): boolean {
+export function isXgSystemReset(data: readonly number[]): boolean {
   return (
     data.length === 9 &&
     data[1] === 0x43 &&
