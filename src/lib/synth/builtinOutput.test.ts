@@ -207,6 +207,26 @@ describe('BuiltinSynthOutput', () => {
     ]);
   });
 
+  test('resets the synth on the next activate() after requestReset()', () => {
+    const { output, calls } = setupOutput();
+    output.activate();
+    const before = calls.length;
+
+    output.requestReset();
+    expect(calls.length).toBe(before);
+    output.activate();
+
+    expect(
+      calls
+        .slice(before)
+        .filter((c) => c.data[0] === 0xf0)
+        .map((c) => c.data),
+    ).toEqual([
+      [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7],
+      [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7],
+    ]);
+  });
+
   test('checkClock() detects a frozen audio clock without any message', () => {
     const { output, stalls, stallTimes, setNow } = setupOutput();
     output.checkClock();

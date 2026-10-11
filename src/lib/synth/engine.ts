@@ -121,6 +121,8 @@ export async function createBuiltinSynthEngine(
         .then(
           () => {
             hasSoundBank = true;
+            // spessasynth resets itself to GS on every sound bank load.
+            output.requestReset();
             settle();
           },
           (error: unknown) => settle(error instanceof Error ? error : new Error(String(error))),

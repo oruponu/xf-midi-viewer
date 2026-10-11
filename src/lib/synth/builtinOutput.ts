@@ -95,6 +95,10 @@ export class BuiltinSynthOutput implements MidiOutputLike {
     if (time > this.lastQueuedTime) this.lastQueuedTime = time;
   }
 
+  requestReset(): void {
+    this.resetPending = true;
+  }
+
   latencyMs(): number {
     return (hardwareLatencySeconds(this.clock) + this.processingLatency + this.anchorLead) * 1000;
   }
