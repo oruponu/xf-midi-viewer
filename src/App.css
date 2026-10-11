@@ -162,6 +162,12 @@
   background: color-mix(in srgb, var(--surface) 50%, var(--bg));
 }
 
+@media (pointer: coarse) {
+  .drop-zone {
+    border-style: solid;
+  }
+}
+
 .drop-zone-icon {
   display: inline-flex;
   margin-bottom: 4px;
