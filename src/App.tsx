@@ -7,6 +7,7 @@ import type { InfoPanelTab } from './components/InfoPanel.tsx';
 import { PartPanel } from './components/PartPanel.tsx';
 import { PlaybackPanel } from './components/PlaybackPanel.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
+import { useMediaQuery } from './hooks/useMediaQuery.ts';
 import { useMidiPlayer } from './hooks/useMidiPlayer.ts';
 import { useSettings } from './hooks/useSettings.ts';
 import type { Settings } from './hooks/useSettings.ts';
@@ -41,6 +42,7 @@ function App() {
   const togglePartPanel = useCallback(() => setIsPartPanelOpen((open) => !open), []);
   const closePartPanel = useCallback(() => setIsPartPanelOpen(false), []);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const isTouchPrimary = useMediaQuery('(pointer: coarse)');
   const { settings, updateSettings } = useSettings();
   useTheme(settings.theme);
   const song = songState.status === 'loaded' ? songState.song : null;
@@ -199,7 +201,9 @@ function App() {
               <span className="drop-zone-icon">
                 <FolderOpenIcon size={36} />
               </span>
-              <p className="empty-state-headline">MIDI ファイルをここにドロップ</p>
+              <p className="empty-state-headline">
+                {isTouchPrimary ? 'MIDI ファイルを開く' : 'MIDI ファイルをここにドロップ'}
+              </p>
               <p className="muted">YAMAHA XF フォーマットの歌詞とコードを表示します</p>
               <button
                 type="button"
