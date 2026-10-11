@@ -69,7 +69,7 @@ export class BuiltinSynthOutput implements MidiOutputLike {
   private anchorLead = 0;
   private lastQueuedTime = 0;
   private active = false;
-  private resetPending = false;
+  private resetPending = true;
 
   constructor(options: BuiltinSynthOutputOptions) {
     this.synth = options.synth;
@@ -93,6 +93,10 @@ export class BuiltinSynthOutput implements MidiOutputLike {
     }
     this.synth.sendMessage(data, 0, { time });
     if (time > this.lastQueuedTime) this.lastQueuedTime = time;
+  }
+
+  requestReset(): void {
+    this.resetPending = true;
   }
 
   latencyMs(): number {

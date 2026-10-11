@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import { collectChaseMessages, isResetSysex } from './chase.ts';
+import { collectChaseMessages, isResetSysex, isXgSystemReset } from './chase.ts';
 import type { PlaybackMidiMessage } from '../smf/playback.ts';
+import { XgDrumKitFallback } from '../synth/xgDrumKitFallback.ts';
 
 const PRELUDE = Array.from({ length: 16 }, (_, channel) => [0xb0 | channel, 121, 0]);
 const GM_SYSTEM_ON = [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7];
@@ -548,5 +549,229 @@ describe('collectChaseMessages size', () => {
       XG_SYSTEM_ON,
       ...parameterChanges,
     ]);
+  });
+});
+
+describe('chase XG drum kit history', () => {
+  test('sends the earlier kit before an undefined kit', () => {
+    expect(body(sequence(XG_SYSTEM_ON, [0xb9, 0, 127], [0xc9, 16], [0xc9, 86]))).toEqual([
+      XG_SYSTEM_ON,
+      [0xb9, 0, 127],
+      [0xc9, 16],
+      [0xb9, 0, 127],
+      [0xc9, 86],
+    ]);
+  });
+
+  test('restores the bank of a melodic program after the history', () => {
+    expect(
+      body(sequence(XG_SYSTEM_ON, [0xb8, 0, 127], [0xc8, 16], [0xb8, 0, 0], [0xc8, 52])),
+    ).toEqual([XG_SYSTEM_ON, [0xb8, 0, 127], [0xc8, 16], [0xb8, 0, 0], [0xc8, 52]]);
+  });
+
+  test('keeps only the last occurrence of each program in order', () => {
+    expect(
+      body(sequence(XG_SYSTEM_ON, [0xb9, 0, 127], [0xc9, 16], [0xc9, 112], [0xc9, 16], [0xc9, 86])),
+    ).toEqual([
+      XG_SYSTEM_ON,
+      [0xb9, 0, 127],
+      [0xc9, 112],
+      [0xb9, 0, 127],
+      [0xc9, 16],
+      [0xb9, 0, 127],
+      [0xc9, 86],
+    ]);
+  });
+
+  test('sends the last program once when it is a kit itself', () => {
+    expect(body(sequence(XG_SYSTEM_ON, [0xb9, 0, 127], [0xc9, 86], [0xc9, 16]))).toEqual([
+      XG_SYSTEM_ON,
+      [0xb9, 0, 127],
+      [0xc9, 86],
+      [0xb9, 0, 127],
+      [0xc9, 16],
+    ]);
+  });
+
+  test('records channel 10 without a bank select but not other channels', () => {
+    expect(body(sequence(XG_SYSTEM_ON, [0xc9, 16], [0xc9, 86], [0xc0, 16], [0xc0, 86]))).toEqual([
+      XG_SYSTEM_ON,
+      [0xc9, 16],
+      [0xc9, 86],
+      [0xc0, 86],
+    ]);
+  });
+
+  test('keeps a pending bank after the history', () => {
+    expect(
+      body(sequence(XG_SYSTEM_ON, [0xb9, 0, 127], [0xc9, 16], [0xc9, 86], [0xb9, 0, 0])),
+    ).toEqual([XG_SYSTEM_ON, [0xb9, 0, 127], [0xc9, 16], [0xb9, 0, 127], [0xc9, 86], [0xb9, 0, 0]]);
+  });
+
+  test('drops the history before a reset', () => {
+    expect(
+      body(sequence(XG_SYSTEM_ON, [0xb9, 0, 127], [0xc9, 16], XG_SYSTEM_ON, [0xc9, 86])),
+    ).toEqual([XG_SYSTEM_ON, [0xc9, 86]]);
+  });
+
+  test.each([
+    ['GM System On', GM_SYSTEM_ON],
+    ['GS Reset', GS_RESET],
+  ] as [string, number[]][])('sends only the last program after %s', (_, reset) => {
+    expect(body(sequence(reset, [0xb9, 0, 127], [0xc9, 16], [0xc9, 86]))).toEqual([
+      reset,
+      [0xb9, 0, 127],
+      [0xc9, 86],
+    ]);
+  });
+
+  test('treats a song without a reset as XG', () => {
+    expect(body(sequence([0xb9, 0, 127], [0xc9, 16], [0xc9, 86]))).toEqual([
+      [0xb9, 0, 127],
+      [0xc9, 16],
+      [0xb9, 0, 127],
+      [0xc9, 86],
+    ]);
+  });
+});
+
+describe('isXgSystemReset', () => {
+  test.each([
+    ['XG System On', XG_SYSTEM_ON],
+    ['XG All Parameter Reset', XG_ALL_PARAMETER_RESET],
+  ] as [string, number[]][])('recognizes %s', (_, data) => {
+    expect(isXgSystemReset(data)).toBe(true);
+  });
+
+  test.each([
+    ['GM System On', GM_SYSTEM_ON],
+    ['GS Reset', GS_RESET],
+  ] as [string, number[]][])('does not treat %s as an XG reset', (_, data) => {
+    expect(isXgSystemReset(data)).toBe(false);
+  });
+});
+
+describe('chase XG drum kit history matches continuous playback', () => {
+  const MU50_KITS = new Set([0, 1, 8, 16, 24, 25, 32, 40, 48]);
+  const PROGRAMS = [0, 16, 25, 52, 64, 86, 112];
+  const CHANNELS = [0, 1, 9];
+
+  function kitDevice(hasKit: (program: number) => boolean) {
+    let xg = true;
+    let bank = initialBank();
+    let kit = new Array<number>(16).fill(0);
+    let voice = new Array<string>(16).fill('melodic 0/0');
+    return {
+      send(data: readonly number[]) {
+        const status = data[0]!;
+        if (status === 0xf0) {
+          if (isResetSysex(data)) {
+            xg = isXgSystemReset(data);
+            bank = initialBank();
+            kit = new Array<number>(16).fill(0);
+            voice = new Array<string>(16).fill('melodic 0/0');
+          }
+          return;
+        }
+        const channel = status & 0x0f;
+        if ((status & 0xf0) === 0xb0 && data[1] === 0) bank[channel] = data[2]!;
+        if ((status & 0xf0) !== 0xc0) return;
+        const program = data[1]!;
+        if (xg && bank[channel] === 127) {
+          if (hasKit(program)) kit[channel] = program;
+          voice[channel] = `kit ${kit[channel]}`;
+        } else {
+          voice[channel] = `melodic ${bank[channel]}/${program}`;
+        }
+      },
+      voices: () => [...voice],
+    };
+  }
+
+  function initialBank(): number[] {
+    return Array.from({ length: 16 }, (_, channel) => (channel === 9 ? 127 : 0));
+  }
+
+  function random(seed: number): () => number {
+    let state = seed;
+    return () => {
+      state = (state + 0x6d2b79f5) | 0;
+      let t = Math.imul(state ^ (state >>> 15), 1 | state);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function randomSong(next: () => number): number[][] {
+    const pick = <T>(items: readonly T[]): T => items[Math.floor(next() * items.length)]!;
+    const datas: number[][] = next() < 0.8 ? [XG_SYSTEM_ON] : [];
+    for (let i = 0; i < 40; i += 1) {
+      const channel = pick(CHANNELS);
+      const roll = next();
+      if (roll < 0.03) datas.push(pick([XG_SYSTEM_ON, GS_RESET, GM_SYSTEM_ON]));
+      else if (roll < 0.35) datas.push([0xb0 | channel, 0, pick([0, 127])]);
+      else datas.push([0xc0 | channel, pick(PROGRAMS)]);
+    }
+    return datas;
+  }
+
+  function finalVoices(
+    datas: number[][],
+    split: number,
+    device: () => ReturnType<typeof kitDevice>,
+    route: (data: readonly number[]) => readonly number[],
+  ): { continuous: string[]; seeked: string[] } {
+    const messages = sequence(...datas);
+    const continuous = device();
+    for (const data of datas) continuous.send(route(data));
+    const seeked = device();
+    for (const message of collectChaseMessages(messages, split)) seeked.send(route(message.data));
+    for (const data of datas.slice(split)) seeked.send(route(data));
+    return { continuous: continuous.voices(), seeked: seeked.voices() };
+  }
+
+  test('on a device that has the MU50 kits and PC 112', () => {
+    const next = random(1);
+    for (let run = 0; run < 500; run += 1) {
+      const datas = randomSong(next);
+      const split = Math.floor(next() * (datas.length + 1));
+      const { continuous, seeked } = finalVoices(
+        datas,
+        split,
+        () => kitDevice((program) => MU50_KITS.has(program) || program === 112),
+        (data) => data,
+      );
+      expect({ datas, split, voices: seeked }).toEqual({ datas, split, voices: continuous });
+    }
+  });
+
+  test('through the built-in synth fallback', () => {
+    const next = random(2);
+    for (let run = 0; run < 500; run += 1) {
+      const datas = randomSong(next);
+      const split = Math.floor(next() * (datas.length + 1));
+      const fallbacks: XgDrumKitFallback[] = [];
+      const route = (data: readonly number[]) => fallbacks.at(-1)!.apply(data);
+      const device = () => {
+        const fallback = new XgDrumKitFallback();
+        fallback.enabled = true;
+        fallback.apply(XG_SYSTEM_ON);
+        fallbacks.push(fallback);
+        return kitDevice(() => true);
+      };
+      const messages = sequence(...datas);
+      const continuousDevice = device();
+      for (const data of datas) continuousDevice.send(route(data));
+      const seekedDevice = device();
+      for (const message of collectChaseMessages(messages, split)) {
+        seekedDevice.send(route(message.data));
+      }
+      for (const data of datas.slice(split)) seekedDevice.send(route(data));
+      expect({ datas, split, voices: seekedDevice.voices() }).toEqual({
+        datas,
+        split,
+        voices: continuousDevice.voices(),
+      });
+    }
   });
 });

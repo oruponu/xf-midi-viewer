@@ -3,6 +3,7 @@ import processorUrl from 'spessasynth_lib/dist/spessasynth_processor.min.js?url'
 import { BuiltinSynthOutput, waitForClockStart } from './builtinOutput.ts';
 import { soundBankGain } from './soundBank.ts';
 import { SynthClockOffset, withClockOffset } from './synthClock.ts';
+import { XgDrumKitFallback, withXgDrumKitFallback } from './xgDrumKitFallback.ts';
 
 export type SoundBankLoadResult = 'loaded' | 'fallback';
 
@@ -77,6 +78,7 @@ export async function createBuiltinSynthEngine(
     },
   });
   const clockOffset = new SynthClockOffset();
+  const kitFallback = new XgDrumKitFallback();
   const onWorkletMessage = (event: MessageEvent<unknown>) => {
     const data = event.data;
     if (typeof data !== 'object' || data === null || !('currentTime' in data)) return;
@@ -91,7 +93,7 @@ export async function createBuiltinSynthEngine(
   gain.connect(limiter);
   limiter.connect(context.destination);
   const output = new BuiltinSynthOutput({
-    synth: withClockOffset(synth, clockOffset),
+    synth: withXgDrumKitFallback(withClockOffset(synth, clockOffset), kitFallback),
     clock: context,
     gain: gain.gain,
     onStall,
@@ -119,14 +121,18 @@ export async function createBuiltinSynthEngine(
         .then(
           () => {
             hasSoundBank = true;
+            // spessasynth resets itself to GS on every sound bank load.
+            output.requestReset();
             settle();
           },
           (error: unknown) => settle(error instanceof Error ? error : new Error(String(error))),
         );
     });
 
-  const setGain = (bundled: boolean) =>
+  const applySoundBankKind = (bundled: boolean) => {
     synth.setSystemParameter('gain', MASTER_GAIN * soundBankGain(bundled));
+    kitFallback.enabled = bundled;
+  };
 
   const loadSoundBank = (
     data: ArrayBuffer,
@@ -138,10 +144,10 @@ export async function createBuiltinSynthEngine(
       } catch (error) {
         if (!options.fallback) throw error;
         await addSoundBank(await options.fallback());
-        setGain(true);
+        applySoundBankKind(true);
         return 'fallback';
       }
-      setGain(options.bundled);
+      applySoundBankKind(options.bundled);
       return 'loaded';
     };
     const result = pending.then(run, run);
