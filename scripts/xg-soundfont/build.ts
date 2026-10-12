@@ -6,9 +6,10 @@ import { applyCorrections } from './calibration/apply.ts';
 import { readCorrections } from './calibration/corrections.ts';
 import type { Corrections } from './calibration/corrections.ts';
 import { CORRECTIONS_PATH, OUTPUT_SOUND_BANK_PATH, SOURCE_SOUND_BANK_PATH } from './paths.ts';
-import { buildKitPreset, buildSfxVoicePreset } from './remap.ts';
+import { buildKitPreset, buildSfxVoicePreset, buildVariationVoicePreset } from './remap.ts';
 import { XG_KITS } from './xgDrumKits.ts';
 import { XG_SFX_VOICES } from './xgSfxVoices.ts';
+import { XG_VARIATION_VOICES } from './xgVariationVoices.ts';
 
 export function sourceSha256(source: ArrayBuffer): string {
   return createHash('sha256').update(new Uint8Array(source)).digest('hex');
@@ -27,6 +28,10 @@ export function buildXgBank(source: ArrayBuffer, corrections: Corrections): Basi
   ];
   bank.addPresets(...presets);
   applyCorrections(bank, corrections);
+  // Added after the corrections so that the variations copy the corrected sources.
+  bank.addPresets(
+    ...XG_VARIATION_VOICES.map((variation) => buildVariationVoicePreset(bank, variation)),
+  );
   bank.flush();
   return bank;
 }
