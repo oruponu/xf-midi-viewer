@@ -39,7 +39,7 @@ describe('listUnits', () => {
   test('lists the layers of each XG drum key and the zones of each calibration voice', () => {
     const units = listUnits(fresh());
     const snare = units.drums.find((d) => d.kit === 0 && d.key === 40)!;
-    expect(snare.layers.map((l) => [...l.velocity])).toContainEqual([0, 52]);
+    expect(snare.layers.map((l) => [...l.velocity])).toContainEqual([0, 96]);
     expect(snare.layers.every((l) => l.velocityAmount > 0)).toBe(true);
     expect(
       units.voices.find((v) => v.bankMSB === 0 && v.program === 0)!.zones.length,
