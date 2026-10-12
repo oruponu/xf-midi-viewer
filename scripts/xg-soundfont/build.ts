@@ -32,7 +32,8 @@ export function buildXgBank(source: ArrayBuffer, corrections: Corrections): Basi
 }
 
 export function buildXgSoundBank(source: ArrayBuffer, corrections: Corrections): ArrayBuffer {
-  return buildXgBank(source, corrections).writeSF2({ software: 'xf-midi-viewer' });
+  // SF2 has no separate bank LSB; an XG variation (MSB 0 / LSB n) would collide with GS bank n.
+  return buildXgBank(source, corrections).writeSFE({ software: 'xf-midi-viewer' });
 }
 
 export function readSoundBank(path: string): ArrayBuffer {
