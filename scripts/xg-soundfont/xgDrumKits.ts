@@ -33,7 +33,7 @@ const STANDARD_KIT: XgKit = {
     37: { name: 'Side Stick', from: gs(0, 37) },
     38: { name: 'Snare M', from: gs(0, 38) },
     39: { name: 'Hand Clap', from: gs(0, 39) },
-    40: { name: 'Snare H', from: gs(0, 40) },
+    40: { name: 'Snare H', from: gs(0, 40), lowestLayer: 75 },
     41: { name: 'Floor Tom L', from: gs(0, 41) },
     42: { name: 'Hi-Hat Closed', from: gs(0, 42) },
     43: { name: 'Floor Tom H', from: gs(0, 43) },

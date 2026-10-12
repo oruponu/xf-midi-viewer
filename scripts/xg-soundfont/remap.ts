@@ -50,11 +50,13 @@ export function buildKitPreset(bank: BasicSoundBank, kit: XgKit): BasicPreset {
     if (!mapped.from) continue;
     const source = findSourcePreset(bank, mapped.from);
     const key = mapped.from.note;
+    const lowest = mapped.lowestLayer;
     let found = false;
+    let lowestFound = false;
     for (const sourceZone of source.zones) {
       if (!inRange(keyRangeOf(sourceZone, source.globalZone), key)) continue;
       const instrument = sourceZone.instrument;
-      const zones = instrument.zones.filter((z) =>
+      let zones = instrument.zones.filter((z) =>
         inRange(keyRangeOf(z, instrument.globalZone), key),
       );
       if (zones.length === 0) continue;
@@ -66,13 +68,43 @@ export function buildKitPreset(bank: BasicSoundBank, kit: XgKit): BasicPreset {
           `${kit.name} のノート ${note}: ${describeSource(mapped.from)} はノート番号で変化するモジュレーターを持つため移せません`,
         );
       }
+      if (lowest !== undefined) {
+        const presetRange = velocityRangeOf(sourceZone, source.globalZone);
+        if (presetRange.min > 0 || presetRange.max < 127) {
+          throw new Error(
+            `${kit.name} note ${note}: the source preset limits velocities, so its layers cannot be extended`,
+          );
+        }
+        for (const z of zones) {
+          const { min, max } = velocityRangeOf(z, instrument.globalZone);
+          if (min < lowest && lowest <= max) {
+            throw new Error(
+              `${kit.name} note ${note}: velocity layer ${min}-${max} crosses lowestLayer ${lowest}`,
+            );
+          }
+        }
+        zones = zones.filter((z) => velocityRangeOf(z, instrument.globalZone).max >= lowest);
+        if (zones.length === 0) continue;
+      }
       let layer = layers.get(sourceZone);
       if (!layer) {
         layer = createLayer(bank, preset, source, sourceZone, kit);
         layers.set(sourceZone, layer);
       }
-      for (const zone of zones) moveZone(zone, instrument.globalZone, layer, key, note);
+      for (const zone of zones) {
+        const moved = moveZone(zone, instrument.globalZone, layer, key, note);
+        const range = velocityRangeOf(zone, instrument.globalZone);
+        if (range.min === lowest) {
+          moved.velRange = { min: 0, max: range.max };
+          lowestFound = true;
+        }
+      }
       found = true;
+    }
+    if (lowest !== undefined && !lowestFound) {
+      throw new Error(
+        `${kit.name} note ${note}: no velocity layer starts at lowestLayer ${lowest}`,
+      );
     }
     if (!found)
       throw new Error(
@@ -162,18 +194,18 @@ function moveZone(
   layer: Layer,
   from: number,
   to: number,
-): void {
+): BasicInstrumentZone {
   const zone = layer.instrument.createZone(source.sample);
   zone.copyFrom(source);
   zone.keyRange = { min: to, max: to };
   const shift = to - from;
-  if (shift === 0) return;
+  if (shift === 0) return zone;
 
   const instrumentValue = (type: GeneratorType) =>
     zone.getGenerator(type, sourceGlobal.getGenerator(type, GeneratorLimits[type].def));
   const presetValue = (type: GeneratorType) => layer.presetZone.getGenerator(type, 0);
 
-  if (instrumentValue(GeneratorTypes.keyNum) >= 0) return;
+  if (instrumentValue(GeneratorTypes.keyNum) >= 0) return zone;
 
   const overridden = instrumentValue(GeneratorTypes.overridingRootKey);
   const root = (overridden >= 0 ? overridden : source.sample.originalKey) + shift;
@@ -192,10 +224,16 @@ function moveZone(
     if (amount !== 0)
       zone.setGenerator(envelope, instrumentValue(envelope) + shift * amount, false);
   }
+  return zone;
 }
 
 function keyRangeOf(zone: BasicZone, global: BasicZone): GenericRange {
   return zone.hasKeyRange ? zone.keyRange : global.keyRange;
+}
+
+function velocityRangeOf(zone: BasicZone, global: BasicZone): GenericRange {
+  const range = zone.hasVelRange ? zone.velRange : global.velRange;
+  return { min: Math.max(0, range.min), max: range.max };
 }
 
 function inRange(range: GenericRange, value: number): boolean {

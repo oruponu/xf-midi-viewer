@@ -875,65 +875,29 @@
         {
           "velocity": [
             0,
-            52
+            96
           ],
           "sample": "Standard Snare 3",
-          "attenuation": 460,
-          "velocityAmount": 673
+          "attenuation": 357,
+          "velocityAmount": 682
         },
         {
           "velocity": [
             0,
-            52
-          ],
-          "sample": "Jazz Snare Soft 1",
-          "attenuation": 235,
-          "velocityAmount": 395
-        },
-        {
-          "velocity": [
-            53,
-            74
-          ],
-          "sample": "Standard Snare 3",
-          "attenuation": 308,
-          "velocityAmount": 673
-        },
-        {
-          "velocity": [
-            53,
-            74
-          ],
-          "sample": "Jazz Snare Soft 1",
-          "attenuation": 158,
-          "velocityAmount": 395
-        },
-        {
-          "velocity": [
-            75,
-            96
-          ],
-          "sample": "Standard Snare 3",
-          "attenuation": 342,
-          "velocityAmount": 673
-        },
-        {
-          "velocity": [
-            75,
             96
           ],
           "sample": "Jazz Snare Soft 1",
-          "attenuation": 230,
-          "velocityAmount": 673
+          "attenuation": 245,
+          "velocityAmount": 682
         },
         {
           "velocity": [
-            75,
+            0,
             96
           ],
           "sample": "Jazz Snare Hard",
-          "attenuation": 330,
-          "velocityAmount": 673
+          "attenuation": 345,
+          "velocityAmount": 682
         },
         {
           "velocity": [
@@ -942,7 +906,7 @@
           ],
           "sample": "Standard Snare 3",
           "attenuation": 345,
-          "velocityAmount": 673
+          "velocityAmount": 682
         },
         {
           "velocity": [
@@ -951,7 +915,7 @@
           ],
           "sample": "Jazz Snare Hard",
           "attenuation": 370,
-          "velocityAmount": 374
+          "velocityAmount": 379
         }
       ]
     },
@@ -14627,65 +14591,29 @@
         {
           "velocity": [
             0,
-            52
+            96
           ],
           "sample": "Standard Snare 3",
-          "attenuation": 500,
-          "velocityAmount": 672
+          "attenuation": 397,
+          "velocityAmount": 682
         },
         {
           "velocity": [
             0,
-            52
-          ],
-          "sample": "Jazz Snare Soft 1",
-          "attenuation": 275,
-          "velocityAmount": 395
-        },
-        {
-          "velocity": [
-            53,
-            74
-          ],
-          "sample": "Standard Snare 3",
-          "attenuation": 350,
-          "velocityAmount": 672
-        },
-        {
-          "velocity": [
-            53,
-            74
-          ],
-          "sample": "Jazz Snare Soft 1",
-          "attenuation": 200,
-          "velocityAmount": 395
-        },
-        {
-          "velocity": [
-            75,
-            96
-          ],
-          "sample": "Standard Snare 3",
-          "attenuation": 386,
-          "velocityAmount": 672
-        },
-        {
-          "velocity": [
-            75,
             96
           ],
           "sample": "Jazz Snare Soft 1",
-          "attenuation": 274,
-          "velocityAmount": 672
+          "attenuation": 285,
+          "velocityAmount": 682
         },
         {
           "velocity": [
-            75,
+            0,
             96
           ],
           "sample": "Jazz Snare Hard",
-          "attenuation": 374,
-          "velocityAmount": 672
+          "attenuation": 385,
+          "velocityAmount": 682
         },
         {
           "velocity": [
@@ -14694,7 +14622,7 @@
           ],
           "sample": "Standard Snare 3",
           "attenuation": 385,
-          "velocityAmount": 672
+          "velocityAmount": 682
         },
         {
           "velocity": [
@@ -14703,7 +14631,7 @@
           ],
           "sample": "Jazz Snare Hard",
           "attenuation": 410,
-          "velocityAmount": 373
+          "velocityAmount": 379
         }
       ]
     },
