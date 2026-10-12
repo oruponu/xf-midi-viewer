@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { calibrate } from './calibrate.ts';
+import { calibrate, mergeCorrections } from './calibrate.ts';
 import { NO_CORRECTIONS } from './corrections.ts';
 import type { CalibrationUnits, Corrections, ExcludedUnit } from './corrections.ts';
 import type { LevelTable } from './levels.ts';
@@ -282,5 +282,21 @@ describe('calibrate', () => {
       result.corrections.drums.find((d) => d.key === 40)!.layers.map((l) => l.attenuation),
     ).toEqual([320, 260]);
     expect(result.corrections.voices.map((v) => v.zones[0].attenuation)).toEqual([400, 275]);
+  });
+});
+
+describe('mergeCorrections', () => {
+  test('keeps the variation corrections of the existing file', () => {
+    const variations = [
+      { program: 81, bankLSB: 18, attenuationDelta: -200, velocityAmountDelta: -159 },
+    ];
+    const existing: Corrections = { ...NO_CORRECTIONS, outputGainDb: 15, variations };
+    const fitted: Corrections = { ...NO_CORRECTIONS, commonAttenuation: 444 };
+    expect(mergeCorrections(fitted, existing, 'abc')).toEqual({
+      ...fitted,
+      outputGainDb: 15,
+      sourceSha256: 'abc',
+      variations,
+    });
   });
 });

@@ -3,7 +3,7 @@ import { GeneratorTypes, SpessaLog } from 'spessasynth_core';
 import type { BasicSoundBank, MIDIPatch } from 'spessasynth_core';
 import { buildXgBank, readSoundBank } from '../build.ts';
 import { SOURCE_SOUND_BANK_PATH } from '../paths.ts';
-import { applyCorrections, listUnits } from './apply.ts';
+import { applyCorrections, applyVariationCorrections, listUnits } from './apply.ts';
 import { NO_CORRECTIONS } from './corrections.ts';
 import type { Corrections } from './corrections.ts';
 
@@ -273,5 +273,69 @@ describe('applyCorrections', () => {
     expect(() => applyCorrections(fresh(), { ...NO_CORRECTIONS, commonAttenuation: 1440 })).toThrow(
       '1440',
     );
+  });
+});
+
+describe('applyVariationCorrections', () => {
+  const velocityAmount = (bank: BasicSoundBank, p: MIDIPatch) =>
+    bank
+      .getPreset(p, 'xg')
+      .getVoiceParameters(60, 100)
+      .map((v) =>
+        v.modulators
+          .filter(
+            (m) =>
+              m.destination === ATTENUATION && !m.primarySource.isCC && m.primarySource.index === 2,
+          )
+          .reduce((sum, m) => sum + m.transformAmount, 0),
+      );
+
+  test('adds the deltas to every preset zone of the variation', () => {
+    const before = fresh();
+    const after = fresh();
+    applyVariationCorrections(after, [
+      { program: 81, bankLSB: 18, attenuationDelta: 250, velocityAmountDelta: -120 },
+    ]);
+    const a = voiceAttenuations(before, patch(0, 18, 81), 'xg', 60);
+    const b = voiceAttenuations(after, patch(0, 18, 81), 'xg', 60);
+    expect(b.length).toBeGreaterThan(0);
+    b.forEach((value, i) => expect(value - a[i]).toBe(100));
+    const va = velocityAmount(before, patch(0, 18, 81));
+    expect(velocityAmount(after, patch(0, 18, 81)).map((x, i) => x - va[i])).toEqual(
+      va.map(() => -120),
+    );
+  });
+
+  test('does not touch the base voice when correcting its variation', () => {
+    const before = fresh();
+    const after = fresh();
+    applyVariationCorrections(after, [
+      { program: 81, bankLSB: 18, attenuationDelta: 250, velocityAmountDelta: -120 },
+    ]);
+    expect(voiceAttenuations(after, patch(0, 0, 81), 'xg', 60)).toEqual(
+      voiceAttenuations(before, patch(0, 0, 81), 'xg', 60),
+    );
+    expect(velocityAmount(after, patch(0, 0, 81))).toEqual(velocityAmount(before, patch(0, 0, 81)));
+  });
+
+  test('stops at a variation that has no preset or is corrected twice', () => {
+    const zero = { attenuationDelta: 0, velocityAmountDelta: 0 };
+    expect(() =>
+      applyVariationCorrections(fresh(), [{ program: 81, bankLSB: 7, ...zero }]),
+    ).toThrow('XG variation LSB 7 / PC 81 not found');
+    expect(() =>
+      applyVariationCorrections(fresh(), [
+        { program: 81, bankLSB: 18, ...zero },
+        { program: 81, bankLSB: 18, ...zero },
+      ]),
+    ).toThrow('XG variation LSB 18 / PC 81 is corrected twice');
+  });
+
+  test('stops when a variation correction brings the total attenuation below 0', () => {
+    expect(() =>
+      applyVariationCorrections(fresh(), [
+        { program: 81, bankLSB: 18, attenuationDelta: -1440, velocityAmountDelta: 0 },
+      ]),
+    ).toThrow('below 0');
   });
 });
