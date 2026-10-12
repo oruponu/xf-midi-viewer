@@ -172,14 +172,63 @@ describe('buildXgSoundBank', () => {
   });
 
   test('keeps every original preset and their GS and GM selection', () => {
+    const gsFallbacks = XG_VARIATION_VOICES.filter(
+      ({ bankLSB, program }) =>
+        !source.presets.some((p) => p.bankMSB === bankLSB && p.program === program) &&
+        !(bankLSB === 64 && XG_SFX_VOICES.some((sfx) => sfx.program === program)),
+    );
+    expect(gsFallbacks.length).toBe(289);
     expect(built.presets.length).toBe(
-      source.presets.length + XG_KITS.length + XG_SFX_VOICES.length + XG_VARIATION_VOICES.length,
+      source.presets.length +
+        XG_KITS.length +
+        XG_SFX_VOICES.length +
+        XG_VARIATION_VOICES.length +
+        gsFallbacks.length,
     );
     for (const original of source.presets) {
       const p = patch(original.bankMSB, original.program, original.isGMGSDrum);
       for (const system of ['gs', 'gm'] as const) {
         expect(built.getPreset(p, system).name).toBe(source.getPreset(p, system).name);
       }
+    }
+  });
+
+  test('never falls back to an XG variation for a GS or GM selection with LSB 0', () => {
+    for (const system of ['gs', 'gm'] as const) {
+      for (let bankMSB = 0; bankMSB < 126; bankMSB++) {
+        for (let program = 0; program < 128; program++) {
+          const preset = built.getPreset(patch(bankMSB, program), system);
+          expect(
+            preset.bankMSB === 0 && preset.bankLSB !== 0,
+            `${system} MSB ${bankMSB} / PC ${program} -> ${preset.name}`,
+          ).toBe(false);
+        }
+      }
+    }
+  });
+
+  test('plays the base voice for a GS bank that only an XG variation has the number of', () => {
+    const bank = SoundBankLoader.fromArrayBuffer(
+      buildXgSoundBank(readSoundBank(SOURCE_SOUND_BANK_PATH), readCorrections(CORRECTIONS_PATH)),
+    );
+    const voices = (preset: BasicPreset) =>
+      [48, 60, 72].flatMap((key) =>
+        preset.getVoiceParameters(key, 100).map((v) => ({
+          sample: v.sample.name,
+          generators: [...v.generators],
+          modulators: v.modulators.map((m) => [m.destination, m.transformAmount]),
+        })),
+      );
+    for (const [bankMSB, program] of [
+      [8, 40],
+      [16, 24],
+      [6, 39],
+    ]) {
+      expect(source.presets.some((p) => p.bankMSB === bankMSB && p.program === program)).toBe(
+        false,
+      );
+      const fallback = bank.getPreset(patch(bankMSB, program), 'gs');
+      expect(voices(fallback)).toEqual(voices(bank.getPreset(patch(0, program), 'gs')));
     }
   });
 

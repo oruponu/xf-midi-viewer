@@ -6,7 +6,12 @@ import { applyCorrections, applyVariationCorrections } from './calibration/apply
 import { readCorrections } from './calibration/corrections.ts';
 import type { Corrections } from './calibration/corrections.ts';
 import { CORRECTIONS_PATH, OUTPUT_SOUND_BANK_PATH, SOURCE_SOUND_BANK_PATH } from './paths.ts';
-import { buildKitPreset, buildSfxVoicePreset, buildVariationVoicePreset } from './remap.ts';
+import {
+  buildGsFallbackPreset,
+  buildKitPreset,
+  buildSfxVoicePreset,
+  buildVariationVoicePreset,
+} from './remap.ts';
 import { XG_KITS } from './xgDrumKits.ts';
 import { XG_SFX_VOICES } from './xgSfxVoices.ts';
 import { XG_VARIATION_VOICES } from './xgVariationVoices.ts';
@@ -31,6 +36,16 @@ export function buildXgBank(source: ArrayBuffer, corrections: Corrections): Basi
   // Added after the corrections so that the variations copy the corrected sources.
   bank.addPresets(
     ...XG_VARIATION_VOICES.map((variation) => buildVariationVoicePreset(bank, variation)),
+  );
+  // GS and GM fall back from a missing bank MSB n to a preset with LSB n, which would be a variation.
+  const missingGsBanks = XG_VARIATION_VOICES.filter(
+    ({ bankLSB, program }) =>
+      !bank.presets.some((p) => !p.isGMGSDrum && p.bankMSB === bankLSB && p.program === program),
+  );
+  bank.addPresets(
+    ...missingGsBanks.map((variation) =>
+      buildGsFallbackPreset(bank, variation.bankLSB, variation.from),
+    ),
   );
   applyVariationCorrections(bank, corrections.variations);
   bank.flush();
