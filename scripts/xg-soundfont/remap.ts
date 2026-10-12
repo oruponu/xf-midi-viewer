@@ -15,7 +15,7 @@ import type {
   GenericRange,
 } from 'spessasynth_core';
 import { describeSource, resolveKitNotes } from './mapping.ts';
-import type { SourceNote, XgKit, XgSfxVoice } from './mapping.ts';
+import type { SourceNote, XgKit, XgSfxVoice, XgVariationVoice } from './mapping.ts';
 
 const KEY_NUMBER_ENVELOPES: readonly (readonly [GeneratorType, GeneratorType])[] = [
   [GeneratorTypes.keyNumToVolEnvHold, GeneratorTypes.holdVolEnv],
@@ -92,16 +92,35 @@ export function buildSfxVoicePreset(bank: BasicSoundBank, sfx: XgSfxVoice): Basi
   return preset;
 }
 
+export function buildVariationVoicePreset(
+  bank: BasicSoundBank,
+  variation: XgVariationVoice,
+): BasicPreset {
+  const preset = createPreset(
+    bank,
+    `XG ${variation.name}`,
+    0,
+    variation.program,
+    variation.bankLSB,
+  );
+  const source = findSourcePreset(bank, variation.from);
+  preset.globalZone.copyFrom(source.globalZone);
+  for (const sourceZone of source.zones)
+    preset.createZone(sourceZone.instrument).copyFrom(sourceZone);
+  return preset;
+}
+
 function createPreset(
   bank: BasicSoundBank,
   name: string,
   bankMSB: number,
   program: number,
+  bankLSB = 0,
 ): BasicPreset {
   const preset = new BasicPreset(bank);
   preset.name = name;
   preset.bankMSB = bankMSB;
-  preset.bankLSB = 0;
+  preset.bankLSB = bankLSB;
   preset.program = program;
   preset.isGMGSDrum = false;
   return preset;

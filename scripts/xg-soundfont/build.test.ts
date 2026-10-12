@@ -1,11 +1,12 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { SoundBankLoader, SpessaLog } from 'spessasynth_core';
-import type { BasicSoundBank, MIDIPatch } from 'spessasynth_core';
+import type { BasicPreset, BasicSoundBank, MIDIPatch } from 'spessasynth_core';
 import { buildXgBank, buildXgSoundBank, readSoundBank, sourceSha256 } from './build.ts';
 import { NO_CORRECTIONS, readCorrections } from './calibration/corrections.ts';
 import { CORRECTIONS_PATH, SOURCE_SOUND_BANK_PATH } from './paths.ts';
 import { XG_KITS } from './xgDrumKits.ts';
 import { XG_SFX_VOICES } from './xgSfxVoices.ts';
+import { XG_VARIATION_VOICES } from './xgVariationVoices.ts';
 
 SpessaLog.setLogLevel(false, false, false);
 
@@ -54,13 +55,60 @@ describe('buildXgSoundBank', () => {
     }
   });
 
+  test('selects the XG variation voices by exact match in XG mode', () => {
+    for (const variation of XG_VARIATION_VOICES) {
+      const preset = built.getPreset(
+        { bankMSB: 0, bankLSB: variation.bankLSB, program: variation.program, isGMGSDrum: false },
+        'xg',
+      );
+      expect([preset.name, preset.bankMSB, preset.bankLSB, preset.program]).toEqual([
+        `XG ${variation.name}`,
+        0,
+        variation.bankLSB,
+        variation.program,
+      ]);
+    }
+  });
+
+  test('keeps the GS variation in the bank that shares its number', () => {
+    for (const system of ['xg', 'gs', 'gm'] as const) {
+      expect(built.getPreset(patch(16, 25), system).name).toBe(
+        source.getPreset(patch(16, 25), system).name,
+      );
+    }
+  });
+
+  test('plays the XG variation voices exactly like their corrected source', () => {
+    const bank = SoundBankLoader.fromArrayBuffer(
+      buildXgSoundBank(readSoundBank(SOURCE_SOUND_BANK_PATH), readCorrections(CORRECTIONS_PATH)),
+    );
+    const voices = (preset: BasicPreset) =>
+      [36, 48, 60, 72, 84].flatMap((key) =>
+        [40, 100].flatMap((velocity) =>
+          preset
+            .getVoiceParameters(key, velocity)
+            .map((v) => ({ sample: v.sample.name, generators: [...v.generators] })),
+        ),
+      );
+    for (const variation of XG_VARIATION_VOICES) {
+      const alias = bank.getPreset(
+        { bankMSB: 0, bankLSB: variation.bankLSB, program: variation.program, isGMGSDrum: false },
+        'xg',
+      );
+      const original = bank.getPreset(patch(variation.from.bankMSB, variation.from.program), 'xg');
+      expect(alias.name).toBe(`XG ${variation.name}`);
+      expect(voices(alias).length).toBeGreaterThan(0);
+      expect(voices(alias)).toEqual(voices(original));
+    }
+  });
+
   test('is recognized as an XG sound bank', () => {
     expect(built.isXGBank).toBe(true);
   });
 
   test('keeps every original preset and their GS and GM selection', () => {
     expect(built.presets.length).toBe(
-      source.presets.length + XG_KITS.length + XG_SFX_VOICES.length,
+      source.presets.length + XG_KITS.length + XG_SFX_VOICES.length + XG_VARIATION_VOICES.length,
     );
     for (const original of source.presets) {
       const p = patch(original.bankMSB, original.program, original.isGMGSDrum);

@@ -27,6 +27,13 @@ export interface XgKit {
 
 export type XgSfxVoice = Mapped & { readonly program: number };
 
+export interface XgVariationVoice {
+  readonly program: number;
+  readonly bankLSB: number;
+  readonly name: string;
+  readonly from: SourceNote;
+}
+
 export function resolveKitNotes(kit: XgKit): Map<number, Mapped> {
   const notes = kit.base ? resolveKitNotes(kit.base) : new Map<number, Mapped>();
   for (const [note, mapped] of Object.entries(kit.notes)) notes.set(Number(note), mapped);
