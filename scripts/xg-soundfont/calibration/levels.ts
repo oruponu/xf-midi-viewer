@@ -12,6 +12,7 @@ export interface DrumLevels {
 
 export interface VoiceLevels {
   readonly bankMSB: number;
+  readonly bankLSB?: number;
   readonly program: number;
   readonly levels: Readonly<Record<string, Level>>;
 }
@@ -70,14 +71,19 @@ export function voiceLevels(energy: KWeightedEnergy, midi: TestMidi<VoiceProbe>)
   const shift = markerShift(energy, midi);
   const table = new Map<
     string,
-    { bankMSB: number; program: number; levels: Record<string, Level> }
+    { bankMSB: number; bankLSB?: number; program: number; levels: Record<string, Level> }
   >();
   for (const { probe, seconds } of midi.probes) {
     const db = energy.levelDb(seconds + shift, VOICE_NOTE_SECONDS);
-    const id = `${probe.bankMSB}/${probe.program}`;
+    const id = `${probe.bankMSB}/${probe.bankLSB ?? 0}/${probe.program}`;
     let entry = table.get(id);
     if (!entry) {
-      entry = { bankMSB: probe.bankMSB, program: probe.program, levels: {} };
+      entry = {
+        bankMSB: probe.bankMSB,
+        ...(probe.bankLSB ? { bankLSB: probe.bankLSB } : {}),
+        program: probe.program,
+        levels: {},
+      };
       table.set(id, entry);
     }
     entry.levels[voiceLevelKey(probe.note, probe.velocity)] = toLevel(db);

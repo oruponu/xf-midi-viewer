@@ -4,6 +4,7 @@ import { XG_SFX_VOICES } from '../xgSfxVoices.ts';
 export interface VoiceId {
   readonly bankMSB: number;
   readonly program: number;
+  readonly bankLSB?: number;
 }
 
 export interface DrumProbe {
@@ -67,11 +68,11 @@ const MARKER_KEY = 36;
 const DRUM_NOTE_SECONDS = 10 * SECONDS_PER_TICK;
 const XG_SYSTEM_ON = [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7];
 
-function setup(channel: number, bankMSB: number, program: number): number[][] {
+function setup(channel: number, bankMSB: number, program: number, bankLSB = 0): number[][] {
   const cc = (controller: number, value: number) => [0xb0 | channel, controller, value];
   return [
     cc(0, bankMSB),
-    cc(32, 0),
+    cc(32, bankLSB),
     [0xc0 | channel, program],
     cc(91, 0),
     cc(93, 0),
@@ -147,13 +148,15 @@ export function voiceTestMidi(
   const messages = preamble();
   const probes: ScheduledProbe<VoiceProbe>[] = [];
   let t = MARKER_SECONDS + DRUM_INTERVAL_SECONDS;
-  for (const { bankMSB, program } of voices) {
-    for (const data of setup(VOICE_CHANNEL, bankMSB, program)) messages.push({ seconds: t, data });
+  for (const { bankMSB, program, bankLSB = 0 } of voices) {
+    for (const data of setup(VOICE_CHANNEL, bankMSB, program, bankLSB))
+      messages.push({ seconds: t, data });
     t += SETUP_SECONDS;
+    const id: VoiceId = bankLSB === 0 ? { bankMSB, program } : { bankMSB, bankLSB, program };
     for (const note of notes) {
       for (const velocity of velocities) {
         hit(messages, VOICE_CHANNEL, note, velocity, t, VOICE_NOTE_SECONDS);
-        probes.push({ probe: { bankMSB, program, note, velocity }, seconds: t });
+        probes.push({ probe: { ...id, note, velocity }, seconds: t });
         t += VOICE_INTERVAL_SECONDS;
       }
     }

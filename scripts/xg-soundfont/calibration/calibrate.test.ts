@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { calibrate } from './calibrate.ts';
+import { calibrate, mergeCorrections } from './calibrate.ts';
 import { NO_CORRECTIONS } from './corrections.ts';
 import type { CalibrationUnits, Corrections, ExcludedUnit } from './corrections.ts';
 import type { LevelTable } from './levels.ts';
@@ -152,6 +152,21 @@ describe('calibrate', () => {
     expect(() => run([{ kit: 0, key: 99 }])).toThrow('Excluded entry {"kit":0,"key":99}');
   });
 
+  test('refuses a level table with a variation voice instead of overwriting its base voice', () => {
+    const ref = reference();
+    const variation = { ...ref.voices[0], bankLSB: 18 };
+    expect(() => run([], { ...ref, voices: [...ref.voices, variation] })).toThrow(
+      'voice 0/0 with bank LSB 18',
+    );
+    const measure = fakeMeasure();
+    expect(() =>
+      run([], ref, (corrections) => {
+        const table = measure(corrections);
+        return { ...table, voices: [...table.voices, { ...table.voices[1], bankLSB: 6 }] };
+      }),
+    ).toThrow('voice 0/1 with bank LSB 6');
+  });
+
   test('gives units without valid reference points only the common attenuation', () => {
     const result = run([], reference({ '0/1': null }));
     expect(result.unmeasured).toContain('voice 0/1');
@@ -267,5 +282,21 @@ describe('calibrate', () => {
       result.corrections.drums.find((d) => d.key === 40)!.layers.map((l) => l.attenuation),
     ).toEqual([320, 260]);
     expect(result.corrections.voices.map((v) => v.zones[0].attenuation)).toEqual([400, 275]);
+  });
+});
+
+describe('mergeCorrections', () => {
+  test('keeps the variation corrections of the existing file', () => {
+    const variations = [
+      { program: 81, bankLSB: 18, attenuationDelta: -200, velocityAmountDelta: -159 },
+    ];
+    const existing: Corrections = { ...NO_CORRECTIONS, outputGainDb: 15, variations };
+    const fitted: Corrections = { ...NO_CORRECTIONS, commonAttenuation: 444 };
+    expect(mergeCorrections(fitted, existing, 'abc')).toEqual({
+      ...fitted,
+      outputGainDb: 15,
+      sourceSha256: 'abc',
+      variations,
+    });
   });
 });

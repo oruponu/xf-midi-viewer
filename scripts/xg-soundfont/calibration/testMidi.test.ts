@@ -71,6 +71,20 @@ describe('voiceTestMidi', () => {
     expect(midi.messages).toContainEqual({ seconds: 5.9, data: [0xb0, 120, 0] });
   });
 
+  test('selects the bank LSB and keeps it on each probe of a variation voice', () => {
+    const midi = voiceTestMidi([{ bankMSB: 0, bankLSB: 18, program: 81 }], [60], [100]);
+    expect(midi.messages).toContainEqual({ seconds: 3, data: [0xb0, 32, 18] });
+    expect(midi.probes.map((p) => p.probe)).toEqual([
+      { bankMSB: 0, bankLSB: 18, program: 81, note: 60, velocity: 100 },
+    ]);
+  });
+
+  test('sends LSB 0 and leaves the LSB out of the probe for a base voice', () => {
+    const midi = voiceTestMidi([{ bankMSB: 0, program: 81 }], [60], [100]);
+    expect(midi.messages).toContainEqual({ seconds: 3, data: [0xb0, 32, 0] });
+    expect('bankLSB' in midi.probes[0].probe).toBe(false);
+  });
+
   test('lists the GM programs and the SFX voices that have a substitute', () => {
     const sfx = XG_SFX_VOICES.filter((v) => v.from !== null);
     expect(CALIBRATION_VOICES.length).toBe(128 + sfx.length);

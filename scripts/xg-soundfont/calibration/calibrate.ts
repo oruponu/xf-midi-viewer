@@ -62,7 +62,13 @@ const voiceId = (bankMSB: number, program: number) => `voice ${bankMSB}/${progra
 function index(table: LevelTable): Index {
   const map: Index = new Map();
   for (const d of table.drums) map.set(drumId(d.kit, d.key), d.levels);
-  for (const v of table.voices) map.set(voiceId(v.bankMSB, v.program), v.levels);
+  for (const v of table.voices) {
+    // Variations would overwrite their base voice here; calibrateVariations.ts handles them.
+    if (v.bankLSB) {
+      throw new Error(`${voiceId(v.bankMSB, v.program)} with bank LSB ${v.bankLSB} is not a unit`);
+    }
+    map.set(voiceId(v.bankMSB, v.program), v.levels);
+  }
   return map;
 }
 
@@ -277,6 +283,19 @@ export function calibrate(input: CalibrationInput): CalibrationResult {
   };
 }
 
+export function mergeCorrections(
+  fitted: Corrections,
+  existing: Corrections,
+  sha256: string,
+): Corrections {
+  return {
+    ...fitted,
+    outputGainDb: existing.outputGainDb,
+    sourceSha256: sha256,
+    variations: existing.variations,
+  };
+}
+
 if (import.meta.main) {
   const [referencePath] = process.argv.slice(2);
   if (!referencePath) {
@@ -314,10 +333,11 @@ if (import.meta.main) {
     console.error('The fit does not meet the error criteria; corrections.json was not written');
     process.exit(1);
   }
-  writeCorrections(CORRECTIONS_PATH, {
-    ...result.corrections,
-    outputGainDb: existing.outputGainDb,
-    sourceSha256: sourceSha256(source),
-  });
-  console.log('outputGainDb was kept from the previous file; run outputGain.ts again');
+  writeCorrections(
+    CORRECTIONS_PATH,
+    mergeCorrections(result.corrections, existing, sourceSha256(source)),
+  );
+  console.log(
+    'outputGainDb and variations were kept from the previous file; run outputGain.ts again',
+  );
 }

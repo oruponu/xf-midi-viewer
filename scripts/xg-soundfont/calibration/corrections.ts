@@ -32,11 +32,19 @@ export interface CalibrationUnits {
   voices: Voice[];
 }
 
+export interface VariationCorrection {
+  program: number;
+  bankLSB: number;
+  attenuationDelta: number;
+  velocityAmountDelta: number;
+}
+
 export interface Corrections extends CalibrationUnits {
   outputGainDb: number;
   commonAttenuation: number;
   sourceSha256: string | null;
   excluded: ExcludedUnit[];
+  variations: VariationCorrection[];
 }
 
 export const NO_CORRECTIONS: Corrections = {
@@ -46,6 +54,7 @@ export const NO_CORRECTIONS: Corrections = {
   excluded: [],
   drums: [],
   voices: [],
+  variations: [],
 };
 
 export function readCorrections(path: string): Corrections {

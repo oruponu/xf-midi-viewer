@@ -6,7 +6,13 @@ import type {
   BasicSoundBank,
   BasicZone,
 } from 'spessasynth_core';
-import type { CalibrationUnits, Corrections, DrumKey, Voice } from './corrections.ts';
+import type {
+  CalibrationUnits,
+  Corrections,
+  DrumKey,
+  VariationCorrection,
+  Voice,
+} from './corrections.ts';
 import { CALIBRATION_VOICES, DRUM_KEYS, XG_DRUM_KITS } from './testMidi.ts';
 import type { VoiceId } from './testMidi.ts';
 
@@ -159,6 +165,20 @@ function applyDrum(bank: BasicSoundBank, drum: DrumKey, touched: Set<BasicInstru
   });
 }
 
+function addVelocityAmount(
+  bank: BasicSoundBank,
+  preset: BasicPreset,
+  pz: BasicPresetZone,
+  delta: number,
+): void {
+  const reference = velocityModulator(bank);
+  const own = pz.modulators.find((m) => Modulator.isIdentical(m, reference));
+  const base = own ?? preset.globalZone.modulators.find((m) => Modulator.isIdentical(m, reference));
+  const replacement = Modulator.copyFrom(base ?? reference);
+  replacement.transformAmount = (base?.transformAmount ?? 0) + delta;
+  pz.modulators = [...pz.modulators.filter((m) => m !== own), replacement];
+}
+
 function applyVoice(bank: BasicSoundBank, voice: Voice): BasicPreset {
   const preset = voicePreset(bank, voice);
   const where = `Voice MSB ${voice.bankMSB} / PC ${voice.program}`;
@@ -167,7 +187,6 @@ function applyVoice(bank: BasicSoundBank, voice: Voice): BasicPreset {
       `${where}: ${voice.zones.length} zones in the corrections but ${preset.zones.length} in the sound bank`,
     );
   }
-  const reference = velocityModulator(bank);
   preset.zones.forEach((pz, i) => {
     const correction = voice.zones[i];
     if (pz.instrument.name !== correction.instrument) {
@@ -176,18 +195,19 @@ function applyVoice(bank: BasicSoundBank, voice: Voice): BasicPreset {
       );
     }
     pz.setGenerator(ATTENUATION, correction.attenuation, false);
-    if (correction.velocityAmountDelta === 0) return;
-    const own = pz.modulators.find((m) => Modulator.isIdentical(m, reference));
-    const base =
-      own ?? preset.globalZone.modulators.find((m) => Modulator.isIdentical(m, reference));
-    const replacement = Modulator.copyFrom(base ?? reference);
-    replacement.transformAmount = (base?.transformAmount ?? 0) + correction.velocityAmountDelta;
-    pz.modulators = [...pz.modulators.filter((m) => m !== own), replacement];
+    if (correction.velocityAmountDelta !== 0) {
+      addVelocityAmount(bank, preset, pz, correction.velocityAmountDelta);
+    }
   });
   return preset;
 }
 
-function checkAttenuationRange(bank: BasicSoundBank): void {
+// Only the given presets are held to 0 and above: the source sound bank itself goes below 0
+// (a GS ride cymbal), which the synth clamps only after adding the velocity and volume attenuation.
+function checkAttenuationRange(
+  bank: BasicSoundBank,
+  nonNegative: ReadonlySet<BasicPreset> = new Set(),
+): void {
   for (const preset of bank.presets) {
     for (const pz of preset.zones) {
       const presetValue = attenuationOf(pz, preset.globalZone);
@@ -196,6 +216,11 @@ function checkAttenuationRange(bank: BasicSoundBank): void {
         if (total > MAX_ATTENUATION) {
           throw new Error(
             `${preset.name} / ${zone.sample.name}: total attenuation ${total} exceeds ${MAX_ATTENUATION}`,
+          );
+        }
+        if (total < 0 && nonNegative.has(preset)) {
+          throw new Error(
+            `${preset.name} / ${zone.sample.name}: total attenuation ${total} is below 0`,
           );
         }
       }
@@ -234,4 +259,42 @@ export function applyCorrections(bank: BasicSoundBank, corrections: Corrections)
     }
   }
   checkAttenuationRange(bank);
+}
+
+function variationPreset(bank: BasicSoundBank, v: VariationCorrection): BasicPreset {
+  const preset = bank.presets.find(
+    (p) =>
+      !p.isGMGSDrum &&
+      p.bankMSB === 0 &&
+      p.bankLSB === v.bankLSB &&
+      p.program === v.program &&
+      p.name.startsWith('XG '),
+  );
+  if (!preset) throw new Error(`XG variation LSB ${v.bankLSB} / PC ${v.program} not found`);
+  return preset;
+}
+
+export function applyVariationCorrections(
+  bank: BasicSoundBank,
+  variations: readonly VariationCorrection[],
+): void {
+  const corrected = new Set<BasicPreset>();
+  for (const v of variations) {
+    const preset = variationPreset(bank, v);
+    if (corrected.has(preset)) {
+      throw new Error(`XG variation LSB ${v.bankLSB} / PC ${v.program} is corrected twice`);
+    }
+    corrected.add(preset);
+    for (const pz of preset.zones) {
+      if (v.attenuationDelta !== 0) {
+        pz.setGenerator(
+          ATTENUATION,
+          attenuationOf(pz, preset.globalZone) + v.attenuationDelta,
+          false,
+        );
+      }
+      if (v.velocityAmountDelta !== 0) addVelocityAmount(bank, preset, pz, v.velocityAmountDelta);
+    }
+  }
+  checkAttenuationRange(bank, corrected);
 }

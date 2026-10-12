@@ -25226,5 +25226,1861 @@
         }
       ]
     }
+  ],
+  "variations": [
+    {
+      "program": 0,
+      "bankLSB": 1,
+      "attenuationDelta": -81,
+      "velocityAmountDelta": 36
+    },
+    {
+      "program": 0,
+      "bankLSB": 18,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 0,
+      "bankLSB": 40,
+      "attenuationDelta": -9,
+      "velocityAmountDelta": -82
+    },
+    {
+      "program": 0,
+      "bankLSB": 41,
+      "attenuationDelta": -121,
+      "velocityAmountDelta": 115
+    },
+    {
+      "program": 1,
+      "bankLSB": 1,
+      "attenuationDelta": 17,
+      "velocityAmountDelta": 29
+    },
+    {
+      "program": 2,
+      "bankLSB": 1,
+      "attenuationDelta": -120,
+      "velocityAmountDelta": -236
+    },
+    {
+      "program": 2,
+      "bankLSB": 32,
+      "attenuationDelta": 32,
+      "velocityAmountDelta": -125
+    },
+    {
+      "program": 2,
+      "bankLSB": 40,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 2,
+      "bankLSB": 41,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 3,
+      "bankLSB": 1,
+      "attenuationDelta": 272,
+      "velocityAmountDelta": 80
+    },
+    {
+      "program": 4,
+      "bankLSB": 1,
+      "attenuationDelta": -64,
+      "velocityAmountDelta": 19
+    },
+    {
+      "program": 4,
+      "bankLSB": 18,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 4,
+      "bankLSB": 32,
+      "attenuationDelta": 108,
+      "velocityAmountDelta": 15
+    },
+    {
+      "program": 4,
+      "bankLSB": 40,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 4,
+      "bankLSB": 45,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 4,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 5,
+      "bankLSB": 1,
+      "attenuationDelta": -120,
+      "velocityAmountDelta": 39
+    },
+    {
+      "program": 5,
+      "bankLSB": 32,
+      "attenuationDelta": 48,
+      "velocityAmountDelta": 185
+    },
+    {
+      "program": 5,
+      "bankLSB": 33,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 5,
+      "bankLSB": 34,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 5,
+      "bankLSB": 40,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 5,
+      "bankLSB": 41,
+      "attenuationDelta": -89,
+      "velocityAmountDelta": 3
+    },
+    {
+      "program": 5,
+      "bankLSB": 42,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 5,
+      "bankLSB": 45,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 6,
+      "bankLSB": 1,
+      "attenuationDelta": -107,
+      "velocityAmountDelta": -11
+    },
+    {
+      "program": 6,
+      "bankLSB": 25,
+      "attenuationDelta": 162,
+      "velocityAmountDelta": -4
+    },
+    {
+      "program": 6,
+      "bankLSB": 35,
+      "attenuationDelta": 186,
+      "velocityAmountDelta": 20
+    },
+    {
+      "program": 7,
+      "bankLSB": 1,
+      "attenuationDelta": 7,
+      "velocityAmountDelta": 159
+    },
+    {
+      "program": 7,
+      "bankLSB": 27,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 7,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 7,
+      "bankLSB": 65,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 10,
+      "bankLSB": 64,
+      "attenuationDelta": 39,
+      "velocityAmountDelta": -15
+    },
+    {
+      "program": 11,
+      "bankLSB": 1,
+      "attenuationDelta": 94,
+      "velocityAmountDelta": 37
+    },
+    {
+      "program": 11,
+      "bankLSB": 45,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 12,
+      "bankLSB": 1,
+      "attenuationDelta": -13,
+      "velocityAmountDelta": -12
+    },
+    {
+      "program": 12,
+      "bankLSB": 64,
+      "attenuationDelta": 228,
+      "velocityAmountDelta": 23
+    },
+    {
+      "program": 12,
+      "bankLSB": 97,
+      "attenuationDelta": 36,
+      "velocityAmountDelta": 76
+    },
+    {
+      "program": 12,
+      "bankLSB": 98,
+      "attenuationDelta": -135,
+      "velocityAmountDelta": 607
+    },
+    {
+      "program": 14,
+      "bankLSB": 96,
+      "attenuationDelta": -64,
+      "velocityAmountDelta": 135
+    },
+    {
+      "program": 14,
+      "bankLSB": 97,
+      "attenuationDelta": -103,
+      "velocityAmountDelta": 46
+    },
+    {
+      "program": 15,
+      "bankLSB": 35,
+      "attenuationDelta": 29,
+      "velocityAmountDelta": 124
+    },
+    {
+      "program": 15,
+      "bankLSB": 96,
+      "attenuationDelta": -12,
+      "velocityAmountDelta": 39
+    },
+    {
+      "program": 15,
+      "bankLSB": 97,
+      "attenuationDelta": -85,
+      "velocityAmountDelta": 102
+    },
+    {
+      "program": 16,
+      "bankLSB": 32,
+      "attenuationDelta": -164,
+      "velocityAmountDelta": -15
+    },
+    {
+      "program": 16,
+      "bankLSB": 33,
+      "attenuationDelta": -60,
+      "velocityAmountDelta": -6
+    },
+    {
+      "program": 16,
+      "bankLSB": 34,
+      "attenuationDelta": -70,
+      "velocityAmountDelta": -8
+    },
+    {
+      "program": 16,
+      "bankLSB": 35,
+      "attenuationDelta": 39,
+      "velocityAmountDelta": -497
+    },
+    {
+      "program": 16,
+      "bankLSB": 36,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 16,
+      "bankLSB": 37,
+      "attenuationDelta": -38,
+      "velocityAmountDelta": -12
+    },
+    {
+      "program": 16,
+      "bankLSB": 38,
+      "attenuationDelta": -1,
+      "velocityAmountDelta": 1
+    },
+    {
+      "program": 16,
+      "bankLSB": 40,
+      "attenuationDelta": 88,
+      "velocityAmountDelta": 1
+    },
+    {
+      "program": 16,
+      "bankLSB": 64,
+      "attenuationDelta": 6,
+      "velocityAmountDelta": -227
+    },
+    {
+      "program": 16,
+      "bankLSB": 65,
+      "attenuationDelta": 52,
+      "velocityAmountDelta": 3
+    },
+    {
+      "program": 16,
+      "bankLSB": 66,
+      "attenuationDelta": 65,
+      "velocityAmountDelta": -4
+    },
+    {
+      "program": 16,
+      "bankLSB": 67,
+      "attenuationDelta": -104,
+      "velocityAmountDelta": -6
+    },
+    {
+      "program": 17,
+      "bankLSB": 24,
+      "attenuationDelta": -25,
+      "velocityAmountDelta": -220
+    },
+    {
+      "program": 17,
+      "bankLSB": 32,
+      "attenuationDelta": -83,
+      "velocityAmountDelta": -17
+    },
+    {
+      "program": 17,
+      "bankLSB": 33,
+      "attenuationDelta": -64,
+      "velocityAmountDelta": -7
+    },
+    {
+      "program": 17,
+      "bankLSB": 37,
+      "attenuationDelta": -82,
+      "velocityAmountDelta": -221
+    },
+    {
+      "program": 18,
+      "bankLSB": 64,
+      "attenuationDelta": -4,
+      "velocityAmountDelta": -260
+    },
+    {
+      "program": 18,
+      "bankLSB": 65,
+      "attenuationDelta": 62,
+      "velocityAmountDelta": -211
+    },
+    {
+      "program": 18,
+      "bankLSB": 66,
+      "attenuationDelta": 139,
+      "velocityAmountDelta": -347
+    },
+    {
+      "program": 19,
+      "bankLSB": 32,
+      "attenuationDelta": 12,
+      "velocityAmountDelta": -3
+    },
+    {
+      "program": 19,
+      "bankLSB": 35,
+      "attenuationDelta": 156,
+      "velocityAmountDelta": 1
+    },
+    {
+      "program": 19,
+      "bankLSB": 40,
+      "attenuationDelta": -33,
+      "velocityAmountDelta": 9
+    },
+    {
+      "program": 19,
+      "bankLSB": 64,
+      "attenuationDelta": -59,
+      "velocityAmountDelta": -10
+    },
+    {
+      "program": 19,
+      "bankLSB": 65,
+      "attenuationDelta": -39,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 20,
+      "bankLSB": 40,
+      "attenuationDelta": -133,
+      "velocityAmountDelta": 15
+    },
+    {
+      "program": 21,
+      "bankLSB": 32,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 22,
+      "bankLSB": 32,
+      "attenuationDelta": -43,
+      "velocityAmountDelta": -31
+    },
+    {
+      "program": 23,
+      "bankLSB": 64,
+      "attenuationDelta": 40,
+      "velocityAmountDelta": 33
+    },
+    {
+      "program": 24,
+      "bankLSB": 16,
+      "attenuationDelta": 151,
+      "velocityAmountDelta": 1
+    },
+    {
+      "program": 24,
+      "bankLSB": 25,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 24,
+      "bankLSB": 43,
+      "attenuationDelta": 65,
+      "velocityAmountDelta": -268
+    },
+    {
+      "program": 24,
+      "bankLSB": 96,
+      "attenuationDelta": 94,
+      "velocityAmountDelta": -21
+    },
+    {
+      "program": 25,
+      "bankLSB": 16,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 25,
+      "bankLSB": 35,
+      "attenuationDelta": -96,
+      "velocityAmountDelta": 238
+    },
+    {
+      "program": 25,
+      "bankLSB": 40,
+      "attenuationDelta": 138,
+      "velocityAmountDelta": 3
+    },
+    {
+      "program": 25,
+      "bankLSB": 41,
+      "attenuationDelta": -86,
+      "velocityAmountDelta": 75
+    },
+    {
+      "program": 25,
+      "bankLSB": 96,
+      "attenuationDelta": -52,
+      "velocityAmountDelta": -47
+    },
+    {
+      "program": 26,
+      "bankLSB": 18,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 26,
+      "bankLSB": 32,
+      "attenuationDelta": -81,
+      "velocityAmountDelta": -37
+    },
+    {
+      "program": 27,
+      "bankLSB": 32,
+      "attenuationDelta": 191,
+      "velocityAmountDelta": 8
+    },
+    {
+      "program": 28,
+      "bankLSB": 40,
+      "attenuationDelta": 68,
+      "velocityAmountDelta": 323
+    },
+    {
+      "program": 28,
+      "bankLSB": 41,
+      "attenuationDelta": 176,
+      "velocityAmountDelta": 12
+    },
+    {
+      "program": 28,
+      "bankLSB": 43,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 28,
+      "bankLSB": 45,
+      "attenuationDelta": -245,
+      "velocityAmountDelta": 1312
+    },
+    {
+      "program": 29,
+      "bankLSB": 43,
+      "attenuationDelta": 79,
+      "velocityAmountDelta": -675
+    },
+    {
+      "program": 30,
+      "bankLSB": 40,
+      "attenuationDelta": 157,
+      "velocityAmountDelta": 9
+    },
+    {
+      "program": 30,
+      "bankLSB": 41,
+      "attenuationDelta": 209,
+      "velocityAmountDelta": 22
+    },
+    {
+      "program": 31,
+      "bankLSB": 65,
+      "attenuationDelta": 214,
+      "velocityAmountDelta": -13
+    },
+    {
+      "program": 31,
+      "bankLSB": 66,
+      "attenuationDelta": -14,
+      "velocityAmountDelta": 143
+    },
+    {
+      "program": 32,
+      "bankLSB": 40,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": -8
+    },
+    {
+      "program": 32,
+      "bankLSB": 45,
+      "attenuationDelta": 59,
+      "velocityAmountDelta": -12
+    },
+    {
+      "program": 33,
+      "bankLSB": 18,
+      "attenuationDelta": 180,
+      "velocityAmountDelta": 340
+    },
+    {
+      "program": 33,
+      "bankLSB": 27,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 33,
+      "bankLSB": 40,
+      "attenuationDelta": 46,
+      "velocityAmountDelta": 36
+    },
+    {
+      "program": 33,
+      "bankLSB": 43,
+      "attenuationDelta": -10,
+      "velocityAmountDelta": 12
+    },
+    {
+      "program": 33,
+      "bankLSB": 45,
+      "attenuationDelta": 71,
+      "velocityAmountDelta": 197
+    },
+    {
+      "program": 33,
+      "bankLSB": 65,
+      "attenuationDelta": 3,
+      "velocityAmountDelta": 137
+    },
+    {
+      "program": 34,
+      "bankLSB": 28,
+      "attenuationDelta": 155,
+      "velocityAmountDelta": 331
+    },
+    {
+      "program": 35,
+      "bankLSB": 32,
+      "attenuationDelta": 92,
+      "velocityAmountDelta": 84
+    },
+    {
+      "program": 35,
+      "bankLSB": 33,
+      "attenuationDelta": 88,
+      "velocityAmountDelta": 110
+    },
+    {
+      "program": 35,
+      "bankLSB": 34,
+      "attenuationDelta": 212,
+      "velocityAmountDelta": -31
+    },
+    {
+      "program": 35,
+      "bankLSB": 96,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 35,
+      "bankLSB": 97,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 36,
+      "bankLSB": 27,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 36,
+      "bankLSB": 32,
+      "attenuationDelta": -104,
+      "velocityAmountDelta": 701
+    },
+    {
+      "program": 37,
+      "bankLSB": 43,
+      "attenuationDelta": 6,
+      "velocityAmountDelta": -673
+    },
+    {
+      "program": 38,
+      "bankLSB": 18,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 38,
+      "bankLSB": 20,
+      "attenuationDelta": -34,
+      "velocityAmountDelta": -346
+    },
+    {
+      "program": 38,
+      "bankLSB": 24,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 38,
+      "bankLSB": 35,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 38,
+      "bankLSB": 40,
+      "attenuationDelta": 299,
+      "velocityAmountDelta": 472
+    },
+    {
+      "program": 38,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 38,
+      "bankLSB": 65,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 38,
+      "bankLSB": 66,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 38,
+      "bankLSB": 96,
+      "attenuationDelta": 23,
+      "velocityAmountDelta": -353
+    },
+    {
+      "program": 39,
+      "bankLSB": 6,
+      "attenuationDelta": -334,
+      "velocityAmountDelta": -204
+    },
+    {
+      "program": 39,
+      "bankLSB": 12,
+      "attenuationDelta": -1,
+      "velocityAmountDelta": 719
+    },
+    {
+      "program": 39,
+      "bankLSB": 18,
+      "attenuationDelta": -68,
+      "velocityAmountDelta": -374
+    },
+    {
+      "program": 39,
+      "bankLSB": 19,
+      "attenuationDelta": -359,
+      "velocityAmountDelta": -210
+    },
+    {
+      "program": 39,
+      "bankLSB": 32,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 39,
+      "bankLSB": 40,
+      "attenuationDelta": -177,
+      "velocityAmountDelta": -65
+    },
+    {
+      "program": 39,
+      "bankLSB": 41,
+      "attenuationDelta": -66,
+      "velocityAmountDelta": -204
+    },
+    {
+      "program": 39,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 40,
+      "bankLSB": 8,
+      "attenuationDelta": -110,
+      "velocityAmountDelta": 1
+    },
+    {
+      "program": 44,
+      "bankLSB": 8,
+      "attenuationDelta": 182,
+      "velocityAmountDelta": 15
+    },
+    {
+      "program": 44,
+      "bankLSB": 40,
+      "attenuationDelta": 363,
+      "velocityAmountDelta": -8
+    },
+    {
+      "program": 46,
+      "bankLSB": 40,
+      "attenuationDelta": 128,
+      "velocityAmountDelta": 13
+    },
+    {
+      "program": 48,
+      "bankLSB": 3,
+      "attenuationDelta": -24,
+      "velocityAmountDelta": -210
+    },
+    {
+      "program": 48,
+      "bankLSB": 24,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 48,
+      "bankLSB": 35,
+      "attenuationDelta": 82,
+      "velocityAmountDelta": -262
+    },
+    {
+      "program": 48,
+      "bankLSB": 40,
+      "attenuationDelta": 107,
+      "velocityAmountDelta": -4
+    },
+    {
+      "program": 48,
+      "bankLSB": 41,
+      "attenuationDelta": 26,
+      "velocityAmountDelta": -26
+    },
+    {
+      "program": 48,
+      "bankLSB": 42,
+      "attenuationDelta": -70,
+      "velocityAmountDelta": 41
+    },
+    {
+      "program": 48,
+      "bankLSB": 45,
+      "attenuationDelta": -61,
+      "velocityAmountDelta": 152
+    },
+    {
+      "program": 49,
+      "bankLSB": 3,
+      "attenuationDelta": 85,
+      "velocityAmountDelta": 35
+    },
+    {
+      "program": 49,
+      "bankLSB": 8,
+      "attenuationDelta": 474,
+      "velocityAmountDelta": 38
+    },
+    {
+      "program": 49,
+      "bankLSB": 40,
+      "attenuationDelta": 494,
+      "velocityAmountDelta": 59
+    },
+    {
+      "program": 49,
+      "bankLSB": 41,
+      "attenuationDelta": 86,
+      "velocityAmountDelta": 10
+    },
+    {
+      "program": 49,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 49,
+      "bankLSB": 65,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 1
+    },
+    {
+      "program": 50,
+      "bankLSB": 27,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 50,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 50,
+      "bankLSB": 65,
+      "attenuationDelta": -46,
+      "velocityAmountDelta": -355
+    },
+    {
+      "program": 52,
+      "bankLSB": 3,
+      "attenuationDelta": 140,
+      "velocityAmountDelta": -146
+    },
+    {
+      "program": 52,
+      "bankLSB": 16,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 52,
+      "bankLSB": 32,
+      "attenuationDelta": 56,
+      "velocityAmountDelta": -211
+    },
+    {
+      "program": 52,
+      "bankLSB": 40,
+      "attenuationDelta": -113,
+      "velocityAmountDelta": -30
+    },
+    {
+      "program": 54,
+      "bankLSB": 40,
+      "attenuationDelta": -156,
+      "velocityAmountDelta": -74
+    },
+    {
+      "program": 54,
+      "bankLSB": 41,
+      "attenuationDelta": -118,
+      "velocityAmountDelta": 52
+    },
+    {
+      "program": 54,
+      "bankLSB": 64,
+      "attenuationDelta": -217,
+      "velocityAmountDelta": 173
+    },
+    {
+      "program": 55,
+      "bankLSB": 35,
+      "attenuationDelta": -9,
+      "velocityAmountDelta": 33
+    },
+    {
+      "program": 55,
+      "bankLSB": 64,
+      "attenuationDelta": -63,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 56,
+      "bankLSB": 16,
+      "attenuationDelta": -1,
+      "velocityAmountDelta": 1
+    },
+    {
+      "program": 56,
+      "bankLSB": 17,
+      "attenuationDelta": -1,
+      "velocityAmountDelta": 1
+    },
+    {
+      "program": 56,
+      "bankLSB": 32,
+      "attenuationDelta": 22,
+      "velocityAmountDelta": 167
+    },
+    {
+      "program": 56,
+      "bankLSB": 96,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 57,
+      "bankLSB": 18,
+      "attenuationDelta": 15,
+      "velocityAmountDelta": -24
+    },
+    {
+      "program": 58,
+      "bankLSB": 16,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 60,
+      "bankLSB": 6,
+      "attenuationDelta": -60,
+      "velocityAmountDelta": -2
+    },
+    {
+      "program": 60,
+      "bankLSB": 32,
+      "attenuationDelta": -47,
+      "velocityAmountDelta": -21
+    },
+    {
+      "program": 60,
+      "bankLSB": 37,
+      "attenuationDelta": 71,
+      "velocityAmountDelta": -508
+    },
+    {
+      "program": 61,
+      "bankLSB": 35,
+      "attenuationDelta": -47,
+      "velocityAmountDelta": -590
+    },
+    {
+      "program": 61,
+      "bankLSB": 40,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": -1
+    },
+    {
+      "program": 61,
+      "bankLSB": 41,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 61,
+      "bankLSB": 42,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 62,
+      "bankLSB": 12,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 62,
+      "bankLSB": 20,
+      "attenuationDelta": 40,
+      "velocityAmountDelta": -617
+    },
+    {
+      "program": 62,
+      "bankLSB": 24,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 62,
+      "bankLSB": 27,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 62,
+      "bankLSB": 32,
+      "attenuationDelta": 141,
+      "velocityAmountDelta": -352
+    },
+    {
+      "program": 62,
+      "bankLSB": 45,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 62,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 63,
+      "bankLSB": 18,
+      "attenuationDelta": 22,
+      "velocityAmountDelta": 86
+    },
+    {
+      "program": 63,
+      "bankLSB": 40,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 63,
+      "bankLSB": 41,
+      "attenuationDelta": 153,
+      "velocityAmountDelta": -654
+    },
+    {
+      "program": 63,
+      "bankLSB": 45,
+      "attenuationDelta": -35,
+      "velocityAmountDelta": -211
+    },
+    {
+      "program": 63,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 65,
+      "bankLSB": 40,
+      "attenuationDelta": 89,
+      "velocityAmountDelta": -278
+    },
+    {
+      "program": 65,
+      "bankLSB": 43,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 66,
+      "bankLSB": 40,
+      "attenuationDelta": 142,
+      "velocityAmountDelta": 10
+    },
+    {
+      "program": 66,
+      "bankLSB": 41,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 66,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 80,
+      "bankLSB": 6,
+      "attenuationDelta": 90,
+      "velocityAmountDelta": 6
+    },
+    {
+      "program": 80,
+      "bankLSB": 18,
+      "attenuationDelta": -59,
+      "velocityAmountDelta": 159
+    },
+    {
+      "program": 80,
+      "bankLSB": 19,
+      "attenuationDelta": 25,
+      "velocityAmountDelta": 9
+    },
+    {
+      "program": 80,
+      "bankLSB": 64,
+      "attenuationDelta": 75,
+      "velocityAmountDelta": -216
+    },
+    {
+      "program": 80,
+      "bankLSB": 65,
+      "attenuationDelta": -99,
+      "velocityAmountDelta": 5
+    },
+    {
+      "program": 80,
+      "bankLSB": 66,
+      "attenuationDelta": -168,
+      "velocityAmountDelta": -2
+    },
+    {
+      "program": 81,
+      "bankLSB": 6,
+      "attenuationDelta": 35,
+      "velocityAmountDelta": -297
+    },
+    {
+      "program": 81,
+      "bankLSB": 18,
+      "attenuationDelta": -154,
+      "velocityAmountDelta": -239
+    },
+    {
+      "program": 81,
+      "bankLSB": 19,
+      "attenuationDelta": -161,
+      "velocityAmountDelta": -184
+    },
+    {
+      "program": 81,
+      "bankLSB": 20,
+      "attenuationDelta": -81,
+      "velocityAmountDelta": -627
+    },
+    {
+      "program": 81,
+      "bankLSB": 24,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 81,
+      "bankLSB": 25,
+      "attenuationDelta": -178,
+      "velocityAmountDelta": -4
+    },
+    {
+      "program": 81,
+      "bankLSB": 40,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 81,
+      "bankLSB": 41,
+      "attenuationDelta": -115,
+      "velocityAmountDelta": 3
+    },
+    {
+      "program": 81,
+      "bankLSB": 45,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 81,
+      "bankLSB": 96,
+      "attenuationDelta": 167,
+      "velocityAmountDelta": -255
+    },
+    {
+      "program": 82,
+      "bankLSB": 65,
+      "attenuationDelta": -125,
+      "velocityAmountDelta": -108
+    },
+    {
+      "program": 83,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 84,
+      "bankLSB": 64,
+      "attenuationDelta": -18,
+      "velocityAmountDelta": 384
+    },
+    {
+      "program": 84,
+      "bankLSB": 65,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 85,
+      "bankLSB": 24,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 85,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 86,
+      "bankLSB": 35,
+      "attenuationDelta": -118,
+      "velocityAmountDelta": -24
+    },
+    {
+      "program": 87,
+      "bankLSB": 16,
+      "attenuationDelta": 32,
+      "velocityAmountDelta": -60
+    },
+    {
+      "program": 87,
+      "bankLSB": 64,
+      "attenuationDelta": 57,
+      "velocityAmountDelta": -295
+    },
+    {
+      "program": 87,
+      "bankLSB": 65,
+      "attenuationDelta": -16,
+      "velocityAmountDelta": -23
+    },
+    {
+      "program": 88,
+      "bankLSB": 64,
+      "attenuationDelta": -9,
+      "velocityAmountDelta": -486
+    },
+    {
+      "program": 89,
+      "bankLSB": 16,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 1
+    },
+    {
+      "program": 89,
+      "bankLSB": 17,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 89,
+      "bankLSB": 18,
+      "attenuationDelta": -119,
+      "velocityAmountDelta": -9
+    },
+    {
+      "program": 89,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 89,
+      "bankLSB": 65,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 90,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 90,
+      "bankLSB": 65,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 90,
+      "bankLSB": 66,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 90,
+      "bankLSB": 67,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 91,
+      "bankLSB": 64,
+      "attenuationDelta": -64,
+      "velocityAmountDelta": 12
+    },
+    {
+      "program": 91,
+      "bankLSB": 66,
+      "attenuationDelta": 227,
+      "velocityAmountDelta": 26
+    },
+    {
+      "program": 91,
+      "bankLSB": 67,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 92,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 92,
+      "bankLSB": 65,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 93,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 93,
+      "bankLSB": 65,
+      "attenuationDelta": 105,
+      "velocityAmountDelta": -6
+    },
+    {
+      "program": 95,
+      "bankLSB": 20,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": -1
+    },
+    {
+      "program": 95,
+      "bankLSB": 27,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": -2
+    },
+    {
+      "program": 95,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": -3
+    },
+    {
+      "program": 95,
+      "bankLSB": 66,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": -2
+    },
+    {
+      "program": 96,
+      "bankLSB": 45,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 96,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 96,
+      "bankLSB": 65,
+      "attenuationDelta": 190,
+      "velocityAmountDelta": 6
+    },
+    {
+      "program": 96,
+      "bankLSB": 66,
+      "attenuationDelta": 355,
+      "velocityAmountDelta": 9
+    },
+    {
+      "program": 97,
+      "bankLSB": 27,
+      "attenuationDelta": 7,
+      "velocityAmountDelta": 87
+    },
+    {
+      "program": 97,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 97,
+      "bankLSB": 65,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 98,
+      "bankLSB": 12,
+      "attenuationDelta": -157,
+      "velocityAmountDelta": -1
+    },
+    {
+      "program": 98,
+      "bankLSB": 14,
+      "attenuationDelta": -111,
+      "velocityAmountDelta": 7
+    },
+    {
+      "program": 98,
+      "bankLSB": 18,
+      "attenuationDelta": -140,
+      "velocityAmountDelta": 269
+    },
+    {
+      "program": 98,
+      "bankLSB": 35,
+      "attenuationDelta": -170,
+      "velocityAmountDelta": -341
+    },
+    {
+      "program": 98,
+      "bankLSB": 40,
+      "attenuationDelta": 34,
+      "velocityAmountDelta": 2
+    },
+    {
+      "program": 98,
+      "bankLSB": 41,
+      "attenuationDelta": -90,
+      "velocityAmountDelta": -228
+    },
+    {
+      "program": 98,
+      "bankLSB": 42,
+      "attenuationDelta": -172,
+      "velocityAmountDelta": 223
+    },
+    {
+      "program": 98,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": -6
+    },
+    {
+      "program": 98,
+      "bankLSB": 65,
+      "attenuationDelta": -187,
+      "velocityAmountDelta": 10
+    },
+    {
+      "program": 98,
+      "bankLSB": 66,
+      "attenuationDelta": -121,
+      "velocityAmountDelta": -13
+    },
+    {
+      "program": 98,
+      "bankLSB": 67,
+      "attenuationDelta": 1,
+      "velocityAmountDelta": -9
+    },
+    {
+      "program": 98,
+      "bankLSB": 68,
+      "attenuationDelta": -27,
+      "velocityAmountDelta": -11
+    },
+    {
+      "program": 98,
+      "bankLSB": 69,
+      "attenuationDelta": -2,
+      "velocityAmountDelta": -2
+    },
+    {
+      "program": 98,
+      "bankLSB": 70,
+      "attenuationDelta": -118,
+      "velocityAmountDelta": -202
+    },
+    {
+      "program": 98,
+      "bankLSB": 71,
+      "attenuationDelta": -80,
+      "velocityAmountDelta": -191
+    },
+    {
+      "program": 98,
+      "bankLSB": 72,
+      "attenuationDelta": -97,
+      "velocityAmountDelta": -178
+    },
+    {
+      "program": 99,
+      "bankLSB": 18,
+      "attenuationDelta": -67,
+      "velocityAmountDelta": 337
+    },
+    {
+      "program": 99,
+      "bankLSB": 19,
+      "attenuationDelta": 20,
+      "velocityAmountDelta": -80
+    },
+    {
+      "program": 99,
+      "bankLSB": 40,
+      "attenuationDelta": -62,
+      "velocityAmountDelta": 628
+    },
+    {
+      "program": 99,
+      "bankLSB": 64,
+      "attenuationDelta": -75,
+      "velocityAmountDelta": 100
+    },
+    {
+      "program": 99,
+      "bankLSB": 65,
+      "attenuationDelta": -122,
+      "velocityAmountDelta": 152
+    },
+    {
+      "program": 99,
+      "bankLSB": 66,
+      "attenuationDelta": -89,
+      "velocityAmountDelta": 17
+    },
+    {
+      "program": 99,
+      "bankLSB": 67,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 100,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 100,
+      "bankLSB": 96,
+      "attenuationDelta": 181,
+      "velocityAmountDelta": -4
+    },
+    {
+      "program": 101,
+      "bankLSB": 64,
+      "attenuationDelta": 44,
+      "velocityAmountDelta": -26
+    },
+    {
+      "program": 101,
+      "bankLSB": 65,
+      "attenuationDelta": 382,
+      "velocityAmountDelta": -10
+    },
+    {
+      "program": 101,
+      "bankLSB": 66,
+      "attenuationDelta": -1,
+      "velocityAmountDelta": 1
+    },
+    {
+      "program": 101,
+      "bankLSB": 67,
+      "attenuationDelta": 13,
+      "velocityAmountDelta": -9
+    },
+    {
+      "program": 101,
+      "bankLSB": 68,
+      "attenuationDelta": 67,
+      "velocityAmountDelta": -14
+    },
+    {
+      "program": 101,
+      "bankLSB": 70,
+      "attenuationDelta": 20,
+      "velocityAmountDelta": 78
+    },
+    {
+      "program": 101,
+      "bankLSB": 71,
+      "attenuationDelta": 162,
+      "velocityAmountDelta": -16
+    },
+    {
+      "program": 101,
+      "bankLSB": 96,
+      "attenuationDelta": -171,
+      "velocityAmountDelta": -9
+    },
+    {
+      "program": 102,
+      "bankLSB": 8,
+      "attenuationDelta": -140,
+      "velocityAmountDelta": -2
+    },
+    {
+      "program": 102,
+      "bankLSB": 14,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": -1
+    },
+    {
+      "program": 102,
+      "bankLSB": 64,
+      "attenuationDelta": -102,
+      "velocityAmountDelta": -2
+    },
+    {
+      "program": 102,
+      "bankLSB": 65,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 102,
+      "bankLSB": 66,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 102,
+      "bankLSB": 67,
+      "attenuationDelta": -13,
+      "velocityAmountDelta": -618
+    },
+    {
+      "program": 102,
+      "bankLSB": 68,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 102,
+      "bankLSB": 69,
+      "attenuationDelta": 57,
+      "velocityAmountDelta": -1
+    },
+    {
+      "program": 103,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": -1
+    },
+    {
+      "program": 104,
+      "bankLSB": 32,
+      "attenuationDelta": 74,
+      "velocityAmountDelta": 85
+    },
+    {
+      "program": 104,
+      "bankLSB": 35,
+      "attenuationDelta": -32,
+      "velocityAmountDelta": 23
+    },
+    {
+      "program": 104,
+      "bankLSB": 96,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 104,
+      "bankLSB": 97,
+      "attenuationDelta": -119,
+      "velocityAmountDelta": -2
+    },
+    {
+      "program": 105,
+      "bankLSB": 28,
+      "attenuationDelta": 50,
+      "velocityAmountDelta": 95
+    },
+    {
+      "program": 105,
+      "bankLSB": 96,
+      "attenuationDelta": 103,
+      "velocityAmountDelta": 1
+    },
+    {
+      "program": 105,
+      "bankLSB": 97,
+      "attenuationDelta": -133,
+      "velocityAmountDelta": -20
+    },
+    {
+      "program": 105,
+      "bankLSB": 98,
+      "attenuationDelta": -1,
+      "velocityAmountDelta": -1
+    },
+    {
+      "program": 107,
+      "bankLSB": 96,
+      "attenuationDelta": 58,
+      "velocityAmountDelta": 204
+    },
+    {
+      "program": 107,
+      "bankLSB": 97,
+      "attenuationDelta": -73,
+      "velocityAmountDelta": 139
+    },
+    {
+      "program": 111,
+      "bankLSB": 64,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 111,
+      "bankLSB": 96,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 111,
+      "bankLSB": 97,
+      "attenuationDelta": -44,
+      "velocityAmountDelta": -2
+    },
+    {
+      "program": 112,
+      "bankLSB": 96,
+      "attenuationDelta": 143,
+      "velocityAmountDelta": -157
+    },
+    {
+      "program": 112,
+      "bankLSB": 97,
+      "attenuationDelta": 46,
+      "velocityAmountDelta": 24
+    },
+    {
+      "program": 112,
+      "bankLSB": 98,
+      "attenuationDelta": -35,
+      "velocityAmountDelta": 152
+    },
+    {
+      "program": 112,
+      "bankLSB": 99,
+      "attenuationDelta": -47,
+      "velocityAmountDelta": -225
+    },
+    {
+      "program": 112,
+      "bankLSB": 100,
+      "attenuationDelta": -19,
+      "velocityAmountDelta": -11
+    },
+    {
+      "program": 112,
+      "bankLSB": 101,
+      "attenuationDelta": 0,
+      "velocityAmountDelta": 0
+    },
+    {
+      "program": 114,
+      "bankLSB": 97,
+      "attenuationDelta": -148,
+      "velocityAmountDelta": 85
+    },
+    {
+      "program": 114,
+      "bankLSB": 98,
+      "attenuationDelta": 90,
+      "velocityAmountDelta": 153
+    },
+    {
+      "program": 115,
+      "bankLSB": 96,
+      "attenuationDelta": 41,
+      "velocityAmountDelta": 22
+    },
+    {
+      "program": 116,
+      "bankLSB": 96,
+      "attenuationDelta": 97,
+      "velocityAmountDelta": 7
+    },
+    {
+      "program": 117,
+      "bankLSB": 64,
+      "attenuationDelta": -79,
+      "velocityAmountDelta": -13
+    },
+    {
+      "program": 117,
+      "bankLSB": 65,
+      "attenuationDelta": 32,
+      "velocityAmountDelta": -23
+    },
+    {
+      "program": 117,
+      "bankLSB": 66,
+      "attenuationDelta": -37,
+      "velocityAmountDelta": -11
+    },
+    {
+      "program": 118,
+      "bankLSB": 64,
+      "attenuationDelta": -30,
+      "velocityAmountDelta": -238
+    },
+    {
+      "program": 118,
+      "bankLSB": 65,
+      "attenuationDelta": 103,
+      "velocityAmountDelta": -203
+    }
   ]
 }

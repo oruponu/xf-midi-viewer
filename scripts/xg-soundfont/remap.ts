@@ -135,11 +135,25 @@ export function buildVariationVoicePreset(
     variation.program,
     variation.bankLSB,
   );
-  const source = findSourcePreset(bank, variation.from);
+  copyZones(preset, findSourcePreset(bank, variation.from));
+  return preset;
+}
+
+export function buildGsFallbackPreset(
+  bank: BasicSoundBank,
+  bankMSB: number,
+  source: SourceNote,
+): BasicPreset {
+  const base = findSourcePreset(bank, source);
+  const preset = createPreset(bank, base.name, bankMSB, source.program);
+  copyZones(preset, base);
+  return preset;
+}
+
+function copyZones(preset: BasicPreset, source: BasicPreset): void {
   preset.globalZone.copyFrom(source.globalZone);
   for (const sourceZone of source.zones)
     preset.createZone(sourceZone.instrument).copyFrom(sourceZone);
-  return preset;
 }
 
 function createPreset(

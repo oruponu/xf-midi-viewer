@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
-import { SoundBankLoader, SpessaLog } from 'spessasynth_core';
-import type { BasicPreset, BasicSoundBank, MIDIPatch } from 'spessasynth_core';
+import { GeneratorTypes, SoundBankLoader, SpessaLog } from 'spessasynth_core';
+import type { BasicPreset, BasicSoundBank, MIDIPatch, Modulator } from 'spessasynth_core';
 import { buildXgBank, buildXgSoundBank, readSoundBank, sourceSha256 } from './build.ts';
 import { NO_CORRECTIONS, readCorrections } from './calibration/corrections.ts';
 import { CORRECTIONS_PATH, SOURCE_SOUND_BANK_PATH } from './paths.ts';
@@ -80,7 +80,10 @@ describe('buildXgSoundBank', () => {
 
   test('plays the XG variation voices exactly like their corrected source', () => {
     const bank = SoundBankLoader.fromArrayBuffer(
-      buildXgSoundBank(readSoundBank(SOURCE_SOUND_BANK_PATH), readCorrections(CORRECTIONS_PATH)),
+      buildXgSoundBank(readSoundBank(SOURCE_SOUND_BANK_PATH), {
+        ...readCorrections(CORRECTIONS_PATH),
+        variations: [],
+      }),
     );
     const voices = (preset: BasicPreset) =>
       [36, 48, 60, 72, 84].flatMap((key) =>
@@ -102,19 +105,130 @@ describe('buildXgSoundBank', () => {
     }
   });
 
+  test('selects XG DynaSaw for MSB 0 / LSB 18 / PC 81 in XG mode', () => {
+    const preset = built.getPreset(
+      { bankMSB: 0, bankLSB: 18, program: 81, isGMGSDrum: false },
+      'xg',
+    );
+    expect(preset.name).toBe('XG DynaSaw');
+  });
+
+  test('changes only the attenuation and the velocity amount of a corrected variation', () => {
+    const ATTENUATION = GeneratorTypes.initialAttenuation;
+    const isVelocity = (m: Modulator) =>
+      m.destination === ATTENUATION && !m.primarySource.isCC && m.primarySource.index === 2;
+    const parts = (preset: BasicPreset, key: number, velocity: number) =>
+      preset.getVoiceParameters(key, velocity).map((v) => ({
+        sample: v.sample.name,
+        attenuation: v.generators[ATTENUATION],
+        others: [...v.generators].filter((_, i) => i !== ATTENUATION),
+        velocityAmount: v.modulators.filter(isVelocity).reduce((s, m) => s + m.transformAmount, 0),
+        otherModulators: v.modulators
+          .filter((m) => !isVelocity(m))
+          .map((m) => [
+            m.destination,
+            m.transformAmount,
+            m.transformType,
+            m.primarySource.toSourceEnum(),
+            m.secondarySource.toSourceEnum(),
+          ]),
+      }));
+    const data = readSoundBank(SOURCE_SOUND_BANK_PATH);
+    for (const [attenuationDelta, velocityAmountDelta] of [
+      [250, 0],
+      [0, -120],
+      [250, -120],
+    ]) {
+      const bank = buildXgBank(data, {
+        ...NO_CORRECTIONS,
+        variations: [{ program: 81, bankLSB: 18, attenuationDelta, velocityAmountDelta }],
+      });
+      const alias = bank.getPreset(
+        { bankMSB: 0, bankLSB: 18, program: 81, isGMGSDrum: false },
+        'xg',
+      );
+      const original = bank.getPreset(patch(0, 81), 'xg');
+      expect(alias.name).toBe('XG DynaSaw');
+      for (const key of [48, 60, 72]) {
+        for (const velocity of [40, 100]) {
+          const a = parts(alias, key, velocity);
+          const o = parts(original, key, velocity);
+          expect(a.length).toBeGreaterThan(0);
+          expect(a.length).toBe(o.length);
+          a.forEach((p, i) => {
+            expect(p.sample).toBe(o[i].sample);
+            expect(p.others).toEqual(o[i].others);
+            expect(p.otherModulators).toEqual(o[i].otherModulators);
+            expect(p.attenuation - o[i].attenuation).toBe(attenuationDelta * 0.4);
+            expect(p.velocityAmount - o[i].velocityAmount).toBe(velocityAmountDelta);
+          });
+        }
+      }
+    }
+  });
+
   test('is recognized as an XG sound bank', () => {
     expect(built.isXGBank).toBe(true);
   });
 
   test('keeps every original preset and their GS and GM selection', () => {
+    const gsFallbacks = XG_VARIATION_VOICES.filter(
+      ({ bankLSB, program }) =>
+        !source.presets.some((p) => p.bankMSB === bankLSB && p.program === program) &&
+        !(bankLSB === 64 && XG_SFX_VOICES.some((sfx) => sfx.program === program)),
+    );
+    expect(gsFallbacks.length).toBe(289);
     expect(built.presets.length).toBe(
-      source.presets.length + XG_KITS.length + XG_SFX_VOICES.length + XG_VARIATION_VOICES.length,
+      source.presets.length +
+        XG_KITS.length +
+        XG_SFX_VOICES.length +
+        XG_VARIATION_VOICES.length +
+        gsFallbacks.length,
     );
     for (const original of source.presets) {
       const p = patch(original.bankMSB, original.program, original.isGMGSDrum);
       for (const system of ['gs', 'gm'] as const) {
         expect(built.getPreset(p, system).name).toBe(source.getPreset(p, system).name);
       }
+    }
+  });
+
+  test('never falls back to an XG variation for a GS or GM selection with LSB 0', () => {
+    for (const system of ['gs', 'gm'] as const) {
+      for (let bankMSB = 0; bankMSB < 126; bankMSB++) {
+        for (let program = 0; program < 128; program++) {
+          const preset = built.getPreset(patch(bankMSB, program), system);
+          expect(
+            preset.bankMSB === 0 && preset.bankLSB !== 0,
+            `${system} MSB ${bankMSB} / PC ${program} -> ${preset.name}`,
+          ).toBe(false);
+        }
+      }
+    }
+  });
+
+  test('plays the base voice for a GS bank that only an XG variation has the number of', () => {
+    const bank = SoundBankLoader.fromArrayBuffer(
+      buildXgSoundBank(readSoundBank(SOURCE_SOUND_BANK_PATH), readCorrections(CORRECTIONS_PATH)),
+    );
+    const voices = (preset: BasicPreset) =>
+      [48, 60, 72].flatMap((key) =>
+        preset.getVoiceParameters(key, 100).map((v) => ({
+          sample: v.sample.name,
+          generators: [...v.generators],
+          modulators: v.modulators.map((m) => [m.destination, m.transformAmount]),
+        })),
+      );
+    for (const [bankMSB, program] of [
+      [8, 40],
+      [16, 24],
+      [6, 39],
+    ]) {
+      expect(source.presets.some((p) => p.bankMSB === bankMSB && p.program === program)).toBe(
+        false,
+      );
+      const fallback = bank.getPreset(patch(bankMSB, program), 'gs');
+      expect(voices(fallback)).toEqual(voices(bank.getPreset(patch(0, program), 'gs')));
     }
   });
 
