@@ -218,9 +218,9 @@ describe('applyCorrections', () => {
     b.forEach((value, i) => expect(value - a[i]).toBe(100));
   });
 
-  test('lets an XG variation voice use the corrected base preset', () => {
+  test('lets an unlisted XG variation use the corrected base preset', () => {
     const bank = fresh();
-    expect(bank.getPreset(patch(0, 6, 81), 'xg')).toBe(bank.getPreset(patch(0, 0, 81), 'xg'));
+    expect(bank.getPreset(patch(0, 7, 81), 'xg')).toBe(bank.getPreset(patch(0, 0, 81), 'xg'));
   });
 
   test('stops with the kit and key when the layers no longer match', () => {
