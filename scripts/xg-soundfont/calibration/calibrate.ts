@@ -62,7 +62,13 @@ const voiceId = (bankMSB: number, program: number) => `voice ${bankMSB}/${progra
 function index(table: LevelTable): Index {
   const map: Index = new Map();
   for (const d of table.drums) map.set(drumId(d.kit, d.key), d.levels);
-  for (const v of table.voices) map.set(voiceId(v.bankMSB, v.program), v.levels);
+  for (const v of table.voices) {
+    // Variations would overwrite their base voice here; calibrateVariations.ts handles them.
+    if (v.bankLSB) {
+      throw new Error(`${voiceId(v.bankMSB, v.program)} with bank LSB ${v.bankLSB} is not a unit`);
+    }
+    map.set(voiceId(v.bankMSB, v.program), v.levels);
+  }
   return map;
 }
 

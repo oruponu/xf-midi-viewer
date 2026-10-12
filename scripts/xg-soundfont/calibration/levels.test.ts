@@ -74,4 +74,25 @@ describe('voiceLevels', () => {
     expect([voice.bankMSB, voice.program]).toEqual([0, 0]);
     expect(voice.levels['60/127']! - voice.levels['60/64']!).toBeCloseTo(12.04, 0);
   });
+
+  test('keeps voices that differ only in the bank LSB apart', () => {
+    const midi = voiceTestMidi(
+      [
+        { bankMSB: 0, program: 81 },
+        { bankMSB: 0, bankLSB: 18, program: 81 },
+      ],
+      [60],
+      [100],
+    );
+    const table = voiceLevels(
+      toneBursts(midi, 0.3, 1, (p) => (p.bankLSB === 18 ? 0.4 : 0.1)),
+      midi,
+    );
+    expect(table.map((v) => [v.bankMSB, v.bankLSB, v.program])).toEqual([
+      [0, undefined, 81],
+      [0, 18, 81],
+    ]);
+    expect('bankLSB' in table[0]).toBe(false);
+    expect(table[1].levels['60/100']! - table[0].levels['60/100']!).toBeCloseTo(12.04, 1);
+  });
 });

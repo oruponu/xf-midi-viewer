@@ -152,6 +152,21 @@ describe('calibrate', () => {
     expect(() => run([{ kit: 0, key: 99 }])).toThrow('Excluded entry {"kit":0,"key":99}');
   });
 
+  test('refuses a level table with a variation voice instead of overwriting its base voice', () => {
+    const ref = reference();
+    const variation = { ...ref.voices[0], bankLSB: 18 };
+    expect(() => run([], { ...ref, voices: [...ref.voices, variation] })).toThrow(
+      'voice 0/0 with bank LSB 18',
+    );
+    const measure = fakeMeasure();
+    expect(() =>
+      run([], ref, (corrections) => {
+        const table = measure(corrections);
+        return { ...table, voices: [...table.voices, { ...table.voices[1], bankLSB: 6 }] };
+      }),
+    ).toThrow('voice 0/1 with bank LSB 6');
+  });
+
   test('gives units without valid reference points only the common attenuation', () => {
     const result = run([], reference({ '0/1': null }));
     expect(result.unmeasured).toContain('voice 0/1');
