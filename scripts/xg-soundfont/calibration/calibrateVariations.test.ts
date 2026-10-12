@@ -91,14 +91,15 @@ describe('calibrateVariations', () => {
     expect(result.means.max).toBeLessThanOrEqual(0.1);
   });
 
-  test('reports a variation without measurable points and leaves it at zero', () => {
+  test('fails and reports a variation without measurable points, leaving it at zero', () => {
     const { measure } = synth([18, 6]);
     const result = calibrateVariations({
       variations: [DYNASAW, SAW2],
       reference: reference({ 18: { level: 8, slope: 0 }, 6: null }),
       measure,
     });
-    expect(result.passed).toBe(true);
+    expect(result.passed).toBe(false);
+    expect(result.means.max).toBeLessThanOrEqual(0.1);
     expect(result.unmeasured).toEqual(['Saw 2 (LSB 6 / PC 81)']);
     expect(result.variations.find((c) => c.bankLSB === 6)).toEqual({
       program: 81,

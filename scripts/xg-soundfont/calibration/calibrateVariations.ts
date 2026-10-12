@@ -1,5 +1,5 @@
 // Usage: bun scripts/xg-soundfont/calibration/calibrateVariations.ts <variation reference levels json>
-// Rewrites only the variations of corrections.json, and only when every fit is within the tolerance.
+// Rewrites only the variations of corrections.json, and only when every variation is measured and fitted.
 import { readFileSync } from 'node:fs';
 import { SpessaLog } from 'spessasynth_core';
 import { buildXgBank, readSoundBank } from '../build.ts';
@@ -163,7 +163,7 @@ export function calibrateVariations(input: VariationCalibrationInput): Variation
     variations: corrections,
     points: errorStats(unitErrors.flatMap((u) => u.errors)),
     means: errorStats(means),
-    passed: means.every((x) => Math.abs(x) <= TOLERANCE_DB),
+    passed: unmeasured.length === 0 && means.every((x) => Math.abs(x) <= TOLERANCE_DB),
     unmeasured,
     worst,
   };
@@ -208,7 +208,9 @@ if (import.meta.main) {
   console.log(`unmeasured: ${result.unmeasured.join(', ') || '-'}`);
   for (const w of result.worst) console.log(`  ${w.unit}: ${w.errorDb.toFixed(2)} dB`);
   if (!result.passed) {
-    console.error('A variation is outside the tolerance; corrections.json was not written');
+    console.error(
+      'A variation is unmeasured or outside the tolerance; corrections.json was not written',
+    );
     process.exit(1);
   }
   writeCorrections(CORRECTIONS_PATH, { ...existing, variations: result.variations });
