@@ -14,7 +14,12 @@ export function voice(bankMSB: number, program: number, note = 60): SourceNote {
 }
 
 export type Mapped =
-  | { readonly name: string; readonly from: SourceNote }
+  | {
+      readonly name: string;
+      readonly from: SourceNote;
+      // Velocities below this play the layer that starts here.
+      readonly lowestLayer?: number;
+    }
   | { readonly name: string; readonly from: null; readonly reason: 'no-substitute' };
 
 export interface XgKit {

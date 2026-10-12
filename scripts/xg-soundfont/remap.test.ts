@@ -270,6 +270,68 @@ describe('buildKitPreset', () => {
       buildKitPreset(bank, kit({ 38: { name: 'Snare M', from: gs(0, 38) } })),
     ).not.toThrow();
   });
+
+  test('plays the first fast layer from velocity 0', () => {
+    const cases = [
+      { program: 0, lowestLayer: 75, below: [0, 1, 40, 74, 75, 96], same: [97, 127], sample: 80 },
+      { program: 1, lowestLayer: 85, below: [0, 1, 40, 84, 85, 106], same: [107, 127], sample: 90 },
+    ];
+    for (const { program, lowestLayer, below, same, sample } of cases) {
+      const source = findSourcePreset(bank, gs(program, 40));
+      const preset = buildKitPreset(
+        bank,
+        kit({ 40: { name: 'Snare H', from: gs(program, 40), lowestLayer } }),
+      );
+      const fastLayer = voicesOf(source, 40, sample);
+      expect(fastLayer.length).toBeGreaterThan(0);
+      for (const velocity of below) expect(voicesOf(preset, 40, velocity)).toEqual(fastLayer);
+      for (const velocity of same)
+        expect(voicesOf(preset, 40, velocity)).toEqual(voicesOf(source, 40, velocity));
+    }
+  });
+
+  test('plays the first fast layer from velocity 0 when moved to another key', () => {
+    const source = findSourcePreset(bank, gs(0, 40));
+    const preset = buildKitPreset(
+      bank,
+      kit({ 31: { name: 'Snare H', from: gs(0, 40), lowestLayer: 75 } }),
+    );
+    expect(voicesOf(preset, 31, 40)).toEqual(voicesOf(source, 40, 80));
+    expect(voicesOf(preset, 31, 127)).toEqual(voicesOf(source, 40, 127));
+  });
+
+  test('inherits lowestLayer from the base kit', () => {
+    const base = kit({ 40: { name: 'Snare H', from: gs(0, 40), lowestLayer: 75 } });
+    const preset = buildKitPreset(bank, {
+      ...kit({ 36: { name: 'BD Jazz', from: gs(32, 36) } }, base),
+      program: 32,
+    });
+    const source = findSourcePreset(bank, gs(0, 40));
+    expect(voicesOf(preset, 40, 40)).toEqual(voicesOf(source, 40, 80));
+  });
+
+  test('throws when a velocity layer crosses lowestLayer', () => {
+    expect(() =>
+      buildKitPreset(bank, kit({ 40: { name: 'X', from: gs(0, 40), lowestLayer: 70 } })),
+    ).toThrow('crosses lowestLayer 70');
+    expect(() =>
+      buildKitPreset(bank, kit({ 40: { name: 'X', from: gs(8, 40), lowestLayer: 75 } })),
+    ).toThrow('crosses lowestLayer 75');
+  });
+
+  test('throws when no velocity layer starts at lowestLayer', () => {
+    expect(() =>
+      buildKitPreset(bank, kit({ 40: { name: 'X', from: gs(0, 40), lowestLayer: 128 } })),
+    ).toThrow('no velocity layer starts at lowestLayer 128');
+  });
+
+  test('throws when the source preset limits velocities with lowestLayer', () => {
+    const source = findSourcePreset(bank, gs(0, 40));
+    for (const zone of source.zones) zone.velRange = { min: 0, max: 100 };
+    expect(() =>
+      buildKitPreset(bank, kit({ 40: { name: 'X', from: gs(0, 40), lowestLayer: 75 } })),
+    ).toThrow('source preset limits velocities');
+  });
 });
 
 describe('buildSfxVoicePreset', () => {
