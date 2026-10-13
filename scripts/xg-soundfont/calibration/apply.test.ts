@@ -3,7 +3,12 @@ import { GeneratorTypes, SpessaLog } from 'spessasynth_core';
 import type { BasicSoundBank, MIDIPatch } from 'spessasynth_core';
 import { buildXgBank, readSoundBank } from '../build.ts';
 import { SOURCE_SOUND_BANK_PATH } from '../paths.ts';
-import { applyCorrections, applyVariationCorrections, listUnits } from './apply.ts';
+import {
+  applyCorrections,
+  applyRangeCorrections,
+  applyVariationCorrections,
+  listUnits,
+} from './apply.ts';
 import { NO_CORRECTIONS } from './corrections.ts';
 import type { Corrections } from './corrections.ts';
 
@@ -354,5 +359,70 @@ describe('applyVariationCorrections', () => {
         { program: 81, bankLSB: 18, attenuationDelta: -1440, velocityAmountDelta: 0 },
       ]),
     ).toThrow('below 0');
+  });
+});
+
+describe('applyRangeCorrections', () => {
+  const SAW = { bankMSB: 0, program: 81 };
+  const RISE = [
+    { key: 60, attenuationDelta: 0 },
+    { key: 72, attenuationDelta: 60 },
+  ];
+
+  test('adds the interpolated delta to each note of the voice', () => {
+    const before = fresh();
+    const after = fresh();
+    applyRangeCorrections(after, [{ ...SAW, keys: RISE }]);
+    // The synth multiplies attenuation by 0.4, so 15 / 30 / 60 cB become 6 / 12 / 24.
+    for (const [note, expected] of [
+      [20, 0],
+      [60, 0],
+      [63, 6],
+      [66, 12],
+      [72, 24],
+      [100, 24],
+    ]) {
+      const a = voiceAttenuations(before, patch(0, 0, 81), 'xg', note);
+      const b = voiceAttenuations(after, patch(0, 0, 81), 'xg', note);
+      expect(b.length).toBeGreaterThan(0);
+      expect(b.map((value, i) => value - a[i])).toEqual(a.map(() => expected));
+    }
+  });
+
+  test('leaves the other presets that share its instruments alone', () => {
+    const bank = fresh();
+    const base = bank.getPreset(patch(0, 0, 81), 'xg');
+    const instruments = new Set(base.zones.map((z) => z.instrument));
+    const others = bank.presets.filter(
+      (p) => p !== base && p.zones.some((z) => instruments.has(z.instrument)),
+    );
+    expect(others.length).toBeGreaterThan(0);
+    const levels = () =>
+      others.map((p) => p.getVoiceParameters(72, 100).map((v) => v.generators[ATTENUATION]));
+    const before = levels();
+    applyRangeCorrections(bank, [{ ...SAW, keys: RISE }]);
+    expect(base.zones.some((z) => instruments.has(z.instrument))).toBe(false);
+    expect(levels()).toEqual(before);
+  });
+
+  test('stops at a voice that is missing or corrected twice', () => {
+    expect(() =>
+      applyRangeCorrections(fresh(), [{ bankMSB: 100, program: 0, keys: RISE }]),
+    ).toThrow('Voice MSB 100 / PC 0 not found');
+    expect(() =>
+      applyRangeCorrections(fresh(), [
+        { ...SAW, keys: RISE },
+        { ...SAW, keys: RISE },
+      ]),
+    ).toThrow('Voice MSB 0 / PC 81 has two range corrections');
+  });
+
+  test('stops when a range correction brings the total attenuation out of 0 to 1440', () => {
+    expect(() =>
+      applyRangeCorrections(fresh(), [{ ...SAW, keys: [{ key: 60, attenuationDelta: -1440 }] }]),
+    ).toThrow('below 0');
+    expect(() =>
+      applyRangeCorrections(fresh(), [{ ...SAW, keys: [{ key: 60, attenuationDelta: 1440 }] }]),
+    ).toThrow('exceeds 1440');
   });
 });
