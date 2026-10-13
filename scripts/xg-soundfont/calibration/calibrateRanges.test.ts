@@ -33,7 +33,10 @@ function table(
   };
 }
 
-function synth(voices: readonly VoiceId[], options: { ignoreDeltas?: boolean } = {}) {
+function synth(
+  voices: readonly VoiceId[],
+  options: { ignoreDeltas?: boolean; gain?: number } = {},
+) {
   let calls = 0;
   const measure = (ranges: readonly RangeCorrection[]): LevelTable => {
     calls++;
@@ -42,7 +45,7 @@ function synth(voices: readonly VoiceId[], options: { ignoreDeltas?: boolean } =
       const delta = options.ignoreDeltas
         ? 0
         : (keys?.find((k) => k.key === n)?.attenuationDelta ?? 0);
-      return base(v, n, vel) - delta / ATTENUATION_PER_DB;
+      return base(v, n, vel) - ((options.gain ?? 1) * delta) / ATTENUATION_PER_DB;
     });
   };
   return { measure, calls: () => calls };
@@ -108,7 +111,7 @@ describe('calibrateRanges', () => {
     expect(result.points.count).toBe(NOTES.length * VELOCITIES.length * 2 - 2 - 1);
   });
 
-  test('fails for a voice without measurable notes', () => {
+  test('leaves a voice without measurable notes uncorrected and reports it', () => {
     const voices = [SAW, HARMONICA];
     const result = calibrateRanges(
       input(voices, {
@@ -116,26 +119,42 @@ describe('calibrateRanges', () => {
         measure: synth(voices).measure,
       }),
     );
-    expect(result.passed).toBe(false);
+    expect(result.passed).toBe(true);
     expect(result.unmeasured).toEqual(['voice 0/22']);
     expect(result.ranges.map((r) => r.program)).toEqual([81]);
   });
 
-  test('fails when a note needs more than the limits allow', () => {
+  test('stops a note at its limits, reports it and still fits the others', () => {
     const voices = [SAW];
     const result = calibrateRanges(
       input(voices, {
         reference: reference(voices, () => 2),
         measure: synth(voices).measure,
-        limit: () => ({ min: -20, max: 1440 }),
+        limit: (_, note) => (note === 36 ? { min: -20, max: 1440 } : { min: -1440, max: 1440 }),
       }),
     );
-    expect(result.passed).toBe(false);
-    expect(result.outOfRange).toEqual([
-      'voice 0/81 note 36: needs -50 cB, allowed -20 to 1440',
-      'voice 0/81 note 48: needs -50 cB, allowed -20 to 1440',
+    expect(result.passed).toBe(true);
+    expect(result.outOfRange).toEqual(['voice 0/81 note 36: needs -50 cB, allowed -20 to 1440']);
+    expect(result.ranges[0].keys).toEqual([
+      { key: 36, attenuationDelta: -20 },
+      { key: 48, attenuationDelta: -50 },
     ]);
-    expect(result.ranges[0].keys.every((k) => k.attenuationDelta === -20)).toBe(true);
+    expect(result.largestResidualDb).toBeGreaterThan(1);
+  });
+
+  test('takes a note back into the fit once it no longer needs to pass its limits', () => {
+    const voices = [SAW];
+    // Twice as strong as expected: the -30 cB limit overshoots the 2 dB target, so the next step is
+    // inside the limits again and the fit has to go on with that note.
+    const result = calibrateRanges(
+      input(voices, {
+        reference: reference(voices, () => 2),
+        measure: synth(voices, { gain: 2 }).measure,
+        limit: () => ({ min: -30, max: 1440 }),
+      }),
+    );
+    expect(result.outOfRange).toEqual([]);
+    expect(result.passed).toBe(false);
   });
 
   test('fails before measuring when an interpolated note leaves the limits', () => {
@@ -152,6 +171,16 @@ describe('calibrateRanges', () => {
     expect(result.outOfRange).toEqual([
       'voice 0/81 note 42: interpolated -50 cB, allowed -10 to 1440',
     ]);
+    expect(calls()).toBe(1);
+  });
+
+  test('accepts a residual of exactly the tolerance despite rounding in the arithmetic', () => {
+    const voices = [SAW];
+    const { measure, calls } = synth(voices, { ignoreDeltas: true });
+    const result = calibrateRanges(
+      input(voices, { reference: reference(voices, () => 0.1), measure, maxIterations: 3 }),
+    );
+    expect(result.passed).toBe(true);
     expect(calls()).toBe(1);
   });
 
@@ -200,11 +229,48 @@ describe('calibrateRanges', () => {
             }
             return {
               ...t,
-              voices: t.voices.map((v) => ({ ...v, levels: { ...v.levels, '36/100': -90 } })),
+              voices: t.voices.map((v) => ({ ...v, levels: { ...v.levels, '36/100': null } })),
             };
           },
         }),
       ),
     ).toThrow('voice 0/81 point 36/100 can no longer be measured');
+  });
+
+  test('keeps fitting a point that ends just below the silent level', () => {
+    const voices = [SAW];
+    const { measure } = synth(voices);
+    let first = true;
+    const result = calibrateRanges(
+      input(voices, {
+        reference: reference(voices, () => 2),
+        measure: (ranges) => {
+          const t = measure(ranges);
+          if (first) {
+            first = false;
+            return t;
+          }
+          return {
+            ...t,
+            voices: t.voices.map((v) => ({ ...v, levels: { ...v.levels, '36/100': -81 } })),
+          };
+        },
+      }),
+    );
+    expect(result.passed).toBe(false);
+    expect(result.points.count).toBe(NOTES.length * VELOCITIES.length);
+  });
+
+  test('leaves out a point whose target is below the silent level', () => {
+    const voices = [SAW];
+    const result = calibrateRanges(
+      input(voices, {
+        reference: reference(voices, (_, n) => (n === 48 ? -60 : 1)),
+        measure: synth(voices).measure,
+      }),
+    );
+    expect(result.passed).toBe(true);
+    expect(result.unmeasuredNotes).toBe(1);
+    expect(result.ranges[0].keys.map((k) => k.key)).toEqual([36]);
   });
 });

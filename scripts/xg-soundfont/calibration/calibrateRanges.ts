@@ -1,5 +1,6 @@
 // Usage: bun scripts/xg-soundfont/calibration/calibrateRanges.ts <range reference levels json>
-// Rewrites only the ranges of corrections.json, and only when every voice is measured and fitted.
+// Rewrites only the ranges of corrections.json, and only when every measured note fits or is held
+// at its limits. Voices without measurable notes keep their level without a range correction.
 import { readFileSync } from 'node:fs';
 import { SpessaLog } from 'spessasynth_core';
 import { buildXgBank, readSoundBank } from '../build.ts';
@@ -41,6 +42,8 @@ export interface RangeCalibrationResult {
 }
 
 const TOLERANCE_DB = 0.1;
+// Levels are rounded to 0.01 dB, so a residual of exactly 0.1 dB can come out a hair above it.
+const withinTolerance = (db: number) => Math.abs(db) <= TOLERANCE_DB + 1e-9;
 const WORST_COUNT = 20;
 
 type Levels = Readonly<Record<string, Level>>;
@@ -90,7 +93,10 @@ export function calibrateRanges(input: RangeCalibrationInput): RangeCalibrationR
             throw new Error(`${label(voice)}: point ${p} is missing from the ${where}`);
         }
       }
-      const valid = points.filter((p) => isLevel(ref[p]) && isLevel(now[p]));
+      // A point whose target is below the silent level would leave the measured range once fitted.
+      const valid = points.filter(
+        (p) => isLevel(ref[p]) && isLevel(now[p]) && isLevel((ref[p] as number) - input.shiftDb),
+      );
       if (valid.length === 0) {
         unmeasuredNotes++;
         continue;
@@ -114,7 +120,7 @@ export function calibrateRanges(input: RangeCalibrationInput): RangeCalibrationR
     const levels = m.get(voiceKey(u.voice)) ?? {};
     return u.points.map((p) => {
       const value = levels[p];
-      if (!isLevel(value)) {
+      if (value === null || value === undefined || !Number.isFinite(value)) {
         throw new Error(`${label(u.voice)} point ${p} can no longer be measured`);
       }
       return (u.reference[p] as number) - input.shiftDb - value;
@@ -136,21 +142,33 @@ export function calibrateRanges(input: RangeCalibrationInput): RangeCalibrationR
     );
   let m = m0;
   let largest: number;
+  // Notes already held at a limit they would have to pass are reported, not counted against the
+  // tolerance.
+  let largestFree: number;
   for (let iteration = 0; ; iteration++) {
     const residuals = units.map((u) => mean(errors(m, u)));
-    largest = Math.max(0, ...residuals.map(Math.abs));
-    log(`iteration ${iteration}: largest residual ${largest.toFixed(2)} dB`);
-    if (largest <= TOLERANCE_DB || iteration === maxIterations) break;
+    const wanted = units.map(
+      (u, i) => u.key.attenuationDelta - Math.round(residuals[i] * ATTENUATION_PER_DB),
+    );
+    const allowed = units.map((u, i) => Math.min(u.limit.max, Math.max(u.limit.min, wanted[i])));
+    const held = new Set<Unit>();
     units.forEach((u, i) => {
-      const wanted = u.key.attenuationDelta - Math.round(residuals[i] * ATTENUATION_PER_DB);
-      const allowed = Math.min(u.limit.max, Math.max(u.limit.min, wanted));
-      if (allowed !== wanted) {
+      if (!withinTolerance(residuals[i]) && (wanted[i] < u.limit.min || wanted[i] > u.limit.max)) {
         outOfRange.set(
           u,
-          `${label(u.voice)} note ${u.note}: needs ${wanted} cB, allowed ${u.limit.min} to ${u.limit.max}`,
+          `${label(u.voice)} note ${u.note}: needs ${wanted[i]} cB, allowed ${u.limit.min} to ${u.limit.max}`,
         );
+        if (u.key.attenuationDelta === allowed[i]) held.add(u);
+      } else {
+        outOfRange.delete(u);
       }
-      u.key.attenuationDelta = allowed;
+    });
+    largest = Math.max(0, ...residuals.map(Math.abs));
+    largestFree = Math.max(0, ...residuals.filter((_, i) => !held.has(units[i])).map(Math.abs));
+    log(`iteration ${iteration}: largest residual ${largest.toFixed(2)} dB`);
+    if (withinTolerance(largestFree) || iteration === maxIterations) break;
+    units.forEach((u, i) => {
+      u.key.attenuationDelta = allowed[i];
     });
     between.push(...interpolatedOutOfRange());
     if (between.length > 0) break;
@@ -175,11 +193,7 @@ export function calibrateRanges(input: RangeCalibrationInput): RangeCalibrationR
     unmeasured,
     unmeasuredNotes,
     outOfRange: [...outOfRange.values(), ...between],
-    passed:
-      unmeasured.length === 0 &&
-      outOfRange.size === 0 &&
-      between.length === 0 &&
-      largest <= TOLERANCE_DB,
+    passed: between.length === 0 && withinTolerance(largestFree),
     worst,
   };
 }
@@ -227,7 +241,7 @@ if (import.meta.main) {
   for (const w of result.worst) console.log(`  ${w.unit}: ${w.errorDb.toFixed(2)} dB`);
   if (!result.passed) {
     console.error(
-      'A voice is unmeasured, out of range or outside the tolerance; corrections.json was not written',
+      'An interpolated note leaves its limits or a residual is outside the tolerance; corrections.json was not written',
     );
     process.exit(1);
   }
