@@ -8,35 +8,41 @@ export interface BiquadCoefficients {
   readonly a2: number;
 }
 
-// Formula and constants from libebur128; they reproduce the BS.1770 coefficients at 48 kHz.
-export function kWeightingCoefficients(
-  sampleRate: number,
-): readonly [BiquadCoefficients, BiquadCoefficients] {
-  let f0 = 1681.974450955533;
-  let q = 0.7071752369554196;
-  let k = Math.tan((Math.PI * f0) / sampleRate);
-  const vh = 10 ** (3.999843853973347 / 20);
-  const vb = vh ** 0.4996667741545416;
-  let a0 = 1 + k / q + k * k;
-  const shelf = {
-    b0: (vh + (vb * k) / q + k * k) / a0,
-    b1: (2 * (k * k - vh)) / a0,
-    b2: (vh - (vb * k) / q + k * k) / a0,
-    a1: (2 * (k * k - 1)) / a0,
-    a2: (1 - k / q + k * k) / a0,
+// IEC 61672 A-weighting: bilinear transform with prewarped poles, 0 dB at 1 kHz.
+function aWeightingCoefficients(sampleRate: number): BiquadCoefficients[] {
+  const k = 2 * sampleRate;
+  const warp = (hz: number) => k * Math.tan((Math.PI * hz) / sampleRate);
+  const [w1, w2, w3, w4] = [20.598997, 107.65265, 737.86223, 12194.217].map(warp);
+  const section = (
+    [b2, b1, b0]: readonly [number, number, number],
+    [a2, a1, a0]: readonly [number, number, number],
+  ): BiquadCoefficients => {
+    const norm = a2 * k * k + a1 * k + a0;
+    return {
+      b0: (b2 * k * k + b1 * k + b0) / norm,
+      b1: (2 * b0 - 2 * b2 * k * k) / norm,
+      b2: (b2 * k * k - b1 * k + b0) / norm,
+      a1: (2 * a0 - 2 * a2 * k * k) / norm,
+      a2: (a2 * k * k - a1 * k + a0) / norm,
+    };
   };
-  f0 = 38.13547087602444;
-  q = 0.5003270373238773;
-  k = Math.tan((Math.PI * f0) / sampleRate);
-  a0 = 1 + k / q + k * k;
-  const highPass = {
-    b0: 1,
-    b1: -2,
-    b2: 1,
-    a1: (2 * (k * k - 1)) / a0,
-    a2: (1 - k / q + k * k) / a0,
-  };
-  return [shelf, highPass];
+  const sections = [
+    section([1, 0, 0], [1, 2 * w1, w1 * w1]),
+    section([1, 0, 0], [1, w2 + w3, w2 * w3]),
+    section([0, 0, 1], [1, 2 * w4, w4 * w4]),
+  ];
+  const w = (2 * Math.PI * 1000) / sampleRate;
+  const magnitude = (x0: number, x1: number, x2: number) =>
+    Math.hypot(
+      x0 + x1 * Math.cos(w) + x2 * Math.cos(2 * w),
+      x1 * Math.sin(w) + x2 * Math.sin(2 * w),
+    );
+  const gain = sections.reduce(
+    (g, c) => (g * magnitude(c.b0, c.b1, c.b2)) / magnitude(1, c.a1, c.a2),
+    1,
+  );
+  const [first, ...rest] = sections;
+  return [{ ...first, b0: first.b0 / gain, b1: first.b1 / gain, b2: first.b2 / gain }, ...rest];
 }
 
 class Biquad {
@@ -61,12 +67,12 @@ class Biquad {
   }
 }
 
-export class KWeightedEnergy {
+export class WeightedEnergy {
   readonly sampleRate: number;
   readonly binSeconds: number;
   private readonly binSize: number;
-  private readonly left: readonly [Biquad, Biquad];
-  private readonly right: readonly [Biquad, Biquad];
+  private readonly left: readonly Biquad[];
+  private readonly right: readonly Biquad[];
   private readonly bins: number[] = [];
   private sum = 0;
   private count = 0;
@@ -75,15 +81,17 @@ export class KWeightedEnergy {
     this.sampleRate = sampleRate;
     this.binSize = Math.round(sampleRate * BIN_SECONDS);
     this.binSeconds = this.binSize / sampleRate;
-    const [shelf, highPass] = kWeightingCoefficients(sampleRate);
-    this.left = [new Biquad(shelf), new Biquad(highPass)];
-    this.right = [new Biquad(shelf), new Biquad(highPass)];
+    const coefficients = aWeightingCoefficients(sampleRate);
+    this.left = coefficients.map((c) => new Biquad(c));
+    this.right = coefficients.map((c) => new Biquad(c));
   }
 
   push(left: Float32Array, right: Float32Array): void {
     for (let i = 0; i < left.length; i++) {
-      const l = this.left[1].process(this.left[0].process(left[i]));
-      const r = this.right[1].process(this.right[0].process(right[i]));
+      let l = left[i];
+      let r = right[i];
+      for (const f of this.left) l = f.process(l);
+      for (const f of this.right) r = f.process(r);
       this.sum += l * l + r * r;
       if (++this.count === this.binSize) {
         this.bins.push(this.sum / (2 * this.binSize));

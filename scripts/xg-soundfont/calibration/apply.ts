@@ -202,21 +202,25 @@ function applyVoice(bank: BasicSoundBank, voice: Voice): BasicPreset {
   return preset;
 }
 
-// Only the given presets are held to 0 and above: the source sound bank itself goes below 0
-// (a GS ride cymbal), which the synth clamps only after adding the velocity and volume attenuation.
+// Only the presets in nonNegative are held to 0 and above: the source sound bank itself goes
+// below 0 (a GS ride cymbal), which the synth clamps only after adding the velocity and volume
+// attenuation. The synth does not clamp the sum to the maximum either, so the presets in aboveMax
+// may exceed it; messages for those zones are returned instead of thrown.
 function checkAttenuationRange(
   bank: BasicSoundBank,
   nonNegative: ReadonlySet<BasicPreset> = new Set(),
-): void {
+  aboveMax: ReadonlySet<BasicPreset> = new Set(),
+): string[] {
+  const over: string[] = [];
   for (const preset of bank.presets) {
     for (const pz of preset.zones) {
       const presetValue = attenuationOf(pz, preset.globalZone);
       for (const zone of pz.instrument.zones) {
         const total = presetValue + attenuationOf(zone, pz.instrument.globalZone);
         if (total > MAX_ATTENUATION) {
-          throw new Error(
-            `${preset.name} / ${zone.sample.name}: total attenuation ${total} exceeds ${MAX_ATTENUATION}`,
-          );
+          const message = `${preset.name} / ${zone.sample.name}: total attenuation ${total} exceeds ${MAX_ATTENUATION}`;
+          if (!aboveMax.has(preset)) throw new Error(message);
+          over.push(message);
         }
         if (total < 0 && nonNegative.has(preset)) {
           throw new Error(
@@ -226,6 +230,7 @@ function checkAttenuationRange(
       }
     }
   }
+  return over;
 }
 
 export function applyCorrections(bank: BasicSoundBank, corrections: Corrections): void {
@@ -277,7 +282,7 @@ function variationPreset(bank: BasicSoundBank, v: VariationCorrection): BasicPre
 export function applyVariationCorrections(
   bank: BasicSoundBank,
   variations: readonly VariationCorrection[],
-): void {
+): string[] {
   const corrected = new Set<BasicPreset>();
   for (const v of variations) {
     const preset = variationPreset(bank, v);
@@ -296,5 +301,5 @@ export function applyVariationCorrections(
       if (v.velocityAmountDelta !== 0) addVelocityAmount(bank, preset, pz, v.velocityAmountDelta);
     }
   }
-  checkAttenuationRange(bank, corrected);
+  return checkAttenuationRange(bank, corrected, corrected);
 }

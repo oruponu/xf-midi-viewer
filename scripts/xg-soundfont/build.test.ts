@@ -78,6 +78,20 @@ describe('buildXgSoundBank', () => {
     }
   });
 
+  test('reports the variation zones above the maximum total attenuation', () => {
+    const warnings: string[] = [];
+    buildXgBank(
+      readSoundBank(SOURCE_SOUND_BANK_PATH),
+      {
+        ...NO_CORRECTIONS,
+        variations: [{ program: 81, bankLSB: 18, attenuationDelta: 1440, velocityAmountDelta: 0 }],
+      },
+      (message) => warnings.push(message),
+    );
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings[0]).toContain('exceeds 1440');
+  });
+
   test('plays the XG variation voices exactly like their corrected source', () => {
     const bank = SoundBankLoader.fromArrayBuffer(
       buildXgSoundBank(readSoundBank(SOURCE_SOUND_BANK_PATH), {

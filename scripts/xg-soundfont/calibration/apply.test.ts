@@ -331,6 +331,23 @@ describe('applyVariationCorrections', () => {
     ).toThrow('XG variation LSB 18 / PC 81 is corrected twice');
   });
 
+  test('lets a variation go above the maximum total attenuation and reports the zones', () => {
+    const over = applyVariationCorrections(fresh(), [
+      { program: 81, bankLSB: 18, attenuationDelta: 1440, velocityAmountDelta: 0 },
+    ]);
+    expect(over.length).toBeGreaterThan(0);
+    for (const line of over)
+      expect(line).toMatch(/^XG .+ \/ .+: total attenuation \d+ exceeds 1440$/);
+  });
+
+  test('reports no zone while the variations stay within the maximum total attenuation', () => {
+    expect(
+      applyVariationCorrections(fresh(), [
+        { program: 81, bankLSB: 18, attenuationDelta: 250, velocityAmountDelta: 0 },
+      ]),
+    ).toEqual([]);
+  });
+
   test('stops when a variation correction brings the total attenuation below 0', () => {
     expect(() =>
       applyVariationCorrections(fresh(), [

@@ -1,6 +1,6 @@
-// Usage: bun scripts/xg-soundfont/calibration/calibrateVariations.ts <variation reference levels json>
+// Usage: bun scripts/xg-soundfont/calibration/calibrateVariations.ts <variation reference levels json> [residuals out json]
 // Rewrites only the variations of corrections.json, and only when every variation is measured and fitted.
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { SpessaLog } from 'spessasynth_core';
 import { buildXgBank, readSoundBank } from '../build.ts';
 import { CORRECTIONS_PATH, SOURCE_SOUND_BANK_PATH } from '../paths.ts';
@@ -34,10 +34,17 @@ export interface VariationCalibrationInput {
   readonly log?: (message: string) => void;
 }
 
+export interface VariationResidual {
+  readonly program: number;
+  readonly bankLSB: number;
+  readonly meanDb: number;
+}
+
 export interface VariationCalibrationResult {
   readonly variations: VariationCorrection[];
   readonly points: ErrorStats;
   readonly means: ErrorStats;
+  readonly residuals: readonly VariationResidual[];
   readonly passed: boolean;
   readonly unmeasured: readonly string[];
   readonly worst: readonly { unit: string; errorDb: number }[];
@@ -163,6 +170,11 @@ export function calibrateVariations(input: VariationCalibrationInput): Variation
     variations: corrections,
     points: errorStats(unitErrors.flatMap((u) => u.errors)),
     means: errorStats(means),
+    residuals: units.map((u, i) => ({
+      program: u.correction.program,
+      bankLSB: u.correction.bankLSB,
+      meanDb: Math.round(means[i] * 1000) / 1000,
+    })),
     passed: unmeasured.length === 0 && means.every((x) => Math.abs(x) <= TOLERANCE_DB),
     unmeasured,
     worst,
@@ -170,10 +182,10 @@ export function calibrateVariations(input: VariationCalibrationInput): Variation
 }
 
 if (import.meta.main) {
-  const [referencePath] = process.argv.slice(2);
+  const [referencePath, residualsPath] = process.argv.slice(2);
   if (!referencePath) {
     console.error(
-      'Usage: bun scripts/xg-soundfont/calibration/calibrateVariations.ts <variation reference levels json>',
+      'Usage: bun scripts/xg-soundfont/calibration/calibrateVariations.ts <variation reference levels json> [residuals out json]',
     );
     process.exit(2);
   }
@@ -214,4 +226,5 @@ if (import.meta.main) {
     process.exit(1);
   }
   writeCorrections(CORRECTIONS_PATH, { ...existing, variations: result.variations });
+  if (residualsPath) writeFileSync(residualsPath, `${JSON.stringify(result.residuals, null, 2)}\n`);
 }
