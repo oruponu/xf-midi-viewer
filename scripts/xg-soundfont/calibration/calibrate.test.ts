@@ -286,17 +286,19 @@ describe('calibrate', () => {
 });
 
 describe('mergeCorrections', () => {
-  test('keeps the variation corrections of the existing file', () => {
+  test('keeps the variation and range corrections of the existing file', () => {
     const variations = [
       { program: 81, bankLSB: 18, attenuationDelta: -200, velocityAmountDelta: -159 },
     ];
-    const existing: Corrections = { ...NO_CORRECTIONS, outputGainDb: 15, variations };
+    const ranges = [{ bankMSB: 0, program: 22, keys: [{ key: 72, attenuationDelta: -50 }] }];
+    const existing: Corrections = { ...NO_CORRECTIONS, outputGainDb: 15, variations, ranges };
     const fitted: Corrections = { ...NO_CORRECTIONS, commonAttenuation: 444 };
     expect(mergeCorrections(fitted, existing, 'abc')).toEqual({
       ...fitted,
       outputGainDb: 15,
       sourceSha256: 'abc',
       variations,
+      ranges,
     });
   });
 });

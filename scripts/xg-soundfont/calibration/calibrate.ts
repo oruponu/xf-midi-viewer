@@ -293,6 +293,7 @@ export function mergeCorrections(
     outputGainDb: existing.outputGainDb,
     sourceSha256: sha256,
     variations: existing.variations,
+    ranges: existing.ranges,
   };
 }
 
@@ -338,6 +339,6 @@ if (import.meta.main) {
     mergeCorrections(result.corrections, existing, sourceSha256(source)),
   );
   console.log(
-    'outputGainDb and variations were kept from the previous file; run outputGain.ts again',
+    'outputGainDb, variations and ranges were kept from the previous file; run calibrateRanges.ts and outputGain.ts again',
   );
 }
