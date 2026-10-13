@@ -109,6 +109,17 @@ describe('calibrateVariations', () => {
     });
   });
 
+  test('reports the mean residual of each measured variation', () => {
+    const { measure } = synth([18, 6]);
+    const result = calibrateVariations({
+      variations: [DYNASAW, SAW2],
+      reference: reference({ 18: { level: 8, slope: -2 }, 6: null }),
+      measure,
+    });
+    expect(result.residuals.map(({ program, bankLSB }) => [program, bankLSB])).toEqual([[81, 18]]);
+    expect(Math.abs(result.residuals[0].meanDb)).toBeLessThanOrEqual(0.1);
+  });
+
   test('drops a point when the base voice is silent there', () => {
     const { measure } = synth([18], { baseSilentAt: '36/40' });
     const result = calibrateVariations({
