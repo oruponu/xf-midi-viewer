@@ -323,6 +323,37 @@ export function applyRangeCorrections(
   checkAttenuationRange(bank, corrected);
 }
 
+export interface AttenuationLimit {
+  readonly min: number;
+  readonly max: number;
+}
+
+const covers = (range: { min: number; max: number }, note: number) =>
+  range.min < 0 || (range.min <= note && note <= range.max);
+
+// The deltas a range correction may add at a note before a zone there leaves 0 to 1440. Like the
+// build check, this looks at every instrument zone on the note, sounding through the preset or not.
+export function rangeLimits(
+  bank: BasicSoundBank,
+): (voice: VoiceId, note: number) => AttenuationLimit {
+  return (voice, note) => {
+    const preset = voicePreset(bank, voice);
+    let lowest = Infinity;
+    let highest = -Infinity;
+    for (const pz of preset.zones) {
+      const presetValue = attenuationOf(pz, preset.globalZone);
+      const global = pz.instrument.globalZone;
+      for (const zone of pz.instrument.zones) {
+        if (!covers(zone.hasKeyRange ? zone.keyRange : global.keyRange, note)) continue;
+        const total = presetValue + attenuationOf(zone, global);
+        lowest = Math.min(lowest, total);
+        highest = Math.max(highest, total);
+      }
+    }
+    return { min: -lowest, max: MAX_ATTENUATION - highest };
+  };
+}
+
 function variationPreset(bank: BasicSoundBank, v: VariationCorrection): BasicPreset {
   const preset = bank.presets.find(
     (p) =>

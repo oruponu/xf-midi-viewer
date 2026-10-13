@@ -8,6 +8,7 @@ import {
   applyRangeCorrections,
   applyVariationCorrections,
   listUnits,
+  rangeLimits,
 } from './apply.ts';
 import { NO_CORRECTIONS } from './corrections.ts';
 import type { Corrections } from './corrections.ts';
@@ -424,5 +425,20 @@ describe('applyRangeCorrections', () => {
     expect(() =>
       applyRangeCorrections(fresh(), [{ ...SAW, keys: [{ key: 60, attenuationDelta: 1440 }] }]),
     ).toThrow('exceeds 1440');
+  });
+});
+
+describe('rangeLimits', () => {
+  test('matches the build check for a delta that is the same at every note', () => {
+    const SAW = { bankMSB: 0, program: 81 };
+    const limit = rangeLimits(fresh());
+    const limits = Array.from({ length: 128 }, (_, note) => limit(SAW, note));
+    const lowest = Math.max(...limits.map((l) => l.min).filter(Number.isFinite));
+    const highest = Math.min(...limits.map((l) => l.max).filter(Number.isFinite));
+    const flat = (attenuationDelta: number) => [{ ...SAW, keys: [{ key: 60, attenuationDelta }] }];
+    expect(() => applyRangeCorrections(fresh(), flat(lowest))).not.toThrow();
+    expect(() => applyRangeCorrections(fresh(), flat(lowest - 1))).toThrow('below 0');
+    expect(() => applyRangeCorrections(fresh(), flat(highest))).not.toThrow();
+    expect(() => applyRangeCorrections(fresh(), flat(highest + 1))).toThrow('exceeds 1440');
   });
 });

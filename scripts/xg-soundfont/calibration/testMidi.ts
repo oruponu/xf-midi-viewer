@@ -50,6 +50,7 @@ export const DRUM_VELOCITIES: readonly number[] = [
 ];
 export const VOICE_NOTES: readonly number[] = [36, 48, 60, 72, 84];
 export const VOICE_VELOCITIES: readonly number[] = [40, 64, 100, 127];
+export const RANGE_NOTES: readonly number[] = Array.from({ length: 25 }, (_, i) => 24 + 3 * i);
 export const CALIBRATION_VOICES: readonly VoiceId[] = [
   ...Array.from({ length: 128 }, (_, program) => ({ bankMSB: 0, program })),
   ...XG_SFX_VOICES.filter((voice) => voice.from !== null).map((voice) => ({
