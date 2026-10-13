@@ -181,7 +181,100 @@ export function calibrateVariations(input: VariationCalibrationInput): Variation
   };
 }
 
+export interface VariationChange {
+  readonly program: number;
+  readonly bankLSB: number;
+  readonly beforeDb: number;
+  readonly afterDb: number | null;
+  readonly lostPoints: number;
+}
+
+// Each variation's mean residual before and after, on the points measured in both; if none,
+// before uses its own points and afterDb is null.
+export function variationChanges(
+  variations: readonly VariationId[],
+  reference: LevelTable,
+  before: LevelTable,
+  after: LevelTable,
+): VariationChange[] {
+  const ref = index(reference);
+  const tables = [index(before), index(after)];
+  const changes: VariationChange[] = [];
+  for (const v of variations) {
+    const rv = ref.get(voiceKey(v.bankLSB, v.program));
+    const rb = ref.get(voiceKey(0, v.program));
+    const sides = tables.map((t) => [
+      t.get(voiceKey(0, v.program)),
+      t.get(voiceKey(v.bankLSB, v.program)),
+    ]);
+    if (!rv || !rb || sides.flat().some((t) => !t)) {
+      throw new Error(`${label(v)} is missing from the tables`);
+    }
+    const valid = sides.map(([b, m]) =>
+      Object.keys(rv).filter(
+        (k) => isLevel(rv[k]) && isLevel(rb[k]) && isLevel(b![k]) && isLevel(m![k]),
+      ),
+    );
+    if (valid[0].length === 0) continue;
+    const common = valid[0].filter((k) => valid[1].includes(k));
+    const meanOf = ([b, m]: readonly (Levels | undefined)[], keys: readonly string[]) =>
+      keys.reduce(
+        (sum, k) =>
+          sum + (b![k] as number) + (rv[k] as number) - (rb[k] as number) - (m![k] as number),
+        0,
+      ) / keys.length;
+    changes.push({
+      program: v.program,
+      bankLSB: v.bankLSB,
+      beforeDb: meanOf(sides[0], common.length > 0 ? common : valid[0]),
+      afterDb: common.length > 0 ? meanOf(sides[1], common) : null,
+      lostPoints: valid[0].length - common.length,
+    });
+  }
+  return changes;
+}
+
 if (import.meta.main) {
+  if (process.argv[2] === '--check') {
+    const referencePath = process.argv[3];
+    if (!referencePath) {
+      console.error(
+        'Usage: bun scripts/xg-soundfont/calibration/calibrateVariations.ts --check <variation reference levels json>',
+      );
+      process.exit(2);
+    }
+    SpessaLog.setLogLevel(false, false, false);
+    await sf3DecoderReady();
+    const source = readSoundBank(SOURCE_SOUND_BANK_PATH);
+    const corrections = readCorrections(CORRECTIONS_PATH);
+    const programs = [...new Set(XG_VARIATION_VOICES.map((v) => v.program))];
+    const ids: VoiceId[] = [
+      ...programs.map((program) => ({ bankMSB: 0, program })),
+      ...XG_VARIATION_VOICES.map(({ program, bankLSB }) => ({ bankMSB: 0, bankLSB, program })),
+    ];
+    const measure = (c: typeof corrections) =>
+      measureBank(buildXgBank(source, c), { kits: [], voices: ids });
+    const changes = variationChanges(
+      XG_VARIATION_VOICES,
+      JSON.parse(readFileSync(referencePath, 'utf8')) as LevelTable,
+      measure({ ...corrections, ranges: [] }),
+      measure(corrections),
+    );
+    const lost = changes.filter((c) => c.lostPoints > 0);
+    const moved = changes.filter(
+      (c) => c.afterDb !== null && Math.abs(c.afterDb - c.beforeDb) > 0.01,
+    );
+    console.log(`checked ${changes.length} variations, moved ${moved.length}, lost ${lost.length}`);
+    for (const c of moved) {
+      console.log(
+        `  moved LSB ${c.bankLSB} / PC ${c.program}: ${(c.afterDb! - c.beforeDb).toFixed(3)} dB`,
+      );
+    }
+    for (const c of lost) {
+      console.log(`  lost ${c.lostPoints} points of LSB ${c.bankLSB} / PC ${c.program}`);
+    }
+    process.exit(moved.length === 0 && lost.length === 0 ? 0 : 1);
+  }
   const [referencePath, residualsPath] = process.argv.slice(2);
   if (!referencePath) {
     console.error(
