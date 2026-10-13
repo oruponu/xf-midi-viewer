@@ -20,7 +20,11 @@ export function sourceSha256(source: ArrayBuffer): string {
   return createHash('sha256').update(new Uint8Array(source)).digest('hex');
 }
 
-export function buildXgBank(source: ArrayBuffer, corrections: Corrections): BasicSoundBank {
+export function buildXgBank(
+  source: ArrayBuffer,
+  corrections: Corrections,
+  warn: (message: string) => void = () => {},
+): BasicSoundBank {
   if (corrections.sourceSha256 !== null && corrections.sourceSha256 !== sourceSha256(source)) {
     throw new Error(
       'The source SF3 differs from the one the corrections were fitted to; rerun scripts/xg-soundfont/calibration/calibrate.ts',
@@ -47,14 +51,18 @@ export function buildXgBank(source: ArrayBuffer, corrections: Corrections): Basi
       buildGsFallbackPreset(bank, variation.bankLSB, variation.from),
     ),
   );
-  applyVariationCorrections(bank, corrections.variations);
+  for (const message of applyVariationCorrections(bank, corrections.variations)) warn(message);
   bank.flush();
   return bank;
 }
 
-export function buildXgSoundBank(source: ArrayBuffer, corrections: Corrections): ArrayBuffer {
+export function buildXgSoundBank(
+  source: ArrayBuffer,
+  corrections: Corrections,
+  warn?: (message: string) => void,
+): ArrayBuffer {
   // SF2 has no separate bank LSB; an XG variation (MSB 0 / LSB n) would collide with GS bank n.
-  return buildXgBank(source, corrections).writeSFE({ software: 'xf-midi-viewer' });
+  return buildXgBank(source, corrections, warn).writeSFE({ software: 'xf-midi-viewer' });
 }
 
 export function readSoundBank(path: string): ArrayBuffer {
@@ -67,6 +75,7 @@ if (import.meta.main) {
   const output = buildXgSoundBank(
     readSoundBank(SOURCE_SOUND_BANK_PATH),
     readCorrections(CORRECTIONS_PATH),
+    (message) => console.warn(message),
   );
   writeFileSync(OUTPUT_SOUND_BANK_PATH, new Uint8Array(output));
 }
