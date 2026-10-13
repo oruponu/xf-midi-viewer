@@ -1,7 +1,7 @@
 import { BasicSoundBank, SpessaSynthProcessor } from 'spessasynth_core';
 import { drumLevels, voiceLevels } from './levels.ts';
 import type { DrumLevels, LevelTable, VoiceLevels } from './levels.ts';
-import { KWeightedEnergy } from './loudness.ts';
+import { WeightedEnergy } from './loudness.ts';
 import {
   CALIBRATION_VOICES,
   DRUM_KEYS,
@@ -32,7 +32,7 @@ export interface RenderOptions {
 }
 
 export interface RenderResult {
-  readonly energy: KWeightedEnergy;
+  readonly energy: WeightedEnergy;
   readonly peak: number;
 }
 
@@ -48,7 +48,7 @@ export function renderMessages(
   const synth = new SpessaSynthProcessor(RENDER_SAMPLE_RATE, { effectsEnabled: options.effects });
   synth.setSystemParameter('gain', options.gain);
   synth.soundBankManager.addSoundBank(bank, 'main');
-  const energy = new KWeightedEnergy(RENDER_SAMPLE_RATE);
+  const energy = new WeightedEnergy(RENDER_SAMPLE_RATE);
   const left = new Float32Array(BLOCK_SIZE);
   const right = new Float32Array(BLOCK_SIZE);
   const blocks = Math.ceil((endSeconds * RENDER_SAMPLE_RATE) / BLOCK_SIZE);

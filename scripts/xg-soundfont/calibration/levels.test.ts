@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { KWeightedEnergy } from './loudness.ts';
+import { WeightedEnergy } from './loudness.ts';
 import { SILENT_DB, drumLevels, markerShift, voiceLevels } from './levels.ts';
 import { drumTestMidi, voiceTestMidi } from './testMidi.ts';
 import type { TestMidi } from './testMidi.ts';
@@ -11,7 +11,7 @@ function toneBursts<P>(
   delay: number,
   burstSeconds: number,
   amplitude: (probe: P) => number,
-): KWeightedEnergy {
+): WeightedEnergy {
   const total = Math.ceil((midi.endSeconds + 1) * RATE);
   const signal = new Float32Array(total);
   const burst = (at: number, amp: number) => {
@@ -22,12 +22,25 @@ function toneBursts<P>(
   };
   burst(midi.markerSeconds, 0.8);
   for (const { probe, seconds: at } of midi.probes) burst(at, amplitude(probe));
-  const energy = new KWeightedEnergy(RATE);
+  const energy = new WeightedEnergy(RATE);
   energy.push(signal, signal);
   return energy;
 }
 
 describe('markerShift', () => {
+  test('finds a marker hit made of a low tone', () => {
+    const midi = voiceTestMidi([{ bankMSB: 0, program: 0 }], [60], [100]);
+    const total = Math.ceil((midi.endSeconds + 1) * RATE);
+    const signal = new Float32Array(total);
+    const from = Math.round((midi.markerSeconds + 0.4) * RATE);
+    for (let i = 0; i < Math.round(0.2 * RATE); i++) {
+      signal[from + i] = 0.8 * Math.sin((2 * Math.PI * 60 * i) / RATE);
+    }
+    const energy = new WeightedEnergy(RATE);
+    energy.push(signal, signal);
+    expect(markerShift(energy, midi)).toBeCloseTo(0.4, 1);
+  });
+
   test('measures how late or early the marker hit sounds', () => {
     const midi = drumTestMidi([0], [36], [64]);
     expect(
@@ -46,7 +59,7 @@ describe('markerShift', () => {
 
   test('throws when the marker is missing', () => {
     const midi = drumTestMidi([0], [36], [64]);
-    const energy = new KWeightedEnergy(RATE);
+    const energy = new WeightedEnergy(RATE);
     const silence = new Float32Array(RATE * 5);
     energy.push(silence, silence);
     expect(() => markerShift(energy, midi)).toThrow('Marker hit not found');

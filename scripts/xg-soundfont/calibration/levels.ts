@@ -1,4 +1,4 @@
-import type { KWeightedEnergy } from './loudness.ts';
+import type { WeightedEnergy } from './loudness.ts';
 import type { DrumProbe, TestMidi, VoiceProbe } from './testMidi.ts';
 import { VOICE_NOTE_SECONDS } from './testMidi.ts';
 
@@ -32,7 +32,7 @@ const HIT_WINDOW_SECONDS = 0.05;
 export const drumLevelKey = (velocity: number): string => String(velocity);
 export const voiceLevelKey = (note: number, velocity: number): string => `${note}/${velocity}`;
 
-export function markerShift(energy: KWeightedEnergy, midi: TestMidi<unknown>): number {
+export function markerShift(energy: WeightedEnergy, midi: TestMidi<unknown>): number {
   const onset = energy.onsetSeconds(
     0,
     midi.markerSeconds + MARKER_SEARCH_SECONDS,
@@ -46,7 +46,7 @@ function toLevel(db: number): Level {
   return Number.isFinite(db) ? Math.round(db * 100) / 100 : null;
 }
 
-export function drumLevels(energy: KWeightedEnergy, midi: TestMidi<DrumProbe>): DrumLevels[] {
+export function drumLevels(energy: WeightedEnergy, midi: TestMidi<DrumProbe>): DrumLevels[] {
   const shift = markerShift(energy, midi);
   const table = new Map<string, { kit: number; key: number; levels: Record<string, Level> }>();
   for (const { probe, seconds } of midi.probes) {
@@ -67,7 +67,7 @@ export function drumLevels(energy: KWeightedEnergy, midi: TestMidi<DrumProbe>): 
   return [...table.values()];
 }
 
-export function voiceLevels(energy: KWeightedEnergy, midi: TestMidi<VoiceProbe>): VoiceLevels[] {
+export function voiceLevels(energy: WeightedEnergy, midi: TestMidi<VoiceProbe>): VoiceLevels[] {
   const shift = markerShift(energy, midi);
   const table = new Map<
     string,
