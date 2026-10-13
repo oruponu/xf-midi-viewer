@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { calibrateVariations, variationChanges } from './calibrateVariations.ts';
+import {
+  calibrateVariations,
+  checkVariationChanges,
+  variationChanges,
+} from './calibrateVariations.ts';
 import type { VariationCorrection } from './corrections.ts';
 import { ATTENUATION_PER_DB, DB_PER_DOUBLING_PER_AMOUNT } from './fit.ts';
 import { voiceLevelKey } from './levels.ts';
@@ -275,5 +279,34 @@ describe('variationChanges', () => {
     expect(all.lostPoints).toBe(0);
     expect(some.lostPoints).toBe(1);
     expect(some.afterDb! - some.beforeDb).toBeCloseTo(all.afterDb! - all.beforeDb, 6);
+  });
+});
+
+describe('checkVariationChanges', () => {
+  const change = (beforeDb: number, afterDb: number | null, lostPoints = 0) => ({
+    program: 81,
+    bankLSB: 18,
+    beforeDb,
+    afterDb,
+    lostPoints,
+  });
+
+  test('passes a change within the 0.1 dB step of the synth', () => {
+    const result = checkVariationChanges([change(0.02, 0.12), change(0, -0.1)]);
+    expect(result.passed).toBe(true);
+    expect(result.moved).toEqual([]);
+  });
+
+  test('fails a change above 0.1 dB and a variation with no points left', () => {
+    const result = checkVariationChanges([change(0, 0.11), change(0, null, 20), change(0, 0)]);
+    expect(result.passed).toBe(false);
+    expect(result.moved).toEqual([change(0, 0.11)]);
+    expect(result.lost).toEqual([change(0, null, 20)]);
+  });
+
+  test('reports a variation that lost some of its points without failing', () => {
+    const result = checkVariationChanges([change(0, 0.02, 2)]);
+    expect(result.passed).toBe(true);
+    expect(result.thinned).toEqual([change(0, 0.02, 2)]);
   });
 });

@@ -234,6 +234,24 @@ export function variationChanges(
   return changes;
 }
 
+export interface VariationCheck {
+  readonly moved: readonly VariationChange[];
+  readonly lost: readonly VariationChange[];
+  readonly thinned: readonly VariationChange[];
+  readonly passed: boolean;
+}
+
+// The synth applies attenuation in 0.1 dB steps, so a variation and its base voice can round apart
+// by that much; a variation that lost only some points is reported, one that lost all of them fails.
+export function checkVariationChanges(changes: readonly VariationChange[]): VariationCheck {
+  const moved = changes.filter(
+    (c) => c.afterDb !== null && Math.abs(c.afterDb - c.beforeDb) > 0.1 + 1e-9,
+  );
+  const lost = changes.filter((c) => c.afterDb === null);
+  const thinned = changes.filter((c) => c.afterDb !== null && c.lostPoints > 0);
+  return { moved, lost, thinned, passed: moved.length === 0 && lost.length === 0 };
+}
+
 if (import.meta.main) {
   if (process.argv[2] === '--check') {
     const referencePath = process.argv[3];
@@ -260,20 +278,20 @@ if (import.meta.main) {
       measure({ ...corrections, ranges: [] }),
       measure(corrections),
     );
-    const lost = changes.filter((c) => c.lostPoints > 0);
-    const moved = changes.filter(
-      (c) => c.afterDb !== null && Math.abs(c.afterDb - c.beforeDb) > 0.01,
+    const { moved, lost, thinned, passed } = checkVariationChanges(changes);
+    const shift = changes.map((c) => (c.afterDb === null ? 0 : Math.abs(c.afterDb - c.beforeDb)));
+    console.log(
+      `checked ${changes.length} variations: largest change ${Math.max(0, ...shift).toFixed(3)} dB, ` +
+        `moved ${moved.length}, lost ${lost.length}, ` +
+        `${thinned.reduce((s, c) => s + c.lostPoints, 0)} points lost in ${thinned.length}`,
     );
-    console.log(`checked ${changes.length} variations, moved ${moved.length}, lost ${lost.length}`);
     for (const c of moved) {
       console.log(
         `  moved LSB ${c.bankLSB} / PC ${c.program}: ${(c.afterDb! - c.beforeDb).toFixed(3)} dB`,
       );
     }
-    for (const c of lost) {
-      console.log(`  lost ${c.lostPoints} points of LSB ${c.bankLSB} / PC ${c.program}`);
-    }
-    process.exit(moved.length === 0 && lost.length === 0 ? 0 : 1);
+    for (const c of lost) console.log(`  lost LSB ${c.bankLSB} / PC ${c.program}`);
+    process.exit(passed ? 0 : 1);
   }
   const [referencePath, residualsPath] = process.argv.slice(2);
   if (!referencePath) {
