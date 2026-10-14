@@ -1,4 +1,9 @@
-import { GeneratorTypes, Modulator, ModulatorControllerSources } from 'spessasynth_core';
+import {
+  BasicInstrument,
+  GeneratorTypes,
+  Modulator,
+  ModulatorControllerSources,
+} from 'spessasynth_core';
 import type {
   BasicInstrumentZone,
   BasicPreset,
@@ -10,9 +15,11 @@ import type {
   CalibrationUnits,
   Corrections,
   DrumKey,
+  RangeCorrection,
   VariationCorrection,
   Voice,
 } from './corrections.ts';
+import { rangeBands, rangeOffsets } from './ranges.ts';
 import { CALIBRATION_VOICES, DRUM_KEYS, XG_DRUM_KITS } from './testMidi.ts';
 import type { VoiceId } from './testMidi.ts';
 
@@ -264,6 +271,87 @@ export function applyCorrections(bank: BasicSoundBank, corrections: Corrections)
     }
   }
   checkAttenuationRange(bank);
+}
+
+function cloneWithRanges(
+  bank: BasicSoundBank,
+  source: BasicInstrument,
+  offsets: readonly number[],
+  suffix: string,
+): BasicInstrument {
+  const clone = new BasicInstrument();
+  clone.name = `${source.name} ${suffix}`;
+  clone.globalZone.copyFrom(source.globalZone);
+  for (const zone of source.zones) {
+    const range = zone.hasKeyRange ? zone.keyRange : source.globalZone.keyRange;
+    const [min, max] = range.min < 0 ? [0, 127] : [range.min, range.max];
+    const attenuation = attenuationOf(zone, source.globalZone);
+    for (const band of rangeBands(offsets, min, max)) {
+      const part = clone.createZone(zone.sample);
+      part.copyFrom(zone);
+      part.keyRange = { min: band.min, max: band.max };
+      if (band.delta !== 0) part.setGenerator(ATTENUATION, attenuation + band.delta, false);
+    }
+  }
+  bank.addInstruments(clone);
+  return clone;
+}
+
+// Each corrected voice gets its own copies of its instruments, so the presets that share them keep their sound.
+export function applyRangeCorrections(
+  bank: BasicSoundBank,
+  ranges: readonly RangeCorrection[],
+): void {
+  const corrected = new Set<BasicPreset>();
+  for (const range of ranges) {
+    const preset = voicePreset(bank, range);
+    const where = `Voice MSB ${range.bankMSB} / PC ${range.program}`;
+    if (corrected.has(preset)) throw new Error(`${where} has two range corrections`);
+    corrected.add(preset);
+    const offsets = rangeOffsets(range.keys, where);
+    const clones = new Map<BasicInstrument, BasicInstrument>();
+    for (const pz of preset.zones) {
+      const source = pz.instrument;
+      let clone = clones.get(source);
+      if (!clone) {
+        clone = cloneWithRanges(bank, source, offsets, `${range.bankMSB}:${range.program}`);
+        clones.set(source, clone);
+      }
+      pz.instrument = clone;
+    }
+  }
+  checkAttenuationRange(bank, corrected);
+}
+
+export interface AttenuationLimit {
+  readonly min: number;
+  readonly max: number;
+}
+
+const covers = (range: { min: number; max: number }, note: number) =>
+  range.min < 0 || (range.min <= note && note <= range.max);
+
+// The deltas a range correction may add at a note before a zone there leaves 0 to 1440. Like the
+// build check, this looks at every instrument zone on the note, sounding through the preset or not.
+export function rangeLimits(
+  bank: BasicSoundBank,
+): (voice: VoiceId, note: number) => AttenuationLimit {
+  return (voice, note) => {
+    const preset = voicePreset(bank, voice);
+    let lowest = Infinity;
+    let highest = -Infinity;
+    for (const pz of preset.zones) {
+      const presetValue = attenuationOf(pz, preset.globalZone);
+      const global = pz.instrument.globalZone;
+      for (const zone of pz.instrument.zones) {
+        if (!covers(zone.hasKeyRange ? zone.keyRange : global.keyRange, note)) continue;
+        const total = presetValue + attenuationOf(zone, global);
+        lowest = Math.min(lowest, total);
+        highest = Math.max(highest, total);
+      }
+    }
+    return { min: -lowest, max: MAX_ATTENUATION - highest };
+  };
 }
 
 function variationPreset(bank: BasicSoundBank, v: VariationCorrection): BasicPreset {

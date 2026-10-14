@@ -181,7 +181,118 @@ export function calibrateVariations(input: VariationCalibrationInput): Variation
   };
 }
 
+export interface VariationChange {
+  readonly program: number;
+  readonly bankLSB: number;
+  readonly beforeDb: number;
+  readonly afterDb: number | null;
+  readonly lostPoints: number;
+}
+
+// Each variation's mean residual before and after, on the points measured in both; if none,
+// before uses its own points and afterDb is null.
+export function variationChanges(
+  variations: readonly VariationId[],
+  reference: LevelTable,
+  before: LevelTable,
+  after: LevelTable,
+): VariationChange[] {
+  const ref = index(reference);
+  const tables = [index(before), index(after)];
+  const changes: VariationChange[] = [];
+  for (const v of variations) {
+    const rv = ref.get(voiceKey(v.bankLSB, v.program));
+    const rb = ref.get(voiceKey(0, v.program));
+    const sides = tables.map((t) => [
+      t.get(voiceKey(0, v.program)),
+      t.get(voiceKey(v.bankLSB, v.program)),
+    ]);
+    if (!rv || !rb || sides.flat().some((t) => !t)) {
+      throw new Error(`${label(v)} is missing from the tables`);
+    }
+    const valid = sides.map(([b, m]) =>
+      Object.keys(rv).filter(
+        (k) => isLevel(rv[k]) && isLevel(rb[k]) && isLevel(b![k]) && isLevel(m![k]),
+      ),
+    );
+    if (valid[0].length === 0) continue;
+    const common = valid[0].filter((k) => valid[1].includes(k));
+    const meanOf = ([b, m]: readonly (Levels | undefined)[], keys: readonly string[]) =>
+      keys.reduce(
+        (sum, k) =>
+          sum + (b![k] as number) + (rv[k] as number) - (rb[k] as number) - (m![k] as number),
+        0,
+      ) / keys.length;
+    changes.push({
+      program: v.program,
+      bankLSB: v.bankLSB,
+      beforeDb: meanOf(sides[0], common.length > 0 ? common : valid[0]),
+      afterDb: common.length > 0 ? meanOf(sides[1], common) : null,
+      lostPoints: valid[0].length - common.length,
+    });
+  }
+  return changes;
+}
+
+export interface VariationCheck {
+  readonly moved: readonly VariationChange[];
+  readonly lost: readonly VariationChange[];
+  readonly thinned: readonly VariationChange[];
+  readonly passed: boolean;
+}
+
+// The synth applies attenuation in 0.1 dB steps, so a variation and its base voice can round apart
+// by that much; a variation that lost only some points is reported, one that lost all of them fails.
+export function checkVariationChanges(changes: readonly VariationChange[]): VariationCheck {
+  const moved = changes.filter(
+    (c) => c.afterDb !== null && Math.abs(c.afterDb - c.beforeDb) > 0.1 + 1e-9,
+  );
+  const lost = changes.filter((c) => c.afterDb === null);
+  const thinned = changes.filter((c) => c.afterDb !== null && c.lostPoints > 0);
+  return { moved, lost, thinned, passed: moved.length === 0 && lost.length === 0 };
+}
+
 if (import.meta.main) {
+  if (process.argv[2] === '--check') {
+    const referencePath = process.argv[3];
+    if (!referencePath) {
+      console.error(
+        'Usage: bun scripts/xg-soundfont/calibration/calibrateVariations.ts --check <variation reference levels json>',
+      );
+      process.exit(2);
+    }
+    SpessaLog.setLogLevel(false, false, false);
+    await sf3DecoderReady();
+    const source = readSoundBank(SOURCE_SOUND_BANK_PATH);
+    const corrections = readCorrections(CORRECTIONS_PATH);
+    const programs = [...new Set(XG_VARIATION_VOICES.map((v) => v.program))];
+    const ids: VoiceId[] = [
+      ...programs.map((program) => ({ bankMSB: 0, program })),
+      ...XG_VARIATION_VOICES.map(({ program, bankLSB }) => ({ bankMSB: 0, bankLSB, program })),
+    ];
+    const measure = (c: typeof corrections) =>
+      measureBank(buildXgBank(source, c), { kits: [], voices: ids });
+    const changes = variationChanges(
+      XG_VARIATION_VOICES,
+      JSON.parse(readFileSync(referencePath, 'utf8')) as LevelTable,
+      measure({ ...corrections, ranges: [] }),
+      measure(corrections),
+    );
+    const { moved, lost, thinned, passed } = checkVariationChanges(changes);
+    const shift = changes.map((c) => (c.afterDb === null ? 0 : Math.abs(c.afterDb - c.beforeDb)));
+    console.log(
+      `checked ${changes.length} variations: largest change ${Math.max(0, ...shift).toFixed(3)} dB, ` +
+        `moved ${moved.length}, lost ${lost.length}, ` +
+        `${thinned.reduce((s, c) => s + c.lostPoints, 0)} points lost in ${thinned.length}`,
+    );
+    for (const c of moved) {
+      console.log(
+        `  moved LSB ${c.bankLSB} / PC ${c.program}: ${(c.afterDb! - c.beforeDb).toFixed(3)} dB`,
+      );
+    }
+    for (const c of lost) console.log(`  lost LSB ${c.bankLSB} / PC ${c.program}`);
+    process.exit(passed ? 0 : 1);
+  }
   const [referencePath, residualsPath] = process.argv.slice(2);
   if (!referencePath) {
     console.error(

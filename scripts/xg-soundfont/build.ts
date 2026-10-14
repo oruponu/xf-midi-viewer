@@ -2,7 +2,11 @@ import { createHash } from 'node:crypto';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { SoundBankLoader, SpessaLog } from 'spessasynth_core';
 import type { BasicSoundBank } from 'spessasynth_core';
-import { applyCorrections, applyVariationCorrections } from './calibration/apply.ts';
+import {
+  applyCorrections,
+  applyRangeCorrections,
+  applyVariationCorrections,
+} from './calibration/apply.ts';
 import { readCorrections } from './calibration/corrections.ts';
 import type { Corrections } from './calibration/corrections.ts';
 import { CORRECTIONS_PATH, OUTPUT_SOUND_BANK_PATH, SOURCE_SOUND_BANK_PATH } from './paths.ts';
@@ -37,6 +41,7 @@ export function buildXgBank(
   ];
   bank.addPresets(...presets);
   applyCorrections(bank, corrections);
+  applyRangeCorrections(bank, corrections.ranges);
   // Added after the corrections so that the variations copy the corrected sources.
   bank.addPresets(
     ...XG_VARIATION_VOICES.map((variation) => buildVariationVoicePreset(bank, variation)),

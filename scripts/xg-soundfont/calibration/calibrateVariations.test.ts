@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { calibrateVariations } from './calibrateVariations.ts';
+import {
+  calibrateVariations,
+  checkVariationChanges,
+  variationChanges,
+} from './calibrateVariations.ts';
 import type { VariationCorrection } from './corrections.ts';
 import { ATTENUATION_PER_DB, DB_PER_DOUBLING_PER_AMOUNT } from './fit.ts';
 import { voiceLevelKey } from './levels.ts';
@@ -213,5 +217,96 @@ describe('calibrateVariations', () => {
         },
       }),
     ).toThrow('DynaSaw (LSB 18 / PC 81) point 60/100 can no longer be measured');
+  });
+});
+
+describe('variationChanges', () => {
+  const ref = reference({ 18: { level: 8, slope: -2 }, 6: null });
+  const fitted = () => {
+    const { measure } = synth([18, 6]);
+    const result = calibrateVariations({ variations: [DYNASAW, SAW2], reference: ref, measure });
+    return { measure, variations: result.variations };
+  };
+
+  test('finds no change when the corrections stay the same', () => {
+    const { measure, variations } = fitted();
+    const changes = variationChanges(
+      [DYNASAW, SAW2],
+      ref,
+      measure(variations),
+      measure(variations),
+    );
+    expect(changes.map((c) => [c.program, c.bankLSB])).toEqual([[81, 18]]);
+    expect(changes[0].afterDb).toBe(changes[0].beforeDb);
+    expect(Math.abs(changes[0].beforeDb)).toBeLessThanOrEqual(0.1);
+  });
+
+  test('shows the residual moving with the level of the variation', () => {
+    const { measure, variations } = fitted();
+    const quieter = variations.map((c) => ({ ...c, attenuationDelta: c.attenuationDelta + 25 }));
+    const [change] = variationChanges([DYNASAW], ref, measure(variations), measure(quieter));
+    expect(change.afterDb! - change.beforeDb).toBeCloseTo(1, 2);
+  });
+
+  test('reports a variation that can no longer be measured', () => {
+    const { measure, variations } = fitted();
+    const after = measure(variations);
+    const silent: LevelTable = {
+      ...after,
+      voices: after.voices.map((v) =>
+        v.bankLSB === 18
+          ? { ...v, levels: Object.fromEntries(Object.keys(v.levels).map((k) => [k, -90])) }
+          : v,
+      ),
+    };
+    const [change] = variationChanges([DYNASAW], ref, measure(variations), silent);
+    expect(change.afterDb).toBeNull();
+    expect(change.lostPoints).toBeGreaterThan(0);
+  });
+
+  test('counts the points lost and compares the rest', () => {
+    const { measure, variations } = fitted();
+    const quieter = variations.map((c) => ({ ...c, attenuationDelta: c.attenuationDelta + 25 }));
+    const after = measure(quieter);
+    const fewer: LevelTable = {
+      ...after,
+      voices: after.voices.map((v) =>
+        v.bankLSB === 18 ? { ...v, levels: { ...v.levels, '36/40': -90 } } : v,
+      ),
+    };
+    const [all] = variationChanges([DYNASAW], ref, measure(variations), after);
+    const [some] = variationChanges([DYNASAW], ref, measure(variations), fewer);
+    expect(all.lostPoints).toBe(0);
+    expect(some.lostPoints).toBe(1);
+    expect(some.afterDb! - some.beforeDb).toBeCloseTo(all.afterDb! - all.beforeDb, 6);
+  });
+});
+
+describe('checkVariationChanges', () => {
+  const change = (beforeDb: number, afterDb: number | null, lostPoints = 0) => ({
+    program: 81,
+    bankLSB: 18,
+    beforeDb,
+    afterDb,
+    lostPoints,
+  });
+
+  test('passes a change within the 0.1 dB step of the synth', () => {
+    const result = checkVariationChanges([change(0.02, 0.12), change(0, -0.1)]);
+    expect(result.passed).toBe(true);
+    expect(result.moved).toEqual([]);
+  });
+
+  test('fails a change above 0.1 dB and a variation with no points left', () => {
+    const result = checkVariationChanges([change(0, 0.11), change(0, null, 20), change(0, 0)]);
+    expect(result.passed).toBe(false);
+    expect(result.moved).toEqual([change(0, 0.11)]);
+    expect(result.lost).toEqual([change(0, null, 20)]);
+  });
+
+  test('reports a variation that lost some of its points without failing', () => {
+    const result = checkVariationChanges([change(0, 0.02, 2)]);
+    expect(result.passed).toBe(true);
+    expect(result.thinned).toEqual([change(0, 0.02, 2)]);
   });
 });

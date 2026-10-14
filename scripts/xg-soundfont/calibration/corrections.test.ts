@@ -1,4 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { SpessaLog } from 'spessasynth_core';
 import { BUNDLED_SOUND_BANK_GAIN_DB } from '../../../src/lib/synth/soundBank.ts';
 import { buildXgBank, readSoundBank } from '../build.ts';
@@ -23,5 +26,15 @@ describe('corrections.json', () => {
     expect(ids([...corrections.drums, ...corrections.voices, ...corrections.excluded])).toEqual(
       ids([...units.drums, ...units.voices]),
     );
+  });
+});
+
+describe('readCorrections', () => {
+  test('reads a file written before range corrections as having none', () => {
+    const { ranges, ...older } = readCorrections(CORRECTIONS_PATH);
+    const path = join(mkdtempSync(join(tmpdir(), 'corrections-')), 'older.json');
+    writeFileSync(path, JSON.stringify(older));
+    expect(ranges).toBeDefined();
+    expect(readCorrections(path)).toEqual({ ...older, ranges: [] });
   });
 });

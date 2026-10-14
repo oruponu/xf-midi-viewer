@@ -6,6 +6,7 @@ import {
   CALIBRATION_VOICES,
   DRUM_KEYS,
   DRUM_VELOCITIES,
+  RANGE_NOTES,
   XG_DRUM_KITS,
   drumTestMidi,
   toSmf,
@@ -104,5 +105,14 @@ describe('toSmf', () => {
     sequence.midiMessages.forEach((m, i) =>
       expect(m.seconds).toBeCloseTo(midi.messages[i].seconds, 6),
     );
+  });
+});
+
+describe('RANGE_NOTES', () => {
+  test('covers 24 to 96 every three semitones', () => {
+    expect(RANGE_NOTES).toHaveLength(25);
+    expect(RANGE_NOTES[0]).toBe(24);
+    expect(RANGE_NOTES.at(-1)).toBe(96);
+    expect(RANGE_NOTES.every((n, i) => i === 0 || n - RANGE_NOTES[i - 1] === 3)).toBe(true);
   });
 });

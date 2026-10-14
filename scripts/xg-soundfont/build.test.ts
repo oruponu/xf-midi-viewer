@@ -92,6 +92,48 @@ describe('buildXgSoundBank', () => {
     expect(warnings[0]).toContain('exceeds 1440');
   });
 
+  test('links the XG variations and the GS fallbacks to the range-corrected instruments', () => {
+    const data = readSoundBank(SOURCE_SOUND_BANK_PATH);
+    const plain = buildXgBank(data, NO_CORRECTIONS);
+    const ranged = buildXgBank(data, {
+      ...NO_CORRECTIONS,
+      ranges: [
+        {
+          bankMSB: 0,
+          program: 81,
+          keys: [
+            { key: 60, attenuationDelta: 0 },
+            { key: 72, attenuationDelta: 60 },
+          ],
+        },
+      ],
+    });
+    const at72 = (bank: BasicSoundBank, p: BasicPreset) =>
+      bank.presets
+        .find(
+          (x) =>
+            x.name === p.name &&
+            x.bankMSB === p.bankMSB &&
+            x.bankLSB === p.bankLSB &&
+            x.program === p.program,
+        )!
+        .getVoiceParameters(72, 100)
+        .map((v) => v.generators[GeneratorTypes.initialAttenuation]);
+    const baseName = plain.getPreset(patch(0, 81), 'xg').name;
+    const copies = plain.presets.filter(
+      (p) =>
+        !p.isGMGSDrum &&
+        p.program === 81 &&
+        ((p.bankMSB === 0 && p.bankLSB !== 0 && p.name.startsWith('XG ')) ||
+          (p.bankMSB !== 0 && p.bankLSB === 0 && p.name === baseName)),
+    );
+    expect(copies.some((p) => p.bankLSB === 18)).toBe(true);
+    for (const p of copies) {
+      const before = at72(plain, p);
+      expect(at72(ranged, p).map((v, i) => v - before[i])).toEqual(before.map(() => 24));
+    }
+  });
+
   test('plays the XG variation voices exactly like their corrected source', () => {
     const bank = SoundBankLoader.fromArrayBuffer(
       buildXgSoundBank(readSoundBank(SOURCE_SOUND_BANK_PATH), {
