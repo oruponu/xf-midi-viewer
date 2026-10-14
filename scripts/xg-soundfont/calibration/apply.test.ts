@@ -569,4 +569,30 @@ describe('variationRangeLimits', () => {
     );
     expect(limit(MODULR, 60).max).toBe(Infinity);
   });
+
+  test('pairs a split zone only with the instrument zones its keys reach', () => {
+    // The base voice's range correction gives its instrument zones different attenuation per key.
+    const corrections = {
+      ...NO_CORRECTIONS,
+      ranges: [
+        {
+          bankMSB: 0,
+          program: 39,
+          keys: [
+            { key: 36, attenuationDelta: 0 },
+            { key: 72, attenuationDelta: 400 },
+          ],
+        },
+      ],
+    };
+    const limit = variationRangeLimits(buildXgBank(source, corrections));
+    const keys = Array.from({ length: 128 }, (_, key) => {
+      const { min } = limit(MODULR, key);
+      return { key, attenuationDelta: Number.isFinite(min) ? Math.ceil(min / 5) * 5 : 0 };
+    });
+    expect(keys.some((k) => k.attenuationDelta < 0)).toBe(true);
+    expect(() =>
+      buildXgBank(source, { ...corrections, variationRanges: [{ ...MODULR, keys }] }),
+    ).not.toThrow();
+  });
 });

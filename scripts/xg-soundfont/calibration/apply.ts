@@ -223,8 +223,12 @@ function checkAttenuationRange(
   for (const preset of bank.presets) {
     for (const pz of preset.zones) {
       const presetValue = attenuationOf(pz, preset.globalZone);
+      const presetKeys = pz.hasKeyRange ? pz.keyRange : preset.globalZone.keyRange;
+      const global = pz.instrument.globalZone;
       for (const zone of pz.instrument.zones) {
-        const total = presetValue + attenuationOf(zone, pz.instrument.globalZone);
+        // A preset zone and an instrument zone that share no key never sound together.
+        if (!overlaps(presetKeys, zone.hasKeyRange ? zone.keyRange : global.keyRange)) continue;
+        const total = presetValue + attenuationOf(zone, global);
         if (total > MAX_ATTENUATION) {
           const message = `${preset.name} / ${zone.sample.name}: total attenuation ${total} exceeds ${MAX_ATTENUATION}`;
           if (!aboveMax.has(preset)) throw new Error(message);
@@ -332,8 +336,12 @@ export interface AttenuationLimit {
 const covers = (range: { min: number; max: number }, note: number) =>
   range.min < 0 || (range.min <= note && note <= range.max);
 
-// The deltas a range correction may add at a note before a zone there leaves 0 to 1440. Like the
-// build check, this looks at every instrument zone on the note, sounding through the preset or not.
+const overlaps = (a: { min: number; max: number }, b: { min: number; max: number }) =>
+  a.min < 0 || b.min < 0 || (a.min <= b.max && b.min <= a.max);
+
+// The deltas a range correction may add at a note before a zone there leaves 0 to 1440. This looks
+// at every instrument zone on the note, sounding through the preset or not, so it is at least as
+// strict as the build check.
 export function rangeLimits(
   bank: BasicSoundBank,
 ): (voice: VoiceId, note: number) => AttenuationLimit {
@@ -403,6 +411,7 @@ function splitVariationRanges(
 }
 
 // The deltas a variation range correction may add at a note before a zone there drops below 0.
+// Like the build check, a preset zone is paired only with the instrument zones its keys reach.
 export function variationRangeLimits(
   bank: BasicSoundBank,
 ): (
