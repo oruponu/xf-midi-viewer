@@ -12,6 +12,7 @@ import {
   variationRangeLimits,
 } from './apply.ts';
 import { NO_CORRECTIONS } from './corrections.ts';
+import { VARIATION_RANGE_STEP } from './ranges.ts';
 import type { Corrections } from './corrections.ts';
 
 SpessaLog.setLogLevel(false, false, false);
@@ -373,13 +374,13 @@ describe('applyVariationCorrections', () => {
     const before = fresh();
     const after = fresh();
     applyVariationCorrections(after, [], [{ ...MODULR, keys: RISE }]);
-    // Stepped deltas 0 / 5 / 10 / 15 / 30 cB; the synth multiplies attenuation by 0.4.
+    // Stepped deltas 0 / 10 / 20 / 30 cB; the synth multiplies attenuation by 0.4.
     for (const [note, expected] of [
       [40, 0],
       [60, 0],
-      [61, 2],
+      [61, 0],
       [63, 4],
-      [65, 6],
+      [66, 8],
       [72, 12],
       [100, 12],
     ]) {
@@ -394,8 +395,8 @@ describe('applyVariationCorrections', () => {
     const bank = fresh();
     applyVariationCorrections(bank, [], [{ ...MODULR, keys: RISE }]);
     const zones = bank.getPreset(patch(0, 40, 39), 'xg').zones;
-    // 0-60, 61-62, 63-64, 65-66, 67-68, 69-70, 71-74 for each of the two 0-74 zones, 75-108 once.
-    expect(zones.length).toBe(15);
+    // 0-61, 62-65, 66-69, 70-74 for each of the two 0-74 zones, 75-108 once.
+    expect(zones.length).toBe(9);
     expect(zones.every((z) => z.keyRange.max <= 74 || z.keyRange.min >= 75)).toBe(true);
     expect(Math.min(...zones.map((z) => z.keyRange.min))).toBe(0);
     expect(Math.max(...zones.map((z) => z.keyRange.max))).toBe(108);
@@ -557,12 +558,14 @@ describe('variationRangeLimits', () => {
     const limit = variationRangeLimits(fresh());
     const atLimit = (note: number) => {
       const { min } = limit(MODULR, note);
-      return Number.isFinite(min) ? Math.ceil(min / 5) * 5 : 0;
+      return Number.isFinite(min)
+        ? Math.ceil(min / VARIATION_RANGE_STEP) * VARIATION_RANGE_STEP
+        : 0;
     };
     const keys = Array.from({ length: 128 }, (_, key) => ({ key, attenuationDelta: atLimit(key) }));
     expect(() => applyVariationCorrections(fresh(), [], [{ ...MODULR, keys }])).not.toThrow();
     const lowered = keys.map((k) =>
-      k.key === 60 ? { ...k, attenuationDelta: k.attenuationDelta - 5 } : k,
+      k.key === 60 ? { ...k, attenuationDelta: k.attenuationDelta - VARIATION_RANGE_STEP } : k,
     );
     expect(() => applyVariationCorrections(fresh(), [], [{ ...MODULR, keys: lowered }])).toThrow(
       'below 0',
@@ -588,7 +591,12 @@ describe('variationRangeLimits', () => {
     const limit = variationRangeLimits(buildXgBank(source, corrections));
     const keys = Array.from({ length: 128 }, (_, key) => {
       const { min } = limit(MODULR, key);
-      return { key, attenuationDelta: Number.isFinite(min) ? Math.ceil(min / 5) * 5 : 0 };
+      return {
+        key,
+        attenuationDelta: Number.isFinite(min)
+          ? Math.ceil(min / VARIATION_RANGE_STEP) * VARIATION_RANGE_STEP
+          : 0,
+      };
     });
     expect(keys.some((k) => k.attenuationDelta < 0)).toBe(true);
     expect(() =>

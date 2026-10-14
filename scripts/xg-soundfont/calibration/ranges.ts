@@ -31,7 +31,7 @@ export function rangeOffsets(keys: readonly RangeKey[], where: string): number[]
   });
 }
 
-export const VARIATION_RANGE_STEP = 5;
+export const VARIATION_RANGE_STEP = 10;
 
 // Rounded so that neighbouring notes share a delta and need fewer zones.
 export function steppedRangeOffsets(
