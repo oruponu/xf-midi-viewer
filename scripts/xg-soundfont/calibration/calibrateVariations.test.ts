@@ -1,9 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import {
   calibrateVariations,
+  checkCorrections,
   checkVariationChanges,
   variationChanges,
+  variationFitCorrections,
 } from './calibrateVariations.ts';
+import { NO_CORRECTIONS } from './corrections.ts';
 import type { VariationCorrection } from './corrections.ts';
 import { ATTENUATION_PER_DB, DB_PER_DOUBLING_PER_AMOUNT } from './fit.ts';
 import { voiceLevelKey } from './levels.ts';
@@ -308,5 +311,34 @@ describe('checkVariationChanges', () => {
     const result = checkVariationChanges([change(0, 0.02, 2)]);
     expect(result.passed).toBe(true);
     expect(result.thinned).toEqual([change(0, 0.02, 2)]);
+  });
+});
+
+const RANGE = { bankMSB: 0, program: 39, keys: [{ key: 36, attenuationDelta: 10 }] };
+const VARIATION_RANGE = { program: 39, bankLSB: 40, keys: [{ key: 36, attenuationDelta: 20 }] };
+
+describe('variationFitCorrections', () => {
+  test('fits the variations without the variation range corrections', () => {
+    const existing = { ...NO_CORRECTIONS, ranges: [RANGE], variationRanges: [VARIATION_RANGE] };
+    const variations = [{ program: 39, bankLSB: 40, attenuationDelta: 5, velocityAmountDelta: 0 }];
+    expect(variationFitCorrections(existing, variations)).toEqual({
+      ...existing,
+      variations,
+      variationRanges: [],
+    });
+  });
+});
+
+describe('checkCorrections', () => {
+  test('leaves out the variation range corrections on both sides', () => {
+    const corrections = {
+      ...NO_CORRECTIONS,
+      ranges: [RANGE],
+      variationRanges: [VARIATION_RANGE],
+    };
+    expect(checkCorrections(corrections)).toEqual([
+      { ...corrections, ranges: [], variationRanges: [] },
+      { ...corrections, variationRanges: [] },
+    ]);
   });
 });

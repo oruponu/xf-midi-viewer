@@ -104,6 +104,8 @@ if (import.meta.main) {
     );
     process.exit(1);
   }
-  writeCorrections(CORRECTIONS_PATH, { ...existing, ranges: result.ranges });
-  console.log('Run calibrateVariations.ts --check and outputGain.ts next');
+  writeCorrections(CORRECTIONS_PATH, { ...existing, ranges: result.ranges, variationRanges: [] });
+  console.log(
+    'The variation ranges were cleared; run calibrateVariations.ts --check, calibrateVariationRanges.ts and outputGain.ts next',
+  );
 }
