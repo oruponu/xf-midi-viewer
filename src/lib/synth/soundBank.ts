@@ -31,7 +31,7 @@ export function saveFailureMessage(next: SoundBankEntry): string {
 
 // Copied from outputGainDb in scripts/xg-soundfont/calibration/corrections.json;
 // a test keeps them equal.
-export const BUNDLED_SOUND_BANK_GAIN_DB = 21.8;
+export const BUNDLED_SOUND_BANK_GAIN_DB = 21.9;
 
 export function soundBankGain(bundled: boolean): number {
   return bundled ? 10 ** (BUNDLED_SOUND_BANK_GAIN_DB / 20) : 1;
