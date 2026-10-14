@@ -139,6 +139,7 @@ describe('buildXgSoundBank', () => {
       buildXgSoundBank(readSoundBank(SOURCE_SOUND_BANK_PATH), {
         ...readCorrections(CORRECTIONS_PATH),
         variations: [],
+        variationRanges: [],
       }),
     );
     const voices = (preset: BasicPreset) =>

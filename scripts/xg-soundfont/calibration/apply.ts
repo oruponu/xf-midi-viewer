@@ -17,9 +17,10 @@ import type {
   DrumKey,
   RangeCorrection,
   VariationCorrection,
+  VariationRangeCorrection,
   Voice,
 } from './corrections.ts';
-import { rangeBands, rangeOffsets } from './ranges.ts';
+import { VARIATION_RANGE_STEP, rangeBands, rangeOffsets, steppedRangeOffsets } from './ranges.ts';
 import { CALIBRATION_VOICES, DRUM_KEYS, XG_DRUM_KITS } from './testMidi.ts';
 import type { VoiceId } from './testMidi.ts';
 
@@ -354,7 +355,10 @@ export function rangeLimits(
   };
 }
 
-function variationPreset(bank: BasicSoundBank, v: VariationCorrection): BasicPreset {
+function variationPreset(
+  bank: BasicSoundBank,
+  v: { readonly bankLSB: number; readonly program: number },
+): BasicPreset {
   const preset = bank.presets.find(
     (p) =>
       !p.isGMGSDrum &&
@@ -367,9 +371,64 @@ function variationPreset(bank: BasicSoundBank, v: VariationCorrection): BasicPre
   return preset;
 }
 
+function splitVariationRanges(
+  bank: BasicSoundBank,
+  ranges: readonly VariationRangeCorrection[],
+): BasicPreset[] {
+  const corrected = new Set<BasicPreset>();
+  for (const range of ranges) {
+    const preset = variationPreset(bank, range);
+    const where = `XG variation LSB ${range.bankLSB} / PC ${range.program}`;
+    if (corrected.has(preset)) throw new Error(`${where} has two range corrections`);
+    corrected.add(preset);
+    const offsets = steppedRangeOffsets(range.keys, where, VARIATION_RANGE_STEP);
+    for (const pz of [...preset.zones]) {
+      const keys = pz.hasKeyRange ? pz.keyRange : preset.globalZone.keyRange;
+      const [min, max] = keys.min < 0 ? [0, 127] : [keys.min, keys.max];
+      const attenuation = attenuationOf(pz, preset.globalZone);
+      const bands = rangeBands(offsets, min, max);
+      const zones = bands.map((_, i) => {
+        if (i === 0) return pz;
+        const copy = preset.createZone(pz.instrument);
+        copy.copyFrom(pz);
+        return copy;
+      });
+      bands.forEach((band, i) => {
+        zones[i].keyRange = { min: band.min, max: band.max };
+        if (band.delta !== 0) zones[i].setGenerator(ATTENUATION, attenuation + band.delta, false);
+      });
+    }
+  }
+  return [...corrected];
+}
+
+// The deltas a variation range correction may add at a note before a zone there drops below 0.
+export function variationRangeLimits(
+  bank: BasicSoundBank,
+): (
+  variation: { readonly bankLSB: number; readonly program: number },
+  note: number,
+) => AttenuationLimit {
+  return (variation, note) => {
+    const preset = variationPreset(bank, variation);
+    let lowest = Infinity;
+    for (const pz of preset.zones) {
+      if (!covers(pz.hasKeyRange ? pz.keyRange : preset.globalZone.keyRange, note)) continue;
+      const presetValue = attenuationOf(pz, preset.globalZone);
+      const global = pz.instrument.globalZone;
+      for (const zone of pz.instrument.zones) {
+        if (!covers(zone.hasKeyRange ? zone.keyRange : global.keyRange, note)) continue;
+        lowest = Math.min(lowest, presetValue + attenuationOf(zone, global));
+      }
+    }
+    return { min: -lowest, max: Infinity };
+  };
+}
+
 export function applyVariationCorrections(
   bank: BasicSoundBank,
   variations: readonly VariationCorrection[],
+  ranges: readonly VariationRangeCorrection[] = [],
 ): string[] {
   const corrected = new Set<BasicPreset>();
   for (const v of variations) {
@@ -389,5 +448,6 @@ export function applyVariationCorrections(
       if (v.velocityAmountDelta !== 0) addVelocityAmount(bank, preset, pz, v.velocityAmountDelta);
     }
   }
+  for (const preset of splitVariationRanges(bank, ranges)) corrected.add(preset);
   return checkAttenuationRange(bank, corrected, corrected);
 }
