@@ -291,7 +291,16 @@ describe('mergeCorrections', () => {
       { program: 81, bankLSB: 18, attenuationDelta: -200, velocityAmountDelta: -159 },
     ];
     const ranges = [{ bankMSB: 0, program: 22, keys: [{ key: 72, attenuationDelta: -50 }] }];
-    const existing: Corrections = { ...NO_CORRECTIONS, outputGainDb: 15, variations, ranges };
+    const variationRanges = [
+      { program: 39, bankLSB: 40, keys: [{ key: 36, attenuationDelta: 30 }] },
+    ];
+    const existing: Corrections = {
+      ...NO_CORRECTIONS,
+      outputGainDb: 15,
+      variations,
+      ranges,
+      variationRanges,
+    };
     const fitted: Corrections = { ...NO_CORRECTIONS, commonAttenuation: 444 };
     expect(mergeCorrections(fitted, existing, 'abc')).toEqual({
       ...fitted,
@@ -299,6 +308,7 @@ describe('mergeCorrections', () => {
       sourceSha256: 'abc',
       variations,
       ranges,
+      variationRanges,
     });
   });
 });
