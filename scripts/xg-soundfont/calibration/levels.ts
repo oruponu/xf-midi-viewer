@@ -28,6 +28,7 @@ const ONSET_RELATIVE_DB = -20;
 const HIT_BEFORE_SECONDS = 0.02;
 const HIT_AFTER_SECONDS = 0.3;
 const HIT_WINDOW_SECONDS = 0.05;
+const VOICE_WINDOW_SECONDS = 0.4;
 
 export const drumLevelKey = (velocity: number): string => String(velocity);
 export const voiceLevelKey = (note: number, velocity: number): string => `${note}/${velocity}`;
@@ -74,7 +75,8 @@ export function voiceLevels(energy: WeightedEnergy, midi: TestMidi<VoiceProbe>):
     { bankMSB: number; bankLSB?: number; program: number; levels: Record<string, Level> }
   >();
   for (const { probe, seconds } of midi.probes) {
-    const db = energy.levelDb(seconds + shift, VOICE_NOTE_SECONDS);
+    const at = seconds + shift;
+    const db = energy.peakWindowDb(at, at + VOICE_NOTE_SECONDS, VOICE_WINDOW_SECONDS);
     const id = `${probe.bankMSB}/${probe.bankLSB ?? 0}/${probe.program}`;
     let entry = table.get(id);
     if (!entry) {

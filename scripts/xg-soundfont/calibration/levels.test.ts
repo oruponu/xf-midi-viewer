@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { WeightedEnergy } from './loudness.ts';
 import { SILENT_DB, drumLevels, markerShift, voiceLevels } from './levels.ts';
 import { drumTestMidi, voiceTestMidi } from './testMidi.ts';
-import type { TestMidi } from './testMidi.ts';
+import type { TestMidi, VoiceProbe } from './testMidi.ts';
 
 const RATE = 44100;
 
@@ -26,6 +26,31 @@ function toneBursts<P>(
   energy.push(signal, signal);
   return energy;
 }
+
+// `t` is seconds from each note-on; each tone is cut off at 1.5 s.
+function shapedNotes(
+  midi: TestMidi<VoiceProbe>,
+  amplitude: (probe: VoiceProbe, t: number) => number,
+): WeightedEnergy {
+  const total = Math.ceil((midi.endSeconds + 2) * RATE);
+  const signal = new Float32Array(total);
+  const marker = Math.round(midi.markerSeconds * RATE);
+  for (let i = 0; i < Math.round(0.05 * RATE); i++) {
+    signal[marker + i] = 0.8 * Math.sin((2 * Math.PI * 997 * i) / RATE);
+  }
+  for (const { probe, seconds } of midi.probes) {
+    const from = Math.round(seconds * RATE);
+    for (let i = 0; i < Math.round(1.5 * RATE); i++) {
+      signal[from + i] += amplitude(probe, i / RATE) * Math.sin((2 * Math.PI * 997 * i) / RATE);
+    }
+  }
+  const energy = new WeightedEnergy(RATE);
+  energy.push(signal, signal);
+  return energy;
+}
+
+// Mean square of a sine of amplitude a is a^2 / 2; A-weighting is about 0 dB at 997 Hz.
+const sineDb = (a: number) => 10 * Math.log10((a * a) / 2);
 
 describe('markerShift', () => {
   test('finds a marker hit made of a low tone', () => {
@@ -80,12 +105,45 @@ describe('drumLevels', () => {
 });
 
 describe('voiceLevels', () => {
-  test('averages one second of each note', () => {
+  test('measures a steady note the same as its one-second average', () => {
     const midi = voiceTestMidi([{ bankMSB: 0, program: 0 }], [60], [64, 127]);
-    const energy = toneBursts(midi, 0, 1, (p) => (p.velocity === 127 ? 0.4 : 0.1));
+    const energy = shapedNotes(midi, (p, t) => (t < 1 ? (p.velocity === 127 ? 0.4 : 0.1) : 0));
     const [voice] = voiceLevels(energy, midi);
     expect([voice.bankMSB, voice.program]).toEqual([0, 0]);
-    expect(voice.levels['60/127']! - voice.levels['60/64']!).toBeCloseTo(12.04, 0);
+    expect(voice.levels['60/127']!).toBeCloseTo(sineDb(0.4), 1);
+    expect(voice.levels['60/127']! - voice.levels['60/64']!).toBeCloseTo(12.04, 1);
+  });
+
+  test('measures a decaying note at its attack', () => {
+    const midi = voiceTestMidi([{ bankMSB: 0, program: 0 }], [60], [100]);
+    // The one-second average of this note is about 3.9 dB lower.
+    const energy = shapedNotes(midi, (_, t) => (t < 0.4 ? 0.4 : t < 1 ? 0.04 : 0));
+    const [voice] = voiceLevels(energy, midi);
+    expect(voice.levels['60/100']!).toBeCloseTo(sineDb(0.4), 0);
+  });
+
+  test('measures a slowly rising note at its loudest window', () => {
+    const midi = voiceTestMidi([{ bankMSB: 0, program: 0 }], [60], [100]);
+    const energy = shapedNotes(midi, (_, t) => (t < 0.6 ? 0.04 : t < 1 ? 0.4 : 0));
+    const [voice] = voiceLevels(energy, midi);
+    expect(voice.levels['60/100']!).toBeCloseTo(sineDb(0.4), 0);
+  });
+
+  test('ignores the sound after the note-off', () => {
+    const midi = voiceTestMidi([{ bankMSB: 0, program: 0 }], [60], [100]);
+    // A gap longer than one energy bin keeps the loud tail out of the last window.
+    const energy = shapedNotes(midi, (_, t) => (t < 1 ? 0.1 : t < 1.01 ? 0 : 0.8));
+    const [voice] = voiceLevels(energy, midi);
+    expect(voice.levels['60/100']!).toBeCloseTo(sineDb(0.1), 1);
+  });
+
+  test('reports a silent note below the silent threshold', () => {
+    const midi = voiceTestMidi([{ bankMSB: 0, program: 0 }], [60], [64, 100]);
+    const energy = shapedNotes(midi, (p, t) => (p.velocity === 100 && t < 1 ? 0.1 : 0));
+    const [voice] = voiceLevels(energy, midi);
+    const silent = voice.levels['60/64'];
+    expect(silent === null || silent! < SILENT_DB).toBe(true);
+    expect(voice.levels['60/100']!).toBeCloseTo(sineDb(0.1), 1);
   });
 
   test('keeps voices that differ only in the bank LSB apart', () => {
