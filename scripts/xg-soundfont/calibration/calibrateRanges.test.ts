@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import { calibrateRanges } from './calibrateRanges.ts';
+import { calibrateRanges, rangeFitCorrections } from './calibrateRanges.ts';
 import type { RangeCalibrationInput } from './calibrateRanges.ts';
+import { NO_CORRECTIONS } from './corrections.ts';
 import type { RangeCorrection } from './corrections.ts';
 import { ATTENUATION_PER_DB } from './fit.ts';
 import { voiceLevelKey } from './levels.ts';
@@ -272,5 +273,18 @@ describe('calibrateRanges', () => {
     expect(result.passed).toBe(true);
     expect(result.unmeasuredNotes).toBe(1);
     expect(result.ranges[0].keys.map((k) => k.key)).toEqual([36]);
+  });
+});
+
+describe('rangeFitCorrections', () => {
+  test('fits the ranges without the variation range corrections', () => {
+    const variationRange = { program: 39, bankLSB: 40, keys: [{ key: 36, attenuationDelta: 20 }] };
+    const existing = { ...NO_CORRECTIONS, variationRanges: [variationRange] };
+    const ranges = [{ bankMSB: 0, program: 39, keys: [{ key: 36, attenuationDelta: 10 }] }];
+    expect(rangeFitCorrections(existing, ranges)).toEqual({
+      ...existing,
+      ranges,
+      variationRanges: [],
+    });
   });
 });

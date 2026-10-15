@@ -9,7 +9,7 @@ import { rangeLimits } from './apply.ts';
 import { rangeOffsets } from './ranges.ts';
 import type { AttenuationLimit } from './apply.ts';
 import { readCorrections, writeCorrections } from './corrections.ts';
-import type { RangeCorrection } from './corrections.ts';
+import type { Corrections, RangeCorrection } from './corrections.ts';
 import { ATTENUATION_PER_DB } from './fit.ts';
 import type { ErrorStats } from './fit.ts';
 import type { LevelTable } from './levels.ts';
@@ -66,6 +66,15 @@ export function calibrateRanges(input: RangeCalibrationInput): RangeCalibrationR
   return { ...result, ranges: toRanges(fits) };
 }
 
+// The variation range corrections were fitted against the old base ranges; with trial base ranges
+// they could push a variation zone below zero attenuation and stop the build.
+export function rangeFitCorrections(
+  existing: Corrections,
+  ranges: readonly RangeCorrection[],
+): Corrections {
+  return { ...existing, ranges: [...ranges], variationRanges: [] };
+}
+
 if (import.meta.main) {
   const [referencePath] = process.argv.slice(2);
   if (!referencePath) {
@@ -86,10 +95,10 @@ if (import.meta.main) {
     velocities: VOICE_VELOCITIES,
     reference: JSON.parse(readFileSync(referencePath, 'utf8')) as LevelTable,
     shiftDb: existing.commonAttenuation / ATTENUATION_PER_DB,
-    limit: rangeLimits(buildXgBank(source, { ...existing, ranges: [] })),
+    limit: rangeLimits(buildXgBank(source, rangeFitCorrections(existing, []))),
     measure: (ranges) => {
       console.log(`measure ${++count}`);
-      return measureBank(buildXgBank(source, { ...existing, ranges: [...ranges] }), {
+      return measureBank(buildXgBank(source, rangeFitCorrections(existing, ranges)), {
         kits: [],
         voices,
         notes: RANGE_NOTES,
@@ -104,7 +113,7 @@ if (import.meta.main) {
     );
     process.exit(1);
   }
-  writeCorrections(CORRECTIONS_PATH, { ...existing, ranges: result.ranges, variationRanges: [] });
+  writeCorrections(CORRECTIONS_PATH, rangeFitCorrections(existing, result.ranges));
   console.log(
     'The variation ranges were cleared; run calibrateVariations.ts --check, calibrateVariationRanges.ts and outputGain.ts next',
   );
