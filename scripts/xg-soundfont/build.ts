@@ -56,7 +56,12 @@ export function buildXgBank(
       buildGsFallbackPreset(bank, variation.bankLSB, variation.from),
     ),
   );
-  for (const message of applyVariationCorrections(bank, corrections.variations)) warn(message);
+  for (const message of applyVariationCorrections(
+    bank,
+    corrections.variations,
+    corrections.variationRanges,
+  ))
+    warn(message);
   bank.flush();
   return bank;
 }

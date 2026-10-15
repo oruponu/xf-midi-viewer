@@ -9,8 +9,10 @@ import {
   applyVariationCorrections,
   listUnits,
   rangeLimits,
+  variationRangeLimits,
 } from './apply.ts';
 import { NO_CORRECTIONS } from './corrections.ts';
+import { VARIATION_RANGE_STEP } from './ranges.ts';
 import type { Corrections } from './corrections.ts';
 
 SpessaLog.setLogLevel(false, false, false);
@@ -283,10 +285,10 @@ describe('applyCorrections', () => {
 });
 
 describe('applyVariationCorrections', () => {
-  const velocityAmount = (bank: BasicSoundBank, p: MIDIPatch) =>
+  const velocityAmount = (bank: BasicSoundBank, p: MIDIPatch, note = 60) =>
     bank
       .getPreset(p, 'xg')
-      .getVoiceParameters(60, 100)
+      .getVoiceParameters(note, 100)
       .map((v) =>
         v.modulators
           .filter(
@@ -360,6 +362,112 @@ describe('applyVariationCorrections', () => {
         { program: 81, bankLSB: 18, attenuationDelta: -1440, velocityAmountDelta: 0 },
       ]),
     ).toThrow('below 0');
+  });
+
+  const MODULR = { program: 39, bankLSB: 40 };
+  const RISE = [
+    { key: 60, attenuationDelta: 0 },
+    { key: 72, attenuationDelta: 30 },
+  ];
+
+  test('adds the stepped delta of each note to the variation', () => {
+    const before = fresh();
+    const after = fresh();
+    applyVariationCorrections(after, [], [{ ...MODULR, keys: RISE }]);
+    // Stepped deltas 0 / 10 / 20 / 30 cB; the synth multiplies attenuation by 0.4.
+    for (const [note, expected] of [
+      [40, 0],
+      [60, 0],
+      [61, 0],
+      [63, 4],
+      [66, 8],
+      [72, 12],
+      [100, 12],
+    ]) {
+      const a = voiceAttenuations(before, patch(0, 40, 39), 'xg', note);
+      const b = voiceAttenuations(after, patch(0, 40, 39), 'xg', note);
+      expect(b.length).toBeGreaterThan(0);
+      expect(b.map((value, i) => value - a[i])).toEqual(a.map(() => expected));
+    }
+  });
+
+  test('splits each preset zone only inside its own keys and merges equal deltas', () => {
+    const bank = fresh();
+    applyVariationCorrections(bank, [], [{ ...MODULR, keys: RISE }]);
+    const zones = bank.getPreset(patch(0, 40, 39), 'xg').zones;
+    // 0-61, 62-65, 66-69, 70-74 for each of the two 0-74 zones, 75-108 once.
+    expect(zones.length).toBe(9);
+    expect(zones.every((z) => z.keyRange.max <= 74 || z.keyRange.min >= 75)).toBe(true);
+    expect(Math.min(...zones.map((z) => z.keyRange.min))).toBe(0);
+    expect(Math.max(...zones.map((z) => z.keyRange.max))).toBe(108);
+  });
+
+  test('keeps the velocity amount on the zones it splits off', () => {
+    const before = fresh();
+    const after = fresh();
+    applyVariationCorrections(
+      after,
+      [{ ...MODULR, attenuationDelta: 0, velocityAmountDelta: -120 }],
+      [{ ...MODULR, keys: RISE }],
+    );
+    expect(velocityAmount(after, patch(0, 40, 39), 61)).toEqual(
+      velocityAmount(before, patch(0, 40, 39), 61).map((x) => x - 120),
+    );
+  });
+
+  test('leaves every other preset alone when splitting a variation', () => {
+    const shape = (bank: BasicSoundBank) =>
+      bank.presets
+        .filter((p) => !(p.bankMSB === 0 && p.bankLSB === 40 && p.program === 39))
+        .map((p) =>
+          p.zones.map((z) => [z.keyRange.min, z.keyRange.max, z.getGenerator(ATTENUATION, 0)]),
+        );
+    const before = fresh();
+    const after = fresh();
+    applyVariationCorrections(after, [], [{ ...MODULR, keys: RISE }]);
+    expect(shape(after)).toEqual(shape(before));
+  });
+
+  test('stops at a variation range correction that has no preset or comes twice', () => {
+    expect(() =>
+      applyVariationCorrections(fresh(), [], [{ program: 81, bankLSB: 7, keys: RISE }]),
+    ).toThrow('XG variation LSB 7 / PC 81 not found');
+    expect(() =>
+      applyVariationCorrections(
+        fresh(),
+        [],
+        [
+          { ...MODULR, keys: RISE },
+          { ...MODULR, keys: RISE },
+        ],
+      ),
+    ).toThrow('XG variation LSB 40 / PC 39 has two range corrections');
+  });
+
+  test('lets a variation range correction go above 1440 but not below 0', () => {
+    const over = applyVariationCorrections(
+      fresh(),
+      [],
+      [{ ...MODULR, keys: [{ key: 60, attenuationDelta: 1440 }] }],
+    );
+    expect(over.length).toBeGreaterThan(0);
+    expect(() =>
+      applyVariationCorrections(
+        fresh(),
+        [],
+        [{ ...MODULR, keys: [{ key: 60, attenuationDelta: -1440 }] }],
+      ),
+    ).toThrow('below 0');
+  });
+
+  test('applies the variation range corrections in the build', () => {
+    const before = fresh();
+    const after = buildXgBank(source, {
+      ...NO_CORRECTIONS,
+      variationRanges: [{ ...MODULR, keys: RISE }],
+    });
+    const a = voiceAttenuations(before, patch(0, 40, 39), 'xg', 72);
+    expect(voiceAttenuations(after, patch(0, 40, 39), 'xg', 72)).toEqual(a.map((x) => x + 12));
   });
 });
 
@@ -440,5 +548,59 @@ describe('rangeLimits', () => {
     expect(() => applyRangeCorrections(fresh(), flat(lowest - 1))).toThrow('below 0');
     expect(() => applyRangeCorrections(fresh(), flat(highest))).not.toThrow();
     expect(() => applyRangeCorrections(fresh(), flat(highest + 1))).toThrow('exceeds 1440');
+  });
+});
+
+describe('variationRangeLimits', () => {
+  const MODULR = { program: 39, bankLSB: 40 };
+
+  test('matches the build check note by note', () => {
+    const limit = variationRangeLimits(fresh());
+    const atLimit = (note: number) => {
+      const { min } = limit(MODULR, note);
+      return Number.isFinite(min)
+        ? Math.ceil(min / VARIATION_RANGE_STEP) * VARIATION_RANGE_STEP
+        : 0;
+    };
+    const keys = Array.from({ length: 128 }, (_, key) => ({ key, attenuationDelta: atLimit(key) }));
+    expect(() => applyVariationCorrections(fresh(), [], [{ ...MODULR, keys }])).not.toThrow();
+    const lowered = keys.map((k) =>
+      k.key === 60 ? { ...k, attenuationDelta: k.attenuationDelta - VARIATION_RANGE_STEP } : k,
+    );
+    expect(() => applyVariationCorrections(fresh(), [], [{ ...MODULR, keys: lowered }])).toThrow(
+      'below 0',
+    );
+    expect(limit(MODULR, 60).max).toBe(Infinity);
+  });
+
+  test('pairs a split zone only with the instrument zones its keys reach', () => {
+    // The base voice's range correction gives its instrument zones different attenuation per key.
+    const corrections = {
+      ...NO_CORRECTIONS,
+      ranges: [
+        {
+          bankMSB: 0,
+          program: 39,
+          keys: [
+            { key: 36, attenuationDelta: 0 },
+            { key: 72, attenuationDelta: 400 },
+          ],
+        },
+      ],
+    };
+    const limit = variationRangeLimits(buildXgBank(source, corrections));
+    const keys = Array.from({ length: 128 }, (_, key) => {
+      const { min } = limit(MODULR, key);
+      return {
+        key,
+        attenuationDelta: Number.isFinite(min)
+          ? Math.ceil(min / VARIATION_RANGE_STEP) * VARIATION_RANGE_STEP
+          : 0,
+      };
+    });
+    expect(keys.some((k) => k.attenuationDelta < 0)).toBe(true);
+    expect(() =>
+      buildXgBank(source, { ...corrections, variationRanges: [{ ...MODULR, keys }] }),
+    ).not.toThrow();
   });
 });

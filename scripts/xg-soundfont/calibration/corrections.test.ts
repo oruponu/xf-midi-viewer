@@ -37,4 +37,12 @@ describe('readCorrections', () => {
     expect(ranges).toBeDefined();
     expect(readCorrections(path)).toEqual({ ...older, ranges: [] });
   });
+
+  test('reads a file written before variation range corrections as having none', () => {
+    const { variationRanges, ...older } = readCorrections(CORRECTIONS_PATH);
+    const path = join(mkdtempSync(join(tmpdir(), 'corrections-')), 'older.json');
+    writeFileSync(path, JSON.stringify(older));
+    expect(variationRanges).toBeDefined();
+    expect(readCorrections(path)).toEqual({ ...older, variationRanges: [] });
+  });
 });

@@ -6,7 +6,7 @@ import { buildXgBank, readSoundBank } from '../build.ts';
 import { CORRECTIONS_PATH, SOURCE_SOUND_BANK_PATH } from '../paths.ts';
 import { XG_VARIATION_VOICES } from '../xgVariationVoices.ts';
 import { readCorrections, writeCorrections } from './corrections.ts';
-import type { VariationCorrection } from './corrections.ts';
+import type { Corrections, VariationCorrection } from './corrections.ts';
 import {
   ATTENUATION_PER_DB,
   errorStats,
@@ -252,6 +252,22 @@ export function checkVariationChanges(changes: readonly VariationChange[]): Vari
   return { moved, lost, thinned, passed: moved.length === 0 && lost.length === 0 };
 }
 
+// The variations are fitted without the variation range corrections, which are fitted on top of them.
+export function variationFitCorrections(
+  existing: Corrections,
+  variations: readonly VariationCorrection[],
+): Corrections {
+  return { ...existing, variations: [...variations], variationRanges: [] };
+}
+
+// --check looks only at how the range corrections of the base voices move the variations.
+export function checkCorrections(corrections: Corrections): readonly [Corrections, Corrections] {
+  return [
+    { ...corrections, ranges: [], variationRanges: [] },
+    { ...corrections, variationRanges: [] },
+  ];
+}
+
 if (import.meta.main) {
   if (process.argv[2] === '--check') {
     const referencePath = process.argv[3];
@@ -272,11 +288,12 @@ if (import.meta.main) {
     ];
     const measure = (c: typeof corrections) =>
       measureBank(buildXgBank(source, c), { kits: [], voices: ids });
+    const [without, withRanges] = checkCorrections(corrections);
     const changes = variationChanges(
       XG_VARIATION_VOICES,
       JSON.parse(readFileSync(referencePath, 'utf8')) as LevelTable,
-      measure({ ...corrections, ranges: [] }),
-      measure(corrections),
+      measure(without),
+      measure(withRanges),
     );
     const { moved, lost, thinned, passed } = checkVariationChanges(changes);
     const shift = changes.map((c) => (c.afterDb === null ? 0 : Math.abs(c.afterDb - c.beforeDb)));
@@ -315,7 +332,7 @@ if (import.meta.main) {
     reference: JSON.parse(readFileSync(referencePath, 'utf8')) as LevelTable,
     measure: (variations) => {
       console.log(`measure ${++count}`);
-      return measureBank(buildXgBank(source, { ...existing, variations: [...variations] }), {
+      return measureBank(buildXgBank(source, variationFitCorrections(existing, variations)), {
         kits: [],
         voices,
       });
@@ -336,6 +353,9 @@ if (import.meta.main) {
     );
     process.exit(1);
   }
-  writeCorrections(CORRECTIONS_PATH, { ...existing, variations: result.variations });
+  writeCorrections(CORRECTIONS_PATH, variationFitCorrections(existing, result.variations));
+  console.log(
+    'The variation ranges were cleared; run calibrateVariationRanges.ts after calibrateRanges.ts',
+  );
   if (residualsPath) writeFileSync(residualsPath, `${JSON.stringify(result.residuals, null, 2)}\n`);
 }

@@ -50,6 +50,12 @@ export interface RangeCorrection {
   keys: RangeKey[];
 }
 
+export interface VariationRangeCorrection {
+  program: number;
+  bankLSB: number;
+  keys: RangeKey[];
+}
+
 export interface Corrections extends CalibrationUnits {
   outputGainDb: number;
   commonAttenuation: number;
@@ -57,6 +63,7 @@ export interface Corrections extends CalibrationUnits {
   excluded: ExcludedUnit[];
   variations: VariationCorrection[];
   ranges: RangeCorrection[];
+  variationRanges: VariationRangeCorrection[];
 }
 
 export const NO_CORRECTIONS: Corrections = {
@@ -68,12 +75,17 @@ export const NO_CORRECTIONS: Corrections = {
   voices: [],
   variations: [],
   ranges: [],
+  variationRanges: [],
 };
 
 export function readCorrections(path: string): Corrections {
   const corrections = JSON.parse(readFileSync(path, 'utf8')) as Corrections;
-  // Files written before the range corrections have no ranges.
-  return { ...corrections, ranges: corrections.ranges ?? [] };
+  // Files written before the range or variation range corrections lack those fields.
+  return {
+    ...corrections,
+    ranges: corrections.ranges ?? [],
+    variationRanges: corrections.variationRanges ?? [],
+  };
 }
 
 export function writeCorrections(path: string, corrections: Corrections): void {

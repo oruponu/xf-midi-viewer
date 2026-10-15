@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { rangeBands, rangeOffsets } from './ranges.ts';
+import { rangeBands, rangeOffsets, steppedRangeOffsets } from './ranges.ts';
 
 describe('rangeOffsets', () => {
   test('interpolates between the keys and keeps the end values outside them', () => {
@@ -62,5 +62,35 @@ describe('rangeBands', () => {
       { min: 25, max: 25, delta: 10 },
       { min: 26, max: 26, delta: 20 },
     ]);
+  });
+});
+
+describe('steppedRangeOffsets', () => {
+  const RISE = [
+    { key: 60, attenuationDelta: 0 },
+    { key: 72, attenuationDelta: 30 },
+  ];
+
+  test('rounds the interpolated deltas to multiples of the step', () => {
+    const offsets = steppedRangeOffsets(RISE, 'test', 5);
+    expect(offsets.slice(59, 68)).toEqual([0, 0, 5, 5, 10, 10, 15, 15, 20]);
+    expect(offsets[0]).toBe(0);
+    expect(offsets[127]).toBe(30);
+  });
+
+  test('matches rangeOffsets with a step of 1', () => {
+    expect(steppedRangeOffsets(RISE, 'test', 1)).toEqual(rangeOffsets(RISE, 'test'));
+  });
+
+  test('never returns negative zero', () => {
+    const offsets = steppedRangeOffsets(
+      [
+        { key: 60, attenuationDelta: 0 },
+        { key: 61, attenuationDelta: -2 },
+      ],
+      'test',
+      5,
+    );
+    expect(Object.is(offsets[61], 0)).toBe(true);
   });
 });

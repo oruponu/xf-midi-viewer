@@ -31,6 +31,17 @@ export function rangeOffsets(keys: readonly RangeKey[], where: string): number[]
   });
 }
 
+export const VARIATION_RANGE_STEP = 10;
+
+// Rounded so that neighbouring notes share a delta and need fewer zones.
+export function steppedRangeOffsets(
+  keys: readonly RangeKey[],
+  where: string,
+  step: number,
+): number[] {
+  return rangeOffsets(keys, where).map((delta) => Math.round(delta / step) * step || 0);
+}
+
 export function rangeBands(offsets: readonly number[], min: number, max: number): RangeBand[] {
   const bands: RangeBand[] = [];
   for (let note = min; note <= max; note++) {

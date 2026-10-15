@@ -9,11 +9,12 @@ import { rangeLimits } from './apply.ts';
 import { rangeOffsets } from './ranges.ts';
 import type { AttenuationLimit } from './apply.ts';
 import { readCorrections, writeCorrections } from './corrections.ts';
-import type { RangeCorrection, RangeKey } from './corrections.ts';
-import { ATTENUATION_PER_DB, errorStats } from './fit.ts';
+import type { Corrections, RangeCorrection } from './corrections.ts';
+import { ATTENUATION_PER_DB } from './fit.ts';
 import type { ErrorStats } from './fit.ts';
-import { SILENT_DB, voiceLevelKey } from './levels.ts';
-import type { Level, LevelTable } from './levels.ts';
+import type { LevelTable } from './levels.ts';
+import { fitRanges, logRangeFit } from './rangeFit.ts';
+import type { RangeFit } from './rangeFit.ts';
 import { measureBank, sf3DecoderReady } from './render.ts';
 import { RANGE_NOTES, VOICE_VELOCITIES } from './testMidi.ts';
 import type { VoiceId } from './testMidi.ts';
@@ -42,160 +43,36 @@ export interface RangeCalibrationResult {
 }
 
 const TOLERANCE_DB = 0.1;
-// Levels are rounded to 0.01 dB, so a residual of exactly 0.1 dB can come out a hair above it.
-const withinTolerance = (db: number) => Math.abs(db) <= TOLERANCE_DB + 1e-9;
-const WORST_COUNT = 20;
-
-type Levels = Readonly<Record<string, Level>>;
-const voiceKey = (v: VoiceId) => `${v.bankMSB}/${v.program}`;
-const label = (v: VoiceId) => `voice ${voiceKey(v)}`;
-const isLevel = (value: Level | undefined): value is number =>
-  typeof value === 'number' && Number.isFinite(value) && value >= SILENT_DB;
-
-function index(table: LevelTable): Map<string, Levels> {
-  const map = new Map<string, Levels>();
-  for (const v of table.voices) if (!v.bankLSB) map.set(voiceKey(v), v.levels);
-  return map;
-}
-
-interface Unit {
-  readonly voice: VoiceId;
-  readonly note: number;
-  readonly key: RangeKey;
-  readonly points: readonly string[];
-  readonly reference: Levels;
-  readonly limit: AttenuationLimit;
-}
+const label = (v: VoiceId) => `voice ${v.bankMSB}/${v.program}`;
 
 export function calibrateRanges(input: RangeCalibrationInput): RangeCalibrationResult {
-  const log = input.log ?? (() => {});
-  const maxIterations = input.maxIterations ?? 5;
-  const reference = index(input.reference);
-  const m0 = index(input.measure([]));
-  const ranges: RangeCorrection[] = [];
-  const units: Unit[] = [];
-  const unmeasured: string[] = [];
-  let unmeasuredNotes = 0;
-  for (const voice of input.voices) {
-    const ref = reference.get(voiceKey(voice));
-    const now = m0.get(voiceKey(voice));
-    if (!ref) throw new Error(`${label(voice)} is missing from the reference`);
-    if (!now) throw new Error(`${label(voice)} is missing from the measurement`);
-    const keys: RangeKey[] = [];
-    for (const note of input.notes) {
-      const points = input.velocities.map((velocity) => voiceLevelKey(note, velocity));
-      for (const [table, where] of [
-        [ref, 'reference'],
-        [now, 'measurement'],
-      ] as const) {
-        for (const p of points) {
-          if (!(p in table))
-            throw new Error(`${label(voice)}: point ${p} is missing from the ${where}`);
-        }
-      }
-      // A point whose target is below the silent level would leave the measured range once fitted.
-      const valid = points.filter(
-        (p) => isLevel(ref[p]) && isLevel(now[p]) && isLevel((ref[p] as number) - input.shiftDb),
-      );
-      if (valid.length === 0) {
-        unmeasuredNotes++;
-        continue;
-      }
-      const key: RangeKey = { key: note, attenuationDelta: 0 };
-      keys.push(key);
-      units.push({
-        voice,
-        note,
-        key,
-        points: valid,
-        reference: ref,
-        limit: input.limit(voice, note),
-      });
-    }
-    if (keys.length === 0) unmeasured.push(label(voice));
-    else ranges.push({ bankMSB: voice.bankMSB, program: voice.program, keys });
-  }
+  const toRanges = (fits: readonly RangeFit[]): RangeCorrection[] =>
+    fits.map(({ voice, keys }) => ({ bankMSB: voice.bankMSB, program: voice.program, keys }));
+  const { fits, ...result } = fitRanges({
+    voices: input.voices,
+    label,
+    notes: input.notes,
+    velocities: input.velocities,
+    reference: input.reference,
+    shiftDb: input.shiftDb,
+    limit: input.limit,
+    offsets: rangeOffsets,
+    step: 1,
+    toleranceDb: TOLERANCE_DB,
+    measure: (f) => input.measure(toRanges(f)),
+    maxIterations: input.maxIterations,
+    log: input.log,
+  });
+  return { ...result, ranges: toRanges(fits) };
+}
 
-  const errors = (m: Map<string, Levels>, u: Unit): number[] => {
-    const levels = m.get(voiceKey(u.voice)) ?? {};
-    return u.points.map((p) => {
-      const value = levels[p];
-      if (value === null || value === undefined || !Number.isFinite(value)) {
-        throw new Error(`${label(u.voice)} point ${p} can no longer be measured`);
-      }
-      return (u.reference[p] as number) - input.shiftDb - value;
-    });
-  };
-  const mean = (xs: readonly number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
-
-  const outOfRange = new Map<Unit, string>();
-  // The build would throw on these, so the fit stops before measuring them.
-  const between: string[] = [];
-  const interpolatedOutOfRange = () =>
-    ranges.flatMap((r) =>
-      rangeOffsets(r.keys, label(r)).flatMap((delta, note) => {
-        const l = input.limit(r, note);
-        return delta < l.min || delta > l.max
-          ? [`${label(r)} note ${note}: interpolated ${delta} cB, allowed ${l.min} to ${l.max}`]
-          : [];
-      }),
-    );
-  let m = m0;
-  let largest: number;
-  // Notes already held at a limit they would have to pass are reported, not counted against the
-  // tolerance.
-  let largestFree: number;
-  for (let iteration = 0; ; iteration++) {
-    const residuals = units.map((u) => mean(errors(m, u)));
-    const wanted = units.map(
-      (u, i) => u.key.attenuationDelta - Math.round(residuals[i] * ATTENUATION_PER_DB),
-    );
-    const allowed = units.map((u, i) => Math.min(u.limit.max, Math.max(u.limit.min, wanted[i])));
-    const held = new Set<Unit>();
-    units.forEach((u, i) => {
-      if (!withinTolerance(residuals[i]) && (wanted[i] < u.limit.min || wanted[i] > u.limit.max)) {
-        outOfRange.set(
-          u,
-          `${label(u.voice)} note ${u.note}: needs ${wanted[i]} cB, allowed ${u.limit.min} to ${u.limit.max}`,
-        );
-        if (u.key.attenuationDelta === allowed[i]) held.add(u);
-      } else {
-        outOfRange.delete(u);
-      }
-    });
-    largest = Math.max(0, ...residuals.map(Math.abs));
-    largestFree = Math.max(0, ...residuals.filter((_, i) => !held.has(units[i])).map(Math.abs));
-    log(`iteration ${iteration}: largest residual ${largest.toFixed(2)} dB`);
-    if (withinTolerance(largestFree) || iteration === maxIterations) break;
-    units.forEach((u, i) => {
-      u.key.attenuationDelta = allowed[i];
-    });
-    between.push(...interpolatedOutOfRange());
-    if (between.length > 0) break;
-    m = index(input.measure(ranges));
-  }
-
-  const unitErrors = units.map((u) => ({ u, errors: errors(m, u) }));
-  const byVoice = new Map<string, number[]>();
-  for (const { u, errors: e } of unitErrors) {
-    const list = byVoice.get(label(u.voice)) ?? [];
-    list.push(...e.map(Math.abs));
-    byVoice.set(label(u.voice), list);
-  }
-  const worst = [...byVoice]
-    .map(([unit, e]) => ({ unit, errorDb: mean(e) }))
-    .sort((a, b) => b.errorDb - a.errorDb)
-    .slice(0, WORST_COUNT);
-  return {
-    ranges,
-    points: errorStats(unitErrors.flatMap((x) => x.errors)),
-    largestResidualDb: largest,
-    unmeasured,
-    unmeasuredNotes,
-    outOfRange: [...outOfRange.values(), ...between],
-    passed: between.length === 0 && withinTolerance(largestFree),
-    worst,
-  };
+// The variation range corrections were fitted against the old base ranges; with trial base ranges
+// they could push a variation zone below zero attenuation and stop the build.
+export function rangeFitCorrections(
+  existing: Corrections,
+  ranges: readonly RangeCorrection[],
+): Corrections {
+  return { ...existing, ranges: [...ranges], variationRanges: [] };
 }
 
 if (import.meta.main) {
@@ -218,10 +95,10 @@ if (import.meta.main) {
     velocities: VOICE_VELOCITIES,
     reference: JSON.parse(readFileSync(referencePath, 'utf8')) as LevelTable,
     shiftDb: existing.commonAttenuation / ATTENUATION_PER_DB,
-    limit: rangeLimits(buildXgBank(source, { ...existing, ranges: [] })),
+    limit: rangeLimits(buildXgBank(source, rangeFitCorrections(existing, []))),
     measure: (ranges) => {
       console.log(`measure ${++count}`);
-      return measureBank(buildXgBank(source, { ...existing, ranges: [...ranges] }), {
+      return measureBank(buildXgBank(source, rangeFitCorrections(existing, ranges)), {
         kits: [],
         voices,
         notes: RANGE_NOTES,
@@ -229,22 +106,15 @@ if (import.meta.main) {
     },
     log: console.log,
   });
-  const s = result.points;
-  console.log(
-    `points: n=${s.count} median ${s.median.toFixed(2)} p90 ${s.p90.toFixed(2)} max ${s.max.toFixed(2)} dB`,
-  );
-  console.log(`largest residual ${result.largestResidualDb.toFixed(2)} dB`);
-  console.log(
-    `unmeasured: ${result.unmeasured.join(', ') || '-'}, unmeasured notes ${result.unmeasuredNotes}`,
-  );
-  for (const line of result.outOfRange) console.log(`out of range: ${line}`);
-  for (const w of result.worst) console.log(`  ${w.unit}: ${w.errorDb.toFixed(2)} dB`);
+  logRangeFit(result, console.log);
   if (!result.passed) {
     console.error(
       'An interpolated note leaves its limits or a residual is outside the tolerance; corrections.json was not written',
     );
     process.exit(1);
   }
-  writeCorrections(CORRECTIONS_PATH, { ...existing, ranges: result.ranges });
-  console.log('Run calibrateVariations.ts --check and outputGain.ts next');
+  writeCorrections(CORRECTIONS_PATH, rangeFitCorrections(existing, result.ranges));
+  console.log(
+    'The variation ranges were cleared; run calibrateVariations.ts --check, calibrateVariationRanges.ts and outputGain.ts next',
+  );
 }
