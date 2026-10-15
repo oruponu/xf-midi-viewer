@@ -41,8 +41,8 @@
 
 html {
   scrollbar-gutter: stable;
-  scroll-padding-top: var(--part-panel-top-inset, 0px);
-  scroll-padding-bottom: var(--part-panel-cover, 0px);
+  scroll-padding-top: calc(var(--app-bar-height, 0px) + var(--viewer-chrome-height, 0px));
+  scroll-padding-bottom: max(var(--dock-height, 0px), var(--part-panel-cover, 0px));
 }
 
 :root[data-theme='light'] {

@@ -406,6 +406,7 @@ function PlayerScope({
 }) {
   const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
   const dockRef = useRef<HTMLDivElement | null>(null);
+  const chromeRef = useRef<HTMLDivElement | null>(null);
   const manualKeyShifts = useMemo<KeyShiftChange[]>(
     () => [{ tick: 0, semitones: keyShift }],
     [keyShift],
@@ -413,21 +414,28 @@ function PlayerScope({
   const keyShifts = fixedKeyShifts ?? manualKeyShifts;
 
   useEffect(() => {
-    const el = dockRef.current;
+    const dock = dockRef.current;
+    const chrome = chromeRef.current;
     const root = document.documentElement;
-    if (!el) {
+    const clear = () => {
       root.style.removeProperty('--dock-height');
+      root.style.removeProperty('--viewer-chrome-height');
+    };
+    if (!dock || !chrome) {
+      clear();
       return;
     }
     const update = () => {
-      root.style.setProperty('--dock-height', `${el.offsetHeight}px`);
+      root.style.setProperty('--dock-height', `${dock.offsetHeight}px`);
+      root.style.setProperty('--viewer-chrome-height', `${chrome.offsetHeight}px`);
     };
     update();
     const observer = new ResizeObserver(update);
-    observer.observe(el);
+    observer.observe(dock);
+    observer.observe(chrome);
     return () => {
       observer.disconnect();
-      root.style.removeProperty('--dock-height');
+      clear();
     };
   }, [song]);
 
@@ -435,7 +443,7 @@ function PlayerScope({
 
   return (
     <>
-      <div className="viewer-chrome">
+      <div className="viewer-chrome" ref={chromeRef}>
         <ViewTabs activeTab={activeTab} onChange={setActiveTab} />
       </div>
       <InfoPanel
