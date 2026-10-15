@@ -443,15 +443,15 @@ function scrollToCenter(el: Element, behavior: ScrollBehavior): void {
   // WebKit's scrollIntoView targets a different box for spans containing ruby.
   const rect = el.getBoundingClientRect();
   const rootStyle = getComputedStyle(document.documentElement);
-  const insetTop = parseFloat(rootStyle.getPropertyValue('--part-panel-top-inset')) || 0;
-  const cover = parseFloat(rootStyle.getPropertyValue('--part-panel-cover')) || 0;
+  const paddingTop = parseFloat(rootStyle.scrollPaddingTop) || 0;
+  const paddingBottom = parseFloat(rootStyle.scrollPaddingBottom) || 0;
   window.scrollTo({
     top: centeredScrollTop(
       window.scrollY,
       rect.top,
       rect.height,
-      insetTop,
-      window.innerHeight - cover,
+      paddingTop,
+      window.innerHeight - paddingBottom,
     ),
     behavior,
   });
