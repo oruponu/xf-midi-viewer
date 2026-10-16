@@ -158,10 +158,16 @@ function App() {
             <h1 className="app-bar-title">{APP_NAME}</h1>
           )}
           <div className="app-bar-actions">
-            <label className="icon-button" title="ファイルを開く" aria-label="ファイルを開く">
-              <input type="file" accept={FILE_ACCEPT} onChange={onChange} ref={fileInputRef} />
+            <input type="file" accept={FILE_ACCEPT} hidden onChange={onChange} ref={fileInputRef} />
+            <button
+              type="button"
+              className="icon-button"
+              title="ファイルを開く"
+              aria-label="ファイルを開く"
+              onClick={() => fileInputRef.current?.click()}
+            >
               <FolderOpenIcon />
-            </label>
+            </button>
             <button
               type="button"
               className="icon-button"
