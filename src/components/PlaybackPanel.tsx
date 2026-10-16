@@ -371,6 +371,7 @@ function PlaybackReadout({
           max={Math.max(0, sequence.durationSeconds)}
           step="0.01"
           value={Math.min(positionSeconds, sequence.durationSeconds)}
+          aria-valuetext={`${formatTime(positionSeconds)} / ${formatTime(sequence.durationSeconds)}`}
           disabled={!canPlay}
           style={progressStyle(progress)}
           onChange={(e) => setDragSeconds(e.currentTarget.valueAsNumber)}
