@@ -20,6 +20,13 @@ import type { KeySignature, SmfTiming } from '../lib/smf/timing.ts';
 import { AccidentalText } from './AccidentalText.tsx';
 
 const FIXED_KEY_NOTICE_MS = 4000;
+const SEEK_KEY_STEP_SECONDS = 5;
+const SEEK_KEY_DIRECTIONS: Readonly<Record<string, number>> = {
+  ArrowLeft: -1,
+  ArrowDown: -1,
+  ArrowRight: 1,
+  ArrowUp: 1,
+};
 
 interface PlaybackPanelProps {
   sequence: PlaybackSequence;
@@ -364,9 +371,17 @@ function PlaybackReadout({
           max={Math.max(0, sequence.durationSeconds)}
           step="0.01"
           value={Math.min(positionSeconds, sequence.durationSeconds)}
+          aria-valuetext={`${formatTime(positionSeconds)} / ${formatTime(sequence.durationSeconds)}`}
           disabled={!canPlay}
           style={progressStyle(progress)}
           onChange={(e) => setDragSeconds(e.currentTarget.valueAsNumber)}
+          onKeyDown={(e) => {
+            const direction = SEEK_KEY_DIRECTIONS[e.key];
+            if (direction === undefined || e.altKey || e.ctrlKey || e.metaKey) return;
+            e.preventDefault();
+            scheduler.seek(positionSeconds + direction * SEEK_KEY_STEP_SECONDS);
+            setDragSeconds(null);
+          }}
         />
         <span className="timecode">{formatTime(sequence.durationSeconds)}</span>
         <PartPanelButton
