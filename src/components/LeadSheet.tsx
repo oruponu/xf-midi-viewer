@@ -177,7 +177,9 @@ export const LeadSheet = memo(function LeadSheet({
   useEffect(() => {
     const container = scoreRef.current;
     if (!container) return;
-    const rowEls = Array.from(container.querySelectorAll<HTMLElement>(':scope > .score-row'));
+    const staffEls = Array.from(
+      container.querySelectorAll<HTMLElement>(':scope > .score-row > .score-staff'),
+    );
     const playheads = Array.from(
       container.querySelectorAll<HTMLSpanElement>(':scope > .score-row > .score-playhead'),
     );
@@ -215,9 +217,9 @@ export const LeadSheet = memo(function LeadSheet({
         if (activeRowIdx !== lastActiveRowIdx) {
           lastActiveRowIdx = activeRowIdx;
           if (autoScroll) {
-            const activeRow = rowEls[activeRowIdx];
-            if (activeRow) {
-              activeRow.scrollIntoView({
+            const activeStaff = staffEls[activeRowIdx];
+            if (activeStaff) {
+              activeStaff.scrollIntoView({
                 block: 'center',
                 behavior: scrolled ? 'smooth' : 'instant',
               });
