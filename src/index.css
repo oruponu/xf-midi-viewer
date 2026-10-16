@@ -41,7 +41,7 @@
 
 html {
   scrollbar-gutter: stable;
-  scroll-padding-top: calc(var(--app-bar-height, 0px) + var(--viewer-chrome-height, 0px));
+  scroll-padding-top: calc(var(--app-bar-height, 0px) + var(--viewer-tabs-bottom, 0px));
   scroll-padding-bottom: max(var(--dock-height, 0px), var(--part-panel-cover, 0px));
 }
 

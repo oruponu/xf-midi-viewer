@@ -419,7 +419,7 @@ function PlayerScope({
     const root = document.documentElement;
     const clear = () => {
       root.style.removeProperty('--dock-height');
-      root.style.removeProperty('--viewer-chrome-height');
+      root.style.removeProperty('--viewer-tabs-bottom');
     };
     if (!dock || !chrome) {
       clear();
@@ -427,7 +427,9 @@ function PlayerScope({
     }
     const update = () => {
       root.style.setProperty('--dock-height', `${dock.offsetHeight}px`);
-      root.style.setProperty('--viewer-chrome-height', `${chrome.offsetHeight}px`);
+      // The bottom padding fades out over the content.
+      const tabsBottom = chrome.offsetHeight - parseFloat(getComputedStyle(chrome).paddingBottom);
+      root.style.setProperty('--viewer-tabs-bottom', `${tabsBottom}px`);
     };
     update();
     const observer = new ResizeObserver(update);
