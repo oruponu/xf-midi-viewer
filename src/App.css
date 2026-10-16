@@ -109,10 +109,6 @@
   outline-offset: 2px;
 }
 
-.icon-button input[type='file'] {
-  display: none;
-}
-
 .muted {
   color: var(--text);
   margin: 0;
