@@ -304,14 +304,15 @@
 }
 
 .playback-panel {
-  display: grid;
-  grid-template-columns: auto auto minmax(220px, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px 18px;
   align-items: center;
 }
 
 .playback-controls {
   display: flex;
+  flex: none;
   gap: 8px;
 }
 
@@ -342,6 +343,7 @@
 
 .playback-timeline {
   display: grid;
+  flex: 1 1 300px;
   grid-template-columns: 42px 1fr 42px auto;
   align-items: center;
   gap: 10px;
@@ -356,6 +358,7 @@
 
 .playback-position-group {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: 8px;
 }
@@ -1597,6 +1600,7 @@
   }
 
   .playback-panel {
+    display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
