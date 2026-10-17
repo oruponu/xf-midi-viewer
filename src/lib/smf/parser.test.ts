@@ -225,4 +225,21 @@ describe('parseSmf - chunks', () => {
     const buf = concat(mthd(0, 1, 480), mthd(0, 1, 480));
     expect(() => parseSmf(buf)).toThrow(/multiple MThd/);
   });
+
+  test('ignores trailing bytes shorter than a chunk header', () => {
+    const file = parseSmf(concat(mthd(0, 1, 480), mtrk(...EOT), u8(0x0d, 0x0a)));
+    expect(file.tracks).toHaveLength(1);
+    expect(file.extraChunks).toHaveLength(0);
+  });
+
+  test('ignores 7 trailing bytes after an extra chunk', () => {
+    const xfih = u8(0x58, 0x46, 0x49, 0x48, 0x00, 0x00, 0x00, 0x04, 0xde, 0xad, 0xbe, 0xef);
+    const file = parseSmf(concat(mthd(0, 1, 480), mtrk(...EOT), xfih, new Uint8Array(7)));
+    expect(file.extraChunks.map((c) => c.type)).toEqual(['XFIH']);
+  });
+
+  test('still throws on a truncated chunk of 8 bytes or more', () => {
+    const truncated = u8(0x58, 0x46, 0x4b, 0x4d, 0x00, 0x00, 0x00, 0x0a, 0x01, 0x02);
+    expect(() => parseSmf(concat(mthd(0, 1, 480), mtrk(...EOT), truncated))).toThrow(RangeError);
+  });
 });

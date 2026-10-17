@@ -10,6 +10,8 @@ import type {
   TrackEvent,
 } from './types.ts';
 
+const CHUNK_HEADER_BYTES = 8;
+
 export class NotSmfError extends Error {
   constructor(message: string) {
     super(message);
@@ -23,7 +25,7 @@ export function parseSmf(buffer: ArrayBuffer | Uint8Array): SmfFile {
   const tracks: SmfTrack[] = [];
   const extraChunks: SmfChunk[] = [];
 
-  while (!r.eof) {
+  while (r.remaining >= CHUNK_HEADER_BYTES) {
     const type = r.readAscii(4);
     const length = r.readUint32();
     const data = r.readBytes(length);
