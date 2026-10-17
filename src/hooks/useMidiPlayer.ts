@@ -111,7 +111,7 @@ export function useMidiPlayer(
         .filter((output) => output.state === 'connected')
         .map((output) => ({
           id: output.id,
-          name: output.name ?? 'MIDI Output',
+          name: output.name ?? 'MIDI 出力',
           manufacturer: output.manufacturer ?? '',
           state: output.state,
         })),
