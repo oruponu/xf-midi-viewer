@@ -34,6 +34,8 @@ export interface BarBeat {
   tickInBeat: number;
 }
 
+export const MAX_BARS = 10_000;
+
 const DEFAULT_SIGNATURE: TimeSignature = {
   numerator: 4,
   denominator: 4,

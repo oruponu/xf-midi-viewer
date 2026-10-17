@@ -1,4 +1,4 @@
-import { tickToBarBeat } from '../smf/timing.ts';
+import { MAX_BARS, tickToBarBeat } from '../smf/timing.ts';
 import type { SmfTiming } from '../smf/timing.ts';
 
 export interface ScoreRowSpec {
@@ -70,5 +70,5 @@ export function countScoreBars(
   if (markTicks.length === 0) return 0;
   let lastTick = endTick - 1;
   for (const tick of markTicks) lastTick = Math.max(lastTick, tick);
-  return tickToBarBeat(lastTick, timing)?.bar ?? 1;
+  return Math.min(tickToBarBeat(lastTick, timing)?.bar ?? 1, MAX_BARS);
 }
