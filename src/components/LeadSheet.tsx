@@ -447,7 +447,7 @@ function ScoreRow({
                           : shiftKeySignature(key.signature, semitones);
                       const label = formatKeySignature(shifted);
                       return (
-                        <span className="score-key" aria-label={`Key ${label}`}>
+                        <span className="score-key">
                           <span className="score-key-label">KEY</span>
                           <span className="score-key-value">
                             <AccidentalText text={label} />
@@ -456,15 +456,12 @@ function ScoreRow({
                       );
                     })()}
                   {sig && (
-                    <span
-                      className="score-timesig"
-                      aria-label={`Time signature ${sig.numerator}/${sig.denominator}`}
-                    >
+                    <span className="score-timesig">
                       {sig.numerator}/{sig.denominator}
                     </span>
                   )}
                   {bpm !== undefined && (
-                    <span className="score-tempo" aria-label={`Tempo ${bpm} BPM`}>
+                    <span className="score-tempo">
                       <span className="score-tempo-note">♩</span>={bpm}
                     </span>
                   )}

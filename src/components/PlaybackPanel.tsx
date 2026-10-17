@@ -65,7 +65,7 @@ export function PlaybackPanel({
   const canPlay = hasMidiMessages && outputReady;
 
   return (
-    <section className="playback-panel" aria-label="MIDI playback">
+    <section className="playback-panel" aria-label="再生バー">
       <div className="playback-controls">
         <button
           className="transport-button primary"
@@ -246,15 +246,16 @@ function PlaybackReadout({
     <>
       {positionLabel && (
         <div className="playback-position-group">
-          <span className="playback-position" aria-label="Bar.Beat.Tick" title="小節.拍.Tick">
+          <span
+            className="playback-position"
+            role="group"
+            aria-label="小節.拍.ティック"
+            title="小節.拍.ティック"
+          >
             {positionLabel}
           </span>
           {tempoBpm !== null && (
-            <span
-              className="playback-tempo"
-              aria-label={`Tempo ${tempoBpm} BPM, rate ${playbackRateLabel}`}
-              title="現在のテンポ（倍率適用後）"
-            >
+            <span className="playback-tempo" title="現在のテンポ（倍率適用後）">
               <span className="playback-tempo-header">
                 <span className="playback-tempo-label">テンポ</span>
                 <span
@@ -294,7 +295,6 @@ function PlaybackReadout({
           )}
           <span
             className="playback-key"
-            aria-label={`Key ${keyLabel ?? 'unknown'}, shift ${keyShiftLabel}`}
             title={isKeyFixed ? 'キーを C / Am に固定中' : '現在のキー（移調適用後）'}
           >
             {keyPulse > 0 && <span key={keyPulse} className="playback-pulse" aria-hidden="true" />}
@@ -346,11 +346,7 @@ function PlaybackReadout({
             </span>
           </span>
           {timeSigLabel && (
-            <span
-              className="playback-time-sig"
-              aria-label={`Time signature ${timeSigLabel}`}
-              title="現在の拍子"
-            >
+            <span className="playback-time-sig" title="現在の拍子">
               {timeSigPulse > 0 && (
                 <span key={timeSigPulse} className="playback-pulse" aria-hidden="true" />
               )}
@@ -365,7 +361,7 @@ function PlaybackReadout({
         <span className="timecode">{formatTime(positionSeconds)}</span>
         <input
           ref={sliderRef}
-          aria-label="Playback position"
+          aria-label="再生位置"
           type="range"
           min="0"
           max={Math.max(0, sequence.durationSeconds)}
