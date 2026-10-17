@@ -34,12 +34,16 @@ export interface BarBeat {
   tickInBeat: number;
 }
 
+export const MAX_BARS = 10_000;
+
 const DEFAULT_SIGNATURE: TimeSignature = {
   numerator: 4,
   denominator: 4,
   clocksPerClick: 24,
   thirtySecondNotesPerQuarter: 8,
 };
+
+const MAX_DENOMINATOR_POWER = 7;
 
 export function extractTiming(smf: SmfFile): SmfTiming {
   const ppq = smf.header.division.kind === 'tpqn' ? smf.header.division.ticksPerQuarter : 0;
@@ -53,11 +57,14 @@ export function extractTiming(smf: SmfFile): SmfTiming {
       const ev = tev.event;
       if (ev.kind !== 'meta') continue;
       if (ev.metaType === 0x58 && ev.data.length >= 4) {
+        const numerator = ev.data[0]!;
+        const denominatorPower = ev.data[1]!;
+        if (numerator === 0 || denominatorPower > MAX_DENOMINATOR_POWER) continue;
         changes.push({
           tick,
           signature: {
-            numerator: ev.data[0]!,
-            denominator: 1 << ev.data[1]!,
+            numerator,
+            denominator: 1 << denominatorPower,
             clocksPerClick: ev.data[2]!,
             thirtySecondNotesPerQuarter: ev.data[3]!,
           },

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { MAX_BARS } from '../smf/timing.ts';
 import type { SmfTiming } from '../smf/timing.ts';
 import { buildScoreRows, countScoreBars, sameScoreRows } from './scoreRows.ts';
 import type { BarFit } from './scoreRows.ts';
@@ -99,6 +100,12 @@ describe('buildScoreRows', () => {
       row(4, 1, 1),
     ]);
   });
+
+  test('builds rows up to MAX_BARS and ignores a section start after it', () => {
+    const result = buildScoreRows(MAX_BARS, 4, [MAX_BARS + 5]);
+    expect(result).toHaveLength(MAX_BARS / 4);
+    expect(result.at(-1)).toEqual(row(MAX_BARS - 3, 4, 4));
+  });
 });
 
 const timing: SmfTiming = {
@@ -151,5 +158,13 @@ describe('countScoreBars', () => {
 
   test('does not add a bar for a song ending on a bar line', () => {
     expect(countScoreBars([0], BAR * 2, timing)).toBe(2);
+  });
+
+  test('stops at MAX_BARS for a song that ends far later', () => {
+    expect(countScoreBars([0], BAR * 20_000, timing)).toBe(MAX_BARS);
+  });
+
+  test('stops at MAX_BARS for a mark far after the end of the song', () => {
+    expect(countScoreBars([0, BAR * 20_000], BAR, timing)).toBe(MAX_BARS);
   });
 });
