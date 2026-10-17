@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { PlaybackNote } from '../smf/playback.ts';
+import { MAX_BARS } from '../smf/timing.ts';
 import type { SmfTiming } from '../smf/timing.ts';
 import type { LyricSyllable } from './lyrics.ts';
 import { buildPitchLane } from './pitchBars.ts';
@@ -170,6 +171,35 @@ describe('buildPitchLane bars', () => {
     });
 
     expect(result!.barTicks).toEqual([0, 1440]);
+  });
+
+  test('stops the bars at MAX_BARS for a song that ends far later', () => {
+    const result = lane(BAR * 20_000);
+
+    expect(result!.barTicks).toHaveLength(MAX_BARS);
+    expect(result!.barTicks.at(-1)).toBe(BAR * (MAX_BARS - 1));
+    expect(result!.endTick).toBe(BAR * MAX_BARS);
+  });
+
+  test('drops melody notes after the last bar and cuts notes crossing it', () => {
+    const end = BAR * MAX_BARS;
+    const result = buildPitchLane(
+      [note(60, 0, 240), note(62, end - 240, end + 240), note(64, end, end + 480)],
+      [1],
+      timing(),
+      [],
+      BAR * 20_000,
+    );
+
+    expect(result!.notes.map((n) => [n.note, n.startTick, n.endTick])).toEqual([
+      [60, 0, 240],
+      [62, end - 240, end],
+    ]);
+  });
+
+  test('returns null when every melody note starts after the last bar', () => {
+    const end = BAR * MAX_BARS;
+    expect(buildPitchLane([note(60, end, end + 240)], [1], timing(), [], BAR * 20_000)).toBeNull();
   });
 });
 

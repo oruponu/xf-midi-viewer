@@ -1,4 +1,5 @@
 import type { PlaybackNote } from '../smf/playback.ts';
+import { MAX_BARS } from '../smf/timing.ts';
 import type { SmfTiming } from '../smf/timing.ts';
 import type { LyricSyllable } from './lyrics.ts';
 import type { RehearsalMessage } from './types.ts';
@@ -39,20 +40,20 @@ export function buildPitchLane(
   syllables: readonly LyricSyllable[] = [],
 ): PitchLane | null {
   if (timing.ppq <= 0) return null;
+  const bars = barBoundaries(timing, durationTicks);
+  const endTick = bars.pop()!;
   const channels = new Set(melodyChannels.map((ch) => ch - 1));
   const melody = notes
-    .filter((n) => channels.has(n.channel))
-    .map(({ note, startTick, endTick }) => ({
-      note,
-      startTick,
-      endTick,
-      part: partAt(syllables, startTick),
+    .filter((n) => channels.has(n.channel) && n.startTick < endTick)
+    .map((n) => ({
+      note: n.note,
+      startTick: n.startTick,
+      endTick: Math.min(n.endTick, endTick),
+      part: partAt(syllables, n.startTick),
     }))
     .sort((a, b) => a.startTick - b.startTick || a.note - b.note);
   if (melody.length === 0) return null;
 
-  const bars = barBoundaries(timing, durationTicks);
-  const endTick = bars.pop()!;
   return {
     ...noteRange(melody),
     notes: melody,
@@ -101,7 +102,7 @@ function barBoundaries(timing: SmfTiming, durationTicks: number): number[] {
   let lastBarEnd = 0;
   segments.forEach((seg, i) => {
     const segEnd = segments[i + 1]?.tick ?? Infinity;
-    for (let t = seg.tick; t < segEnd && t < end; t += seg.barTicks) {
+    for (let t = seg.tick; t < segEnd && t < end && bounds.length < MAX_BARS; t += seg.barTicks) {
       bounds.push(t);
       lastBarEnd = Math.min(t + seg.barTicks, segEnd);
     }
