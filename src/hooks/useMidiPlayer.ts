@@ -20,7 +20,6 @@ export interface MidiOutputOption {
   name: string;
   manufacturer: string;
   state: MIDIPortDeviceState;
-  connection: MIDIPortConnectionState;
 }
 
 export type MidiAccessState = 'unsupported' | 'idle' | 'requesting' | 'ready' | 'denied';
@@ -115,7 +114,6 @@ export function useMidiPlayer(
           name: output.name ?? 'MIDI Output',
           manufacturer: output.manufacturer ?? '',
           state: output.state,
-          connection: output.connection,
         })),
     );
   }, []);

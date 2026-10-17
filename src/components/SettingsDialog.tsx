@@ -313,13 +313,8 @@ function SoundBankControl({ builtin, disabled }: { builtin: BuiltinSynth; disabl
   );
 }
 
-function formatOutputName(output: {
-  name: string;
-  manufacturer: string;
-  connection: MIDIPortConnectionState;
-}): string {
-  const label = output.manufacturer ? `${output.manufacturer} ${output.name}` : output.name;
-  return output.connection === 'open' ? `${label} (open)` : label;
+function formatOutputName(output: { name: string; manufacturer: string }): string {
+  return output.manufacturer ? `${output.manufacturer} ${output.name}` : output.name;
 }
 
 function CloseIcon() {
