@@ -65,7 +65,7 @@ export function PlaybackPanel({
   const canPlay = hasMidiMessages && outputReady;
 
   return (
-    <section className="playback-panel" aria-label="MIDI playback">
+    <section className="playback-panel" aria-label="再生バー">
       <div className="playback-controls">
         <button
           className="transport-button primary"
@@ -246,7 +246,12 @@ function PlaybackReadout({
     <>
       {positionLabel && (
         <div className="playback-position-group">
-          <span className="playback-position" aria-label="Bar.Beat.Tick" title="小節.拍.Tick">
+          <span
+            className="playback-position"
+            role="group"
+            aria-label="小節.拍.ティック"
+            title="小節.拍.ティック"
+          >
             {positionLabel}
           </span>
           {tempoBpm !== null && (
@@ -365,7 +370,7 @@ function PlaybackReadout({
         <span className="timecode">{formatTime(positionSeconds)}</span>
         <input
           ref={sliderRef}
-          aria-label="Playback position"
+          aria-label="再生位置"
           type="range"
           min="0"
           max={Math.max(0, sequence.durationSeconds)}
