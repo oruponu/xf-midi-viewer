@@ -73,6 +73,53 @@ describe('extractTiming', () => {
     ]);
   });
 
+  test('ignores a time signature with a zero numerator', () => {
+    const timing = extractTiming(makeSmf([{ events: [timeSigMeta(0, 2)] }]));
+    expect(timing.timeSignatures).toEqual([
+      {
+        tick: 0,
+        signature: {
+          numerator: 4,
+          denominator: 4,
+          clocksPerClick: 24,
+          thirtySecondNotesPerQuarter: 8,
+        },
+      },
+    ]);
+  });
+
+  test('ignores a time signature with a denominator finer than 1/128', () => {
+    const timing = extractTiming(
+      makeSmf([{ events: [timeSigMeta(3, 8), timeSigMeta(3, 31), timeSigMeta(3, 32)] }]),
+    );
+    expect(timing.timeSignatures.map((c) => c.signature.denominator)).toEqual([4]);
+    expect(timing.timeSignatures[0]!.signature.numerator).toBe(4);
+  });
+
+  test('accepts a 1/128 time signature', () => {
+    const timing = extractTiming(makeSmf([{ events: [timeSigMeta(1, 7)] }]));
+    expect(timing.timeSignatures[0]!.signature).toMatchObject({ numerator: 1, denominator: 128 });
+  });
+
+  test('keeps the previous time signature when a later one is invalid', () => {
+    const timing = extractTiming(
+      makeSmf([{ events: [timeSigMeta(3, 2), timeSigMeta(0, 2, 1440)] }]),
+    );
+    expect(timing.timeSignatures).toHaveLength(1);
+    expect(timing.timeSignatures[0]!.signature).toMatchObject({ numerator: 3, denominator: 4 });
+    expect(tickToBarBeat(1440 * 2, timing)).toEqual({ bar: 3, beat: 1, tickInBeat: 0 });
+  });
+
+  test('assumes 4/4 at tick 0 when the time signature there is invalid', () => {
+    const timing = extractTiming(
+      makeSmf([{ events: [timeSigMeta(0, 2), timeSigMeta(3, 2, 1920)] }]),
+    );
+    expect(timing.timeSignatures.map((c) => [c.tick, c.signature.numerator])).toEqual([
+      [0, 4],
+      [1920, 3],
+    ]);
+  });
+
   test('decodes denominator from power-of-two', () => {
     const timing = extractTiming(makeSmf([{ events: [timeSigMeta(6, 3)] }]));
     expect(timing.timeSignatures[0]?.signature.denominator).toBe(8);
