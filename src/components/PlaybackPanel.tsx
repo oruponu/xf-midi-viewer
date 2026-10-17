@@ -255,11 +255,7 @@ function PlaybackReadout({
             {positionLabel}
           </span>
           {tempoBpm !== null && (
-            <span
-              className="playback-tempo"
-              aria-label={`Tempo ${tempoBpm} BPM, rate ${playbackRateLabel}`}
-              title="現在のテンポ（倍率適用後）"
-            >
+            <span className="playback-tempo" title="現在のテンポ（倍率適用後）">
               <span className="playback-tempo-header">
                 <span className="playback-tempo-label">テンポ</span>
                 <span
@@ -299,7 +295,6 @@ function PlaybackReadout({
           )}
           <span
             className="playback-key"
-            aria-label={`Key ${keyLabel ?? 'unknown'}, shift ${keyShiftLabel}`}
             title={isKeyFixed ? 'キーを C / Am に固定中' : '現在のキー（移調適用後）'}
           >
             {keyPulse > 0 && <span key={keyPulse} className="playback-pulse" aria-hidden="true" />}
@@ -351,11 +346,7 @@ function PlaybackReadout({
             </span>
           </span>
           {timeSigLabel && (
-            <span
-              className="playback-time-sig"
-              aria-label={`Time signature ${timeSigLabel}`}
-              title="現在の拍子"
-            >
+            <span className="playback-time-sig" title="現在の拍子">
               {timeSigPulse > 0 && (
                 <span key={timeSigPulse} className="playback-pulse" aria-hidden="true" />
               )}
