@@ -8,6 +8,7 @@ import type { ChannelPart } from '../lib/smf/channelVoices.ts';
 import { soundingChannels } from '../lib/smf/noteActivity.ts';
 import type { NoteActivity } from '../lib/smf/noteActivity.ts';
 import { voiceName } from '../lib/xg/voiceNames.ts';
+import { CloseIcon } from './CloseIcon.tsx';
 
 interface PartPanelProps {
   id: string;
@@ -157,24 +158,5 @@ export function PartPanel({
         })}
       </ul>
     </section>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M6 6 18 18" />
-      <path d="M18 6 6 18" />
-    </svg>
   );
 }

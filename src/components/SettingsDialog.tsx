@@ -4,6 +4,7 @@ import type { Settings } from '../hooks/useSettings.ts';
 import { BUILTIN_OUTPUT_ID } from '../lib/player/outputSelection.ts';
 import { BUNDLED_SOUND_BANK } from '../lib/synth/soundBank.ts';
 import type { BuiltinSynth } from '../hooks/useBuiltinSynth.ts';
+import { CloseIcon } from './CloseIcon.tsx';
 
 export type PlayerOutputProps = Pick<
   MidiPlayer,
@@ -315,23 +316,4 @@ function SoundBankControl({ builtin, disabled }: { builtin: BuiltinSynth; disabl
 
 function formatOutputName(output: { name: string; manufacturer: string }): string {
   return output.manufacturer ? `${output.manufacturer} ${output.name}` : output.name;
-}
-
-function CloseIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M6 6 18 18" />
-      <path d="M18 6 6 18" />
-    </svg>
-  );
 }
