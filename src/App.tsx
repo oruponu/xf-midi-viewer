@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import './App.css';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
+import { ErrorToast } from './components/ErrorToast.tsx';
 import { InfoPanel } from './components/InfoPanel.tsx';
 import type { InfoPanelTab } from './components/InfoPanel.tsx';
 import { PartPanel } from './components/PartPanel.tsx';
@@ -45,8 +46,10 @@ function App() {
   const isTouchPrimary = useMediaQuery('(pointer: coarse)');
   const { settings, updateSettings } = useSettings();
   useTheme(settings.theme);
-  const song = songState.status === 'loaded' ? songState.song : null;
-  const file = songState.status === 'empty' ? null : songState.file;
+  const song = songState.current?.song ?? null;
+  const file = songState.current?.file ?? null;
+  const loadFailure = songState.failure;
+  const [dismissedFailureId, setDismissedFailureId] = useState<number | null>(null);
   const songKey = file ? `${file.name}-${file.size}-${file.lastModified}` : 'empty';
   const [failedSongKey, setFailedSongKey] = useState<string | null>(null);
   const songFailed = failedSongKey === songKey;
@@ -71,11 +74,12 @@ function App() {
 
   const openFile = useCallback(
     (f: File) => {
-      scheduler.stop();
-      scheduler.sendReset();
-      void loadFile(f);
+      void loadFile(f, () => {
+        stop();
+        scheduler.sendReset();
+      });
     },
-    [scheduler, loadFile],
+    [scheduler, stop, loadFile],
   );
 
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -190,18 +194,31 @@ function App() {
         </div>
       </header>
 
+      {songState.current && loadFailure && loadFailure.id !== dismissedFailureId && (
+        <ErrorToast
+          timerKey={loadFailure.id}
+          onDismiss={() => setDismissedFailureId(loadFailure.id)}
+        >
+          <LoadErrorMessage
+            fileName={loadFailure.file.name}
+            reason={loadFailure.reason}
+            detail={loadFailure.detail}
+          />
+        </ErrorToast>
+      )}
+
       <main className={`app${isDragging ? ' app--dragging' : ''}`}>
-        {songState.status === 'error' && (
+        {!songState.current && loadFailure && (
           <section className="error" role="alert">
             <LoadErrorMessage
-              fileName={songState.file.name}
-              reason={songState.reason}
-              detail={songState.detail}
+              fileName={loadFailure.file.name}
+              reason={loadFailure.reason}
+              detail={loadFailure.detail}
             />
           </section>
         )}
 
-        {songState.status !== 'loaded' && (
+        {!songState.current && (
           <section className="empty-state">
             <div className="drop-zone">
               <span className="drop-zone-icon">
