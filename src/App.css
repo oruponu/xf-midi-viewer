@@ -1,11 +1,13 @@
 :root {
   --app-bar-height: 56px;
+  --app-padding-top: 14px;
 }
 
 .app {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 14px 24px calc(max(var(--dock-height, 0px), var(--part-panel-cover, 0px)) + 32px);
+  padding: var(--app-padding-top) 24px
+    calc(max(var(--dock-height, 0px), var(--part-panel-cover, 0px)) + 32px);
 }
 
 .app--dragging::after {
@@ -28,6 +30,7 @@
   position: sticky;
   top: 0;
   z-index: 35;
+  box-sizing: border-box;
   height: var(--app-bar-height);
   background: color-mix(in srgb, var(--bg) 86%, transparent);
   backdrop-filter: blur(18px) saturate(150%);
@@ -229,13 +232,18 @@
   position: sticky;
   top: var(--app-bar-height);
   z-index: 30;
-  padding: 10px 0 12px;
+  padding: 16px 0 12px;
   background: linear-gradient(
     180deg,
     var(--bg) 0%,
     var(--bg) 78%,
     transparent 100%
   );
+}
+
+/* Start at the stuck position so the tabs don't move on scroll */
+.app > .viewer-chrome:first-child {
+  margin-top: calc(-1 * var(--app-padding-top));
 }
 
 .viewer-tabs {
@@ -1579,16 +1587,17 @@
 }
 
 @media (max-width: 720px) {
+  :root {
+    --app-padding-top: 12px;
+  }
+
   .app {
-    padding: 12px 14px calc(max(var(--dock-height, 0px), var(--part-panel-cover, 0px)) + 24px);
+    padding: var(--app-padding-top) 14px
+      calc(max(var(--dock-height, 0px), var(--part-panel-cover, 0px)) + 24px);
   }
 
   .app-bar-inner {
     padding: 0 14px;
-  }
-
-  .viewer-chrome {
-    padding-top: 8px;
   }
 
   .player-dock {
