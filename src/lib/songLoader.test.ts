@@ -32,8 +32,24 @@ function record() {
   const states: SongState[] = [];
   const loader = createSongLoader((state) => states.push(state));
   const summary = () =>
-    states.map((state) => [state.status, state.status === 'empty' ? null : state.file.name]);
+    states.map((state) => [
+      state.current?.file.name ?? null,
+      state.pending?.name ?? null,
+      state.failure?.file.name ?? null,
+    ]);
   return { states, loader, summary };
+}
+
+async function loadBytes(
+  loader: ReturnType<typeof createSongLoader>,
+  name: string,
+  bytes: ArrayBuffer,
+  beforeSwap?: () => void,
+) {
+  const source = controlledSource(name);
+  const done = loader.load(source.source, beforeSwap);
+  source.resolve(bytes);
+  await done;
 }
 
 describe('createSongLoader', () => {
@@ -46,11 +62,10 @@ describe('createSongLoader', () => {
     await done;
 
     expect(summary()).toEqual([
-      ['loading', 'a.mid'],
-      ['loaded', 'a.mid'],
+      [null, 'a.mid', null],
+      ['a.mid', null, null],
     ]);
-    const last = states.at(-1)!;
-    expect(last.status === 'loaded' && last.song.sequence.durationTicks).toBe(0);
+    expect(states.at(-1)!.current?.song.sequence.durationTicks).toBe(0);
   });
 
   test('reports an error for bytes that are not an SMF', async () => {
@@ -62,11 +77,10 @@ describe('createSongLoader', () => {
     await done;
 
     expect(summary()).toEqual([
-      ['loading', 'a.mid'],
-      ['error', 'a.mid'],
+      [null, 'a.mid', null],
+      [null, null, 'a.mid'],
     ]);
-    const last = states.at(-1)!;
-    expect(last.status === 'error' && last.reason).toBe('notSmf');
+    expect(states.at(-1)!.failure?.reason).toBe('notSmf');
   });
 
   test('reports a broken SMF with the parser detail', async () => {
@@ -78,12 +92,12 @@ describe('createSongLoader', () => {
     await done;
 
     expect(summary()).toEqual([
-      ['loading', 'a.mid'],
-      ['error', 'a.mid'],
+      [null, 'a.mid', null],
+      [null, null, 'a.mid'],
     ]);
-    const last = states.at(-1)!;
-    expect(last.status === 'error' && last.reason).toBe('broken');
-    expect(last.status === 'error' && last.detail.length > 0).toBe(true);
+    const failure = states.at(-1)!.failure;
+    expect(failure?.reason).toBe('broken');
+    expect(failure && failure.detail.length > 0).toBe(true);
   });
 
   test('reports an error when reading the file fails', async () => {
@@ -95,12 +109,99 @@ describe('createSongLoader', () => {
     await done;
 
     expect(summary()).toEqual([
-      ['loading', 'a.mid'],
-      ['error', 'a.mid'],
+      [null, 'a.mid', null],
+      [null, null, 'a.mid'],
     ]);
-    const last = states.at(-1)!;
-    expect(last.status === 'error' && last.reason).toBe('readFailed');
-    expect(last.status === 'error' && last.detail).toBe('read failed');
+    const failure = states.at(-1)!.failure;
+    expect(failure?.reason).toBe('readFailed');
+    expect(failure?.detail).toBe('read failed');
+  });
+
+  test('keeps the current song while the next file loads and after it fails', async () => {
+    const { states, loader, summary } = record();
+    await loadBytes(loader, 'a.mid', smfBytes());
+    const b = controlledSource('b.mid');
+
+    const done = loader.load(b.source);
+    b.resolve(brokenBytes());
+    await done;
+
+    expect(summary()).toEqual([
+      [null, 'a.mid', null],
+      ['a.mid', null, null],
+      ['a.mid', 'b.mid', null],
+      ['a.mid', null, 'b.mid'],
+    ]);
+    expect(states.at(-1)!.failure?.reason).toBe('notSmf');
+  });
+
+  test('keeps the failure while the next file loads without a song', async () => {
+    const { loader, summary } = record();
+    await loadBytes(loader, 'a.mid', brokenBytes());
+
+    void loader.load(controlledSource('b.mid').source);
+
+    expect(summary().at(-1)).toEqual([null, 'b.mid', 'a.mid']);
+  });
+
+  test('clears the failure when a load succeeds', async () => {
+    const { loader, summary } = record();
+    await loadBytes(loader, 'a.mid', smfBytes());
+    await loadBytes(loader, 'b.mid', brokenBytes());
+    await loadBytes(loader, 'c.mid', smfBytes());
+
+    expect(summary().at(-1)).toEqual(['c.mid', null, null]);
+  });
+
+  test('gives each failure a new id', async () => {
+    const { states, loader } = record();
+    await loadBytes(loader, 'a.mid', brokenBytes());
+    const first = states.at(-1)!.failure;
+    await loadBytes(loader, 'a.mid', brokenBytes());
+    const second = states.at(-1)!.failure;
+
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(second!.id).not.toBe(first!.id);
+  });
+
+  test('calls beforeSwap right before switching to the new song', async () => {
+    const { states, loader } = record();
+    const notifiedAtSwap: number[] = [];
+
+    await loadBytes(loader, 'a.mid', smfBytes(), () => notifiedAtSwap.push(states.length));
+
+    expect(notifiedAtSwap).toEqual([1]);
+    expect(states).toHaveLength(2);
+  });
+
+  test('does not call beforeSwap when the load fails', async () => {
+    const { loader } = record();
+    await loadBytes(loader, 'a.mid', smfBytes());
+    let calls = 0;
+
+    await loadBytes(loader, 'b.mid', brokenBytes(), () => calls++);
+
+    expect(calls).toBe(0);
+  });
+
+  test('does not call beforeSwap for a stale load', async () => {
+    const { states, loader } = record();
+    const a = controlledSource('a.mid');
+    const b = controlledSource('b.mid');
+    let callsA = 0;
+    let callsB = 0;
+
+    const doneA = loader.load(a.source, () => callsA++);
+    const doneB = loader.load(b.source, () => callsB++);
+    b.resolve(smfBytes());
+    await doneB;
+    a.resolve(smfBytes());
+    await doneA;
+
+    expect(callsA).toBe(0);
+    expect(callsB).toBe(1);
+    expect(states.at(-1)!.current?.file.name).toBe('b.mid');
   });
 
   test('ignores an older load that succeeds after a newer one succeeded', async () => {
@@ -116,9 +217,9 @@ describe('createSongLoader', () => {
     await doneA;
 
     expect(summary()).toEqual([
-      ['loading', 'a.mid'],
-      ['loading', 'b.mid'],
-      ['loaded', 'b.mid'],
+      [null, 'a.mid', null],
+      [null, 'b.mid', null],
+      ['b.mid', null, null],
     ]);
   });
 
@@ -135,9 +236,9 @@ describe('createSongLoader', () => {
     await doneA;
 
     expect(summary()).toEqual([
-      ['loading', 'a.mid'],
-      ['loading', 'b.mid'],
-      ['loaded', 'b.mid'],
+      [null, 'a.mid', null],
+      [null, 'b.mid', null],
+      ['b.mid', null, null],
     ]);
   });
 
@@ -154,9 +255,9 @@ describe('createSongLoader', () => {
     await doneA;
 
     expect(summary()).toEqual([
-      ['loading', 'a.mid'],
-      ['loading', 'b.mid'],
-      ['error', 'b.mid'],
+      [null, 'a.mid', null],
+      [null, 'b.mid', null],
+      [null, null, 'b.mid'],
     ]);
   });
 
@@ -173,9 +274,9 @@ describe('createSongLoader', () => {
     await doneB;
 
     expect(summary()).toEqual([
-      ['loading', 'a.mid'],
-      ['loading', 'b.mid'],
-      ['loaded', 'b.mid'],
+      [null, 'a.mid', null],
+      [null, 'b.mid', null],
+      ['b.mid', null, null],
     ]);
   });
 });

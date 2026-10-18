@@ -14,19 +14,41 @@ export interface SongSource extends FileSummary {
 
 export type SongErrorReason = 'notSmf' | 'broken' | 'readFailed';
 
-export type SongState =
-  | { status: 'empty' }
-  | { status: 'loading'; file: FileSummary }
-  | { status: 'error'; file: FileSummary; reason: SongErrorReason; detail: string }
-  | { status: 'loaded'; file: FileSummary; song: Song };
-
-export interface SongLoader {
-  load(source: SongSource): Promise<void>;
+export interface LoadedSong {
+  file: FileSummary;
+  song: Song;
 }
 
+export interface LoadFailure {
+  id: number;
+  file: FileSummary;
+  reason: SongErrorReason;
+  detail: string;
+}
+
+export interface SongState {
+  current: LoadedSong | null;
+  pending: FileSummary | null;
+  failure: LoadFailure | null;
+}
+
+export const INITIAL_SONG_STATE: SongState = { current: null, pending: null, failure: null };
+
+export interface SongLoader {
+  load(source: SongSource, beforeSwap?: () => void): Promise<void>;
+}
+
+type ReadResult = { ok: true; song: Song } | { ok: false; reason: SongErrorReason; detail: string };
+
 export function createSongLoader(onChange: (state: SongState) => void): SongLoader {
+  let state = INITIAL_SONG_STATE;
   let latest = 0;
-  const load = async (source: SongSource): Promise<void> => {
+  let failureCount = 0;
+  const update = (next: SongState) => {
+    state = next;
+    onChange(next);
+  };
+  const load = async (source: SongSource, beforeSwap?: () => void): Promise<void> => {
     latest += 1;
     const token = latest;
     const file: FileSummary = {
@@ -34,25 +56,33 @@ export function createSongLoader(onChange: (state: SongState) => void): SongLoad
       size: source.size,
       lastModified: source.lastModified,
     };
-    onChange({ status: 'loading', file });
-    const next = await readSong(source, file);
-    if (token === latest) onChange(next);
+    update({ ...state, pending: file });
+    const result = await readSong(source);
+    if (token !== latest) return;
+    if (result.ok) {
+      beforeSwap?.();
+      update({ current: { file, song: result.song }, pending: null, failure: null });
+    } else {
+      failureCount += 1;
+      const failure = { id: failureCount, file, reason: result.reason, detail: result.detail };
+      update({ current: state.current, pending: null, failure });
+    }
   };
   return { load };
 }
 
-async function readSong(source: SongSource, file: FileSummary): Promise<SongState> {
+async function readSong(source: SongSource): Promise<ReadResult> {
   let buffer: ArrayBuffer;
   try {
     buffer = await source.arrayBuffer();
   } catch (error) {
-    return { status: 'error', file, reason: 'readFailed', detail: errorMessage(error) };
+    return { ok: false, reason: 'readFailed', detail: errorMessage(error) };
   }
   try {
-    return { status: 'loaded', file, song: buildSong(parseSmf(buffer)) };
+    return { ok: true, song: buildSong(parseSmf(buffer)) };
   } catch (error) {
     const reason = error instanceof NotSmfError ? 'notSmf' : 'broken';
-    return { status: 'error', file, reason, detail: errorMessage(error) };
+    return { ok: false, reason, detail: errorMessage(error) };
   }
 }
 
