@@ -120,6 +120,77 @@ describe('buildPitchLane parts', () => {
   });
 });
 
+describe('buildPitchLane duet parts', () => {
+  const partsOf = (notes: PlaybackNote[], syllables: LyricSyllable[]) =>
+    buildPitchLane(notes, [1, 2], timing(), [], BAR, syllables)!.notes.map((n) => n.part);
+
+  const duet = [syllable(0, 'female'), syllable(480, 'male'), syllable(960, 'mixed')];
+
+  test('colors each channel by the singer of its female or male sections', () => {
+    expect(
+      partsOf(
+        [
+          note(67, 0, 240, 0),
+          note(60, 480, 720, 1),
+          note(67, 960, 1200, 0),
+          note(60, 960, 1200, 1),
+        ],
+        duet,
+      ),
+    ).toEqual(['female', 'male', 'male', 'female']);
+  });
+
+  test('ignores the syllable part once the singers of the channels are known', () => {
+    const syllables = [...duet, syllable(1440, 'chorus'), syllable(1680, 'solo')];
+
+    expect(
+      partsOf(
+        [
+          note(67, 0, 240, 0),
+          note(60, 480, 720, 1),
+          note(60, 1440, 1560, 1),
+          note(67, 1560, 1680, 0),
+          note(67, 1680, 1920, 0),
+        ],
+        syllables,
+      ),
+    ).toEqual(['female', 'male', 'male', 'female', 'female']);
+  });
+
+  test('takes the channel heard most often in the sections of each singer', () => {
+    expect(
+      partsOf(
+        [note(67, 0, 240, 0), note(60, 480, 600, 1), note(60, 600, 720, 1), note(67, 600, 720, 0)],
+        duet,
+      ),
+    ).toEqual(['female', 'male', 'male', 'female']);
+  });
+
+  test('falls back to syllable parts when both singers are heard most on one channel', () => {
+    expect(
+      partsOf([note(67, 0, 240, 0), note(60, 480, 720, 0), note(60, 960, 1200, 1)], duet),
+    ).toEqual(['female', 'male', 'base']);
+  });
+
+  test('falls back to syllable parts when a singer is heard equally on both channels', () => {
+    expect(
+      partsOf(
+        [note(67, 0, 240, 0), note(60, 480, 720, 0), note(60, 480, 720, 1), note(60, 960, 1200, 1)],
+        duet,
+      ),
+    ).toEqual(['female', 'male', 'male', 'base']);
+  });
+
+  test('falls back to syllable parts when only one singer is heard', () => {
+    expect(
+      partsOf(
+        [note(67, 0, 240, 0), note(60, 960, 1200, 1)],
+        [syllable(0, 'female'), syllable(960, 'mixed')],
+      ),
+    ).toEqual(['female', 'base']);
+  });
+});
+
 describe('buildPitchLane bars', () => {
   test('starts a bar every 4/4 bar and ends at the end of the last bar', () => {
     const result = lane(BAR * 3);

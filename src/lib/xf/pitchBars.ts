@@ -2,7 +2,7 @@ import type { PlaybackNote } from '../smf/playback.ts';
 import { MAX_BARS } from '../smf/timing.ts';
 import type { SmfTiming } from '../smf/timing.ts';
 import type { LyricSyllable } from './lyrics.ts';
-import type { RehearsalMessage } from './types.ts';
+import type { RehearsalMessage, VocalPart } from './types.ts';
 import { partColorOf } from './vocalPart.ts';
 import type { PartColor } from './vocalPart.ts';
 
@@ -43,13 +43,14 @@ export function buildPitchLane(
   const bars = barBoundaries(timing, durationTicks);
   const endTick = bars.pop()!;
   const channels = new Set(melodyChannels.map((ch) => ch - 1));
-  const melody = notes
-    .filter((n) => channels.has(n.channel) && n.startTick < endTick)
+  const melodyNotes = notes.filter((n) => channels.has(n.channel) && n.startTick < endTick);
+  const singers = singerChannels(melodyNotes, syllables);
+  const melody = melodyNotes
     .map((n) => ({
       note: n.note,
       startTick: n.startTick,
       endTick: Math.min(n.endTick, endTick),
-      part: partAt(syllables, n.startTick),
+      part: singers?.get(n.channel) ?? partColorOf(vocalPartAt(syllables, n.startTick)),
     }))
     .sort((a, b) => a.startTick - b.startTick || a.note - b.note);
   if (melody.length === 0) return null;
@@ -66,7 +67,44 @@ export function buildPitchLane(
   };
 }
 
-function partAt(syllables: readonly LyricSyllable[], tick: number): PartColor {
+// By majority, since the other singer's channel can briefly join a female or male section.
+function singerChannels(
+  notes: readonly PlaybackNote[],
+  syllables: readonly LyricSyllable[],
+): Map<number, PartColor> | null {
+  const female = new Map<number, number>();
+  const male = new Map<number, number>();
+  for (const n of notes) {
+    const part = vocalPartAt(syllables, n.startTick);
+    const counts = part === 'female' ? female : part === 'male' ? male : null;
+    counts?.set(n.channel, (counts.get(n.channel) ?? 0) + 1);
+  }
+  const femaleChannel = mostFrequent(female);
+  const maleChannel = mostFrequent(male);
+  if (femaleChannel === null || maleChannel === null || femaleChannel === maleChannel) return null;
+  return new Map<number, PartColor>([
+    [femaleChannel, 'female'],
+    [maleChannel, 'male'],
+  ]);
+}
+
+function mostFrequent(counts: ReadonlyMap<number, number>): number | null {
+  let best: number | null = null;
+  let bestCount = 0;
+  let tied = false;
+  for (const [key, count] of counts) {
+    if (count > bestCount) {
+      best = key;
+      bestCount = count;
+      tied = false;
+    } else if (count === bestCount) {
+      tied = true;
+    }
+  }
+  return tied ? null : best;
+}
+
+function vocalPartAt(syllables: readonly LyricSyllable[], tick: number): VocalPart | null {
   let lo = 0;
   let hi = syllables.length;
   while (lo < hi) {
@@ -74,7 +112,7 @@ function partAt(syllables: readonly LyricSyllable[], tick: number): PartColor {
     if (syllables[mid]!.tick <= tick) lo = mid + 1;
     else hi = mid;
   }
-  return partColorOf(syllables[lo - 1]?.vocalPart ?? null);
+  return syllables[lo - 1]?.vocalPart ?? null;
 }
 
 function noteRange(notes: readonly PitchBarNote[]): { lowNote: number; highNote: number } {
