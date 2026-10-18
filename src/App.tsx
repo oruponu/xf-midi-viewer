@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import './App.css';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
+import { ErrorToast } from './components/ErrorToast.tsx';
 import { InfoPanel } from './components/InfoPanel.tsx';
 import type { InfoPanelTab } from './components/InfoPanel.tsx';
 import { PartPanel } from './components/PartPanel.tsx';
@@ -48,6 +49,7 @@ function App() {
   const song = songState.current?.song ?? null;
   const file = songState.current?.file ?? null;
   const loadFailure = songState.failure;
+  const [dismissedFailureId, setDismissedFailureId] = useState<number | null>(null);
   const songKey = file ? `${file.name}-${file.size}-${file.lastModified}` : 'empty';
   const [failedSongKey, setFailedSongKey] = useState<string | null>(null);
   const songFailed = failedSongKey === songKey;
@@ -193,7 +195,20 @@ function App() {
       </header>
 
       <main className={`app${isDragging ? ' app--dragging' : ''}`}>
-        {loadFailure && (
+        {songState.current && loadFailure && loadFailure.id !== dismissedFailureId && (
+          <ErrorToast
+            timerKey={loadFailure.id}
+            onDismiss={() => setDismissedFailureId(loadFailure.id)}
+          >
+            <LoadErrorMessage
+              fileName={loadFailure.file.name}
+              reason={loadFailure.reason}
+              detail={loadFailure.detail}
+            />
+          </ErrorToast>
+        )}
+
+        {!songState.current && loadFailure && (
           <section className="error" role="alert">
             <LoadErrorMessage
               fileName={loadFailure.file.name}
