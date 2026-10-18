@@ -230,7 +230,7 @@
 
 .error-toast {
   position: fixed;
-  top: calc(var(--app-bar-height) + var(--app-padding-top) + var(--viewer-tabs-bottom, 0px) + 8px);
+  top: calc(var(--app-bar-height) + var(--viewer-tabs-bottom, 0px) + 12px);
   right: max(24px, calc((100% - 1120px) / 2));
   z-index: 50;
   box-sizing: border-box;

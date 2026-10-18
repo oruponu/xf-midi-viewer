@@ -194,20 +194,20 @@ function App() {
         </div>
       </header>
 
-      <main className={`app${isDragging ? ' app--dragging' : ''}`}>
-        {songState.current && loadFailure && loadFailure.id !== dismissedFailureId && (
-          <ErrorToast
-            timerKey={loadFailure.id}
-            onDismiss={() => setDismissedFailureId(loadFailure.id)}
-          >
-            <LoadErrorMessage
-              fileName={loadFailure.file.name}
-              reason={loadFailure.reason}
-              detail={loadFailure.detail}
-            />
-          </ErrorToast>
-        )}
+      {songState.current && loadFailure && loadFailure.id !== dismissedFailureId && (
+        <ErrorToast
+          timerKey={loadFailure.id}
+          onDismiss={() => setDismissedFailureId(loadFailure.id)}
+        >
+          <LoadErrorMessage
+            fileName={loadFailure.file.name}
+            reason={loadFailure.reason}
+            detail={loadFailure.detail}
+          />
+        </ErrorToast>
+      )}
 
+      <main className={`app${isDragging ? ' app--dragging' : ''}`}>
         {!songState.current && loadFailure && (
           <section className="error" role="alert">
             <LoadErrorMessage
