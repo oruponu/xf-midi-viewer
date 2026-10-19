@@ -94,7 +94,7 @@ export interface SchedulerOptions {
   timers?: Timers;
 }
 
-const windowTimers: Timers = {
+export const windowTimers: Timers = {
   setInterval: (fn, ms) => window.setInterval(fn, ms),
   clearInterval: (handle) => window.clearInterval(handle),
 };
