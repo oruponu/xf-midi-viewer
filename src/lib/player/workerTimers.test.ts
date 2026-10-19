@@ -80,6 +80,43 @@ describe('createWorkerTimers', () => {
     expect(calls).toBe(2);
   });
 
+  test('keeps the fallback timers running until the worker starts ticking', () => {
+    const { workers, fallback, timers } = setup();
+    let calls = 0;
+
+    const handle = timers.setInterval(() => (calls += 1), 10);
+    fallback.fire();
+    expect(calls).toBe(1);
+
+    workers[0]!.tick(handle);
+    fallback.fire();
+
+    expect(calls).toBe(2);
+    expect(fallback.active.size).toBe(0);
+  });
+
+  test('clears both timers when an interval stops before the worker starts ticking', () => {
+    const { workers, fallback, timers } = setup();
+
+    const handle = timers.setInterval(() => {}, 10);
+    timers.clearInterval(handle);
+
+    expect(fallback.active.size).toBe(0);
+    expect(workers[0]!.commands.at(-1)).toEqual({ type: 'clear', id: handle });
+  });
+
+  test('uses only the worker for intervals started after it starts ticking', () => {
+    const { workers, fallback, timers } = setup();
+
+    const first = timers.setInterval(() => {}, 10);
+    workers[0]!.tick(first);
+    timers.clearInterval(first);
+    timers.setInterval(() => {}, 10);
+
+    expect(fallback.active.size).toBe(0);
+    expect(workers[0]!.commands.map(({ type }) => type)).toEqual(['set', 'clear', 'set']);
+  });
+
   test('ignores ticks that arrive after the interval is cleared', () => {
     const { workers, timers } = setup();
     let calls = 0;

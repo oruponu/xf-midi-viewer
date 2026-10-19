@@ -20,6 +20,7 @@ export function createWorkerTimers(createWorker: () => TimerWorkerLike, fallback
   const intervals = new Map<TimerHandle, Interval>();
   let worker: TimerWorkerLike | null = null;
   let failed = false;
+  let ticking = false;
   let nextId = 1;
 
   const switchToFallback = () => {
@@ -31,7 +32,18 @@ export function createWorkerTimers(createWorker: () => TimerWorkerLike, fallback
     }
     failed = true;
     for (const interval of intervals.values()) {
-      interval.fallbackHandle = fallback.setInterval(interval.fn, interval.ms);
+      if (interval.fallbackHandle === null) {
+        interval.fallbackHandle = fallback.setInterval(interval.fn, interval.ms);
+      }
+    }
+  };
+
+  const stopFallbackTimers = () => {
+    ticking = true;
+    for (const interval of intervals.values()) {
+      if (interval.fallbackHandle === null) continue;
+      fallback.clearInterval(interval.fallbackHandle);
+      interval.fallbackHandle = null;
     }
   };
 
@@ -43,7 +55,10 @@ export function createWorkerTimers(createWorker: () => TimerWorkerLike, fallback
       failed = true;
       return null;
     }
-    worker.onmessage = (event) => intervals.get(event.data)?.fn();
+    worker.onmessage = (event) => {
+      if (!ticking) stopFallbackTimers();
+      intervals.get(event.data)?.fn();
+    };
     worker.onerror = switchToFallback;
     return worker;
   };
@@ -52,7 +67,10 @@ export function createWorkerTimers(createWorker: () => TimerWorkerLike, fallback
     setInterval(fn, ms) {
       const id = nextId++;
       const current = ensureWorker();
-      intervals.set(id, { fn, ms, fallbackHandle: current ? null : fallback.setInterval(fn, ms) });
+      // Loading the worker script can take longer than the lookahead, so the fallback
+      // keeps scheduling until the worker's first tick arrives.
+      const fallbackHandle = current && ticking ? null : fallback.setInterval(fn, ms);
+      intervals.set(id, { fn, ms, fallbackHandle });
       current?.postMessage({ type: 'set', id, ms });
       return id;
     },
@@ -61,7 +79,7 @@ export function createWorkerTimers(createWorker: () => TimerWorkerLike, fallback
       if (!interval) return;
       intervals.delete(handle);
       if (interval.fallbackHandle !== null) fallback.clearInterval(interval.fallbackHandle);
-      else worker?.postMessage({ type: 'clear', id: handle });
+      worker?.postMessage({ type: 'clear', id: handle });
     },
   };
 }
