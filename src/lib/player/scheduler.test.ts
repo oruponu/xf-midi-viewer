@@ -331,6 +331,50 @@ describe('MidiScheduler playback', () => {
     expect(scheduler.getPositionSnapshot()).toBe(0.5);
   });
 
+  test('reaching the end lets the sound ring out without a panic', () => {
+    let cleared = 0;
+    const { clock, scheduler, out } = setup(
+      [msg(0, [0x90, 60, 100]), msg(0.4, [0x80, 60, 0])],
+      0.5,
+    );
+    out.output.clear = () => {
+      cleared += 1;
+    };
+    scheduler.play();
+    const before = out.sent.length;
+    const clearedBefore = cleared;
+
+    clock.advance(600);
+
+    expect(scheduler.getState().isPlaying).toBe(false);
+    expect(out.sent.slice(before).map((m) => m.data)).toEqual([[0x80, 60, 0]]);
+    expect(cleared).toBe(clearedBefore);
+  });
+
+  test('play() after the end silences the ringing sound before restarting', () => {
+    const { clock, scheduler, out } = setup([msg(0, [0x90, 60, 100])], 0.5);
+    scheduler.play();
+    clock.advance(600);
+    const before = out.sent.length;
+
+    scheduler.play();
+
+    const restarted = out.sent.slice(before);
+    expect(restarted.filter(isPanic)).toHaveLength(32);
+    expectFenced(out.sent, before);
+  });
+
+  test('stop() after the end silences the ringing sound', () => {
+    const { clock, scheduler, out } = setup([msg(0, [0x90, 60, 100])], 0.5);
+    scheduler.play();
+    clock.advance(600);
+    const before = out.sent.length;
+
+    scheduler.stop();
+
+    expect(out.sent.slice(before).filter(isPanic)).toHaveLength(32);
+  });
+
   test('play() at the end restarts from 0', () => {
     const { clock, scheduler, out } = setup([msg(0, [0x90, 60, 100])], 0.5);
     scheduler.play();

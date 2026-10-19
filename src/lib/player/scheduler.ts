@@ -337,6 +337,16 @@ export class MidiScheduler {
     const position = resetPosition ? 0 : (at ?? this.getPosition());
     this.clearTimer();
     if (this.output) this.silence(this.output, this.reportSendFailure);
+    this.settle(position);
+  }
+
+  // Every message up to the end has been sent, so let the release tails ring out.
+  private finish(position: number): void {
+    this.clearTimer();
+    this.settle(position);
+  }
+
+  private settle(position: number): void {
     this.position = position;
     this.positionSnapshot = position;
     this.setState({ isPlaying: false });
@@ -375,7 +385,7 @@ export class MidiScheduler {
       this.positionSnapshot = audible;
       this.notify();
     }
-    if (audible >= sequence.durationSeconds) this.stopInternal(false, sequence.durationSeconds);
+    if (audible >= sequence.durationSeconds) this.finish(sequence.durationSeconds);
   }
 
   private scheduleMessage(output: MidiOutputLike, message: PlaybackMidiMessage): boolean {
