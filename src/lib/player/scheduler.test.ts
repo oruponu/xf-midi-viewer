@@ -544,6 +544,30 @@ describe('MidiScheduler send failures', () => {
     expect(scheduler.getState().sendError).toBeNull();
     expect(scheduler.getState().isPlaying).toBe(true);
   });
+
+  test('clears the recorded error when the output changes', () => {
+    const { scheduler, out } = setup([msg(0, [0x90, 60, 100]), msg(0.5, [0x80, 60, 0])], 1);
+    out.failWith(new Error('boom'));
+    scheduler.play();
+
+    let calls = 0;
+    scheduler.subscribe(() => calls++);
+
+    scheduler.setOutput(createOutput().output);
+
+    expect(scheduler.getState().sendError).toBeNull();
+    expect(calls).toBeGreaterThan(0);
+  });
+
+  test('clears the recorded error when the sequence changes', () => {
+    const { scheduler, out } = setup([msg(0, [0x90, 60, 100]), msg(0.5, [0x80, 60, 0])], 1);
+    out.failWith(new Error('boom'));
+    scheduler.play();
+
+    scheduler.setSequence(null);
+
+    expect(scheduler.getState().sendError).toBeNull();
+  });
 });
 
 describe('MidiScheduler seek', () => {
