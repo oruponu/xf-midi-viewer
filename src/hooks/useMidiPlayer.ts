@@ -27,6 +27,17 @@ export type MidiAccessState = 'unsupported' | 'idle' | 'requesting' | 'ready' | 
 
 const CLOCK_CHECK_INTERVAL_MS = 100;
 
+export interface PlayerFailure {
+  message: string;
+  hint?: string;
+}
+
+interface PrepareFailure {
+  failure: PlayerFailure;
+  sequence: PlaybackSequence | null;
+  outputId: string;
+}
+
 export interface MidiPlayer {
   scheduler: MidiScheduler;
   isPlaying: boolean;
@@ -34,6 +45,7 @@ export interface MidiPlayer {
   keyShift: number;
   midiAccessState: MidiAccessState;
   playerError: string | null;
+  failure: PlayerFailure | null;
   midiOutputs: MidiOutputOption[];
   selectedOutputId: string;
   outputReady: boolean;
@@ -55,7 +67,7 @@ export function useMidiPlayer(
     typeof navigator.requestMIDIAccess === 'function' ? 'idle' : 'unsupported',
   );
   const [accessError, setAccessError] = useState<string | null>(null);
-  const [prepareError, setPrepareError] = useState<string | null>(null);
+  const [prepareFailure, setPrepareFailure] = useState<PrepareFailure | null>(null);
   const [midiOutputs, setMidiOutputs] = useState<MidiOutputOption[]>([]);
   const [preferredOutputId, setPreferredOutputId] = useState(loadPreferredOutputId);
   const [builtinSupported] = useState(isBuiltinSynthSupported);
@@ -218,7 +230,7 @@ export function useMidiPlayer(
     playRequestRef.current += 1;
     const request = playRequestRef.current;
     setIsPreparing(true);
-    setPrepareError(null);
+    setPrepareFailure(null);
     prepare()
       .then(
         () => {
@@ -226,7 +238,11 @@ export function useMidiPlayer(
         },
         (error: unknown) => {
           if (request === playRequestRef.current) {
-            setPrepareError(`音声を開始できませんでした: ${formatError(error)}`);
+            setPrepareFailure({
+              failure: { message: `音声を開始できませんでした: ${formatError(error)}` },
+              sequence,
+              outputId: selectedOutputId,
+            });
           }
         },
       )
@@ -234,18 +250,31 @@ export function useMidiPlayer(
         preparingRef.current = false;
         setIsPreparing(false);
       });
-  }, [scheduler, isBuiltinSelected, prepare, isSoundBankBusy]);
+  }, [scheduler, isBuiltinSelected, prepare, isSoundBankBusy, sequence, selectedOutputId]);
 
   const stop = useCallback(() => {
     playRequestRef.current += 1;
     scheduler.stop();
   }, [scheduler]);
 
+  const activePrepareFailure =
+    prepareFailure?.sequence === sequence && prepareFailure.outputId === selectedOutputId
+      ? prepareFailure.failure
+      : null;
   const sendError = schedulerState.sendError;
-  const playerError =
-    accessError ??
-    prepareError ??
-    (sendError ? `音の送信に失敗しました: ${formatError(sendError.error)}` : null);
+  const sendFailure = useMemo(
+    () =>
+      sendError ? { message: `音の送信に失敗しました: ${formatError(sendError.error)}` } : null,
+    [sendError],
+  );
+  const builtinLoadError = isBuiltinSelected && builtin.status === 'error' ? builtin.error : null;
+  const builtinLoadFailure = useMemo(
+    () =>
+      builtinLoadError ? { message: builtinLoadError, hint: '設定から再読み込みできます。' } : null,
+    [builtinLoadError],
+  );
+  const playerError = accessError ?? (activePrepareFailure ?? sendFailure)?.message ?? null;
+  const failure = activePrepareFailure ?? sendFailure ?? builtinLoadFailure;
 
   return useMemo(
     () => ({
@@ -255,6 +284,7 @@ export function useMidiPlayer(
       keyShift: schedulerState.keyShift,
       midiAccessState,
       playerError,
+      failure,
       midiOutputs,
       selectedOutputId,
       outputReady,
@@ -270,6 +300,7 @@ export function useMidiPlayer(
       schedulerState,
       midiAccessState,
       playerError,
+      failure,
       midiOutputs,
       selectedOutputId,
       outputReady,

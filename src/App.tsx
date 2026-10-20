@@ -8,6 +8,7 @@ import type { InfoPanelTab } from './components/InfoPanel.tsx';
 import { PartPanel } from './components/PartPanel.tsx';
 import { PlaybackPanel } from './components/PlaybackPanel.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
+import { useFailureNotice } from './hooks/useFailureNotice.ts';
 import { useMediaQuery } from './hooks/useMediaQuery.ts';
 import { useMidiPlayer } from './hooks/useMidiPlayer.ts';
 import { useSettings } from './hooks/useSettings.ts';
@@ -65,6 +66,7 @@ function App() {
   const { scheduler, isPlaying } = player;
   const outputReady = player.outputReady && !player.isPreparing;
   const { play, stop } = player;
+  const { notice: playerNotice, dismiss: dismissPlayerNotice } = useFailureNotice(player.failure);
   useWakeLock(isPlaying);
 
   const songTitle = heading?.title;
@@ -194,18 +196,31 @@ function App() {
         </div>
       </header>
 
-      {songState.current && loadFailure && loadFailure.id !== dismissedFailureId && (
-        <ErrorToast
-          timerKey={loadFailure.id}
-          onDismiss={() => setDismissedFailureId(loadFailure.id)}
-        >
-          <LoadErrorMessage
-            fileName={loadFailure.file.name}
-            reason={loadFailure.reason}
-            detail={loadFailure.detail}
-          />
-        </ErrorToast>
-      )}
+      <div className="toast-stack">
+        {songState.current && loadFailure && loadFailure.id !== dismissedFailureId && (
+          <ErrorToast
+            timerKey={loadFailure.id}
+            onDismiss={() => setDismissedFailureId(loadFailure.id)}
+          >
+            <LoadErrorMessage
+              fileName={loadFailure.file.name}
+              reason={loadFailure.reason}
+              detail={loadFailure.detail}
+            />
+          </ErrorToast>
+        )}
+        {playerNotice && (
+          <ErrorToast timerKey={playerNotice.id} onDismiss={dismissPlayerNotice}>
+            {playerNotice.failure.message}
+            {playerNotice.failure.hint && (
+              <>
+                <br />
+                {playerNotice.failure.hint}
+              </>
+            )}
+          </ErrorToast>
+        )}
+      </div>
 
       <main className={`app${isDragging ? ' app--dragging' : ''}`}>
         {!songState.current && loadFailure && (
