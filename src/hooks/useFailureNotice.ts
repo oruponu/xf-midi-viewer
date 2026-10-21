@@ -10,11 +10,13 @@ export function useFailureNotice<T extends object>(
   failure: T | null,
 ): { notice: FailureNotice<T> | null; dismiss: () => void } {
   const [seen, setSeen] = useState<T | null>(null);
-  const [notice, setNotice] = useState<FailureNotice<T> | null>(null);
+  const [latest, setLatest] = useState<FailureNotice<T> | null>(null);
+  const [dismissedId, setDismissedId] = useState(0);
   if (failure !== seen) {
     setSeen(failure);
-    if (failure) setNotice({ id: (notice?.id ?? 0) + 1, failure });
+    if (failure) setLatest({ id: (latest?.id ?? 0) + 1, failure });
   }
-  const dismiss = useCallback(() => setNotice(null), []);
-  return { notice, dismiss };
+  const latestId = latest?.id ?? 0;
+  const dismiss = useCallback(() => setDismissedId(latestId), [latestId]);
+  return { notice: latest && latest.id !== dismissedId ? latest : null, dismiss };
 }
