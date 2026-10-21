@@ -111,6 +111,10 @@ export class BuiltinSynthOutput implements MidiOutputLike {
     if (this.active && this.isClockStalled()) this.stall();
   }
 
+  halt(): void {
+    if (this.active) this.stall();
+  }
+
   activate(): void {
     const current = this.clock.currentTime;
     const drainUntil = Math.max(current, this.lastQueuedTime);
