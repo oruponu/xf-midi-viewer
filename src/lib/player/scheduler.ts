@@ -157,12 +157,22 @@ export class MidiScheduler {
     this.sequence = sequence;
     this.transposedMessages = null;
     this.noteSince = new Array<number>(16).fill(0);
-    this.setState({ playbackRate: 1, keyShift: 0, mutedChannels: 0, soloChannels: 0 });
+    this.setState({
+      playbackRate: 1,
+      keyShift: 0,
+      mutedChannels: 0,
+      soloChannels: 0,
+      sendError: null,
+    });
     this.notify();
   }
 
   setOutput(output: MidiOutputLike | null): void {
     if (output === this.output) return;
+    if (this.state.sendError !== null) {
+      this.setState({ sendError: null });
+      this.notify();
+    }
     if (output === null && this.intervalHandle !== null) {
       this.stopInternal(false);
       this.output = null;
