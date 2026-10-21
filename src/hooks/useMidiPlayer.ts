@@ -257,10 +257,10 @@ export function useMidiPlayer(
     scheduler.stop();
   }, [scheduler]);
 
-  const activePrepareFailure =
-    prepareFailure?.sequence === sequence && prepareFailure.outputId === selectedOutputId
-      ? prepareFailure.failure
-      : null;
+  const isPrepareFailureCurrent =
+    prepareFailure?.sequence === sequence && prepareFailure.outputId === selectedOutputId;
+  if (prepareFailure && !isPrepareFailureCurrent) setPrepareFailure(null);
+  const activePrepareFailure = isPrepareFailureCurrent ? prepareFailure.failure : null;
   const sendError = schedulerState.sendError;
   const sendFailure = useMemo(
     () =>
