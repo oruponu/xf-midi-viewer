@@ -6,7 +6,13 @@ import {
   fetchBundledSoundBank,
   isBuiltinSynthSupported,
 } from '../lib/synth/engine.ts';
-import type { BuiltinSynthEngine, SoundBankLoadResult } from '../lib/synth/engine.ts';
+import type {
+  BuiltinSynthEngine,
+  BuiltinSynthEngineCallbacks,
+  SoundBankLoadResult,
+} from '../lib/synth/engine.ts';
+import { processorFailureNotice } from '../lib/synth/processorFailure.ts';
+import type { ProcessorFailureNotice } from '../lib/synth/processorFailure.ts';
 import {
   BUNDLED_SOUND_BANK,
   DELETE_FAILURE_MESSAGE,
@@ -31,6 +37,7 @@ export interface BuiltinSynth {
   soundBank: SoundBankEntry | null;
   nextSoundBank: SoundBankEntry;
   notice: string | null;
+  processorFailure: ProcessorFailureNotice | null;
   isBusy: boolean;
   prepare: () => Promise<void>;
   retry: () => void;
@@ -65,23 +72,42 @@ export function useBuiltinSynth({ active, onStall }: BuiltinSynthOptions): Built
   const [savedSoundBank, setSavedSoundBank] = useState<SoundBankEntry | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [processorFailure, setProcessorFailure] = useState<ProcessorFailureNotice | null>(null);
   const onStallRef = useRef(onStall);
+  const soundBankRef = useRef(soundBank);
 
   useEffect(() => {
     onStallRef.current = onStall;
   }, [onStall]);
 
   useEffect(() => {
+    soundBankRef.current = soundBank;
+  }, [soundBank]);
+
+  useEffect(() => {
     if (!supported || !active || engine) return;
     let cancelled = false;
-    void loadEngine((stalledAtMs) => onStallRef.current(stalledAtMs)).then(
+    let loadedEngine: BuiltinSynthEngine | null = null;
+    void loadEngine({
+      onStall: (stalledAtMs) => onStallRef.current(stalledAtMs),
+      onProcessorError: (reason) => {
+        const crashed = loadedEngine;
+        if (!crashed) return;
+        setProcessorFailure(
+          processorFailureNotice(reason, soundBankRef.current ?? BUNDLED_SOUND_BANK),
+        );
+        setEngine((current) => (current === crashed ? null : current));
+      },
+    }).then(
       (loaded) => {
         if (cancelled) {
           loaded.engine.destroy();
           return;
         }
+        loadedEngine = loaded.engine;
         setEngine(loaded.engine);
         setError(null);
+        setProcessorFailure(null);
         setSoundBank(loaded.soundBank);
         setSavedSoundBank(loaded.saved);
         loaded.result.then(
@@ -99,7 +125,9 @@ export function useBuiltinSynth({ active, onStall }: BuiltinSynthOptions): Built
         );
       },
       (e: unknown) => {
-        if (!cancelled) setError(`内蔵音源を準備できませんでした: ${formatError(e)}`);
+        if (cancelled) return;
+        setError(`内蔵音源を準備できませんでした: ${formatError(e)}`);
+        setProcessorFailure(null);
       },
     );
     return () => {
@@ -198,6 +226,7 @@ export function useBuiltinSynth({ active, onStall }: BuiltinSynthOptions): Built
       soundBank,
       nextSoundBank: nextSoundBankToLoad(savedSoundBank),
       notice,
+      processorFailure,
       isBusy,
       prepare,
       retry,
@@ -213,6 +242,7 @@ export function useBuiltinSynth({ active, onStall }: BuiltinSynthOptions): Built
       soundBank,
       savedSoundBank,
       notice,
+      processorFailure,
       isBusy,
       prepare,
       retry,
@@ -223,8 +253,8 @@ export function useBuiltinSynth({ active, onStall }: BuiltinSynthOptions): Built
   );
 }
 
-async function loadEngine(onStall: (stalledAtMs: number) => void): Promise<LoadedEngine> {
-  const engine = await createBuiltinSynthEngine(onStall);
+async function loadEngine(callbacks: BuiltinSynthEngineCallbacks): Promise<LoadedEngine> {
+  const engine = await createBuiltinSynthEngine(callbacks);
   try {
     const saved = await loadSavedSoundBank().catch(() => null);
     if (saved) {

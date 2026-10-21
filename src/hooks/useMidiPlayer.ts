@@ -273,8 +273,10 @@ export function useMidiPlayer(
       builtinLoadError ? { message: builtinLoadError, hint: '設定から再読み込みできます。' } : null,
     [builtinLoadError],
   );
+  const builtinProcessorFailure = isBuiltinSelected ? builtin.processorFailure : null;
   const playerError = accessError ?? (activePrepareFailure ?? sendFailure)?.message ?? null;
-  const failure = activePrepareFailure ?? sendFailure ?? builtinLoadFailure;
+  const failure =
+    activePrepareFailure ?? sendFailure ?? builtinProcessorFailure ?? builtinLoadFailure;
 
   return useMemo(
     () => ({

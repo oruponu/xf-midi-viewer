@@ -1,6 +1,7 @@
 import { WorkletSynthesizer } from 'spessasynth_lib';
 import processorUrl from 'spessasynth_lib/dist/spessasynth_processor.min.js?url';
 import { BuiltinSynthOutput, waitForClockStart } from './builtinOutput.ts';
+import { ProcessorFailure } from './processorFailure.ts';
 import { soundBankGain } from './soundBank.ts';
 import { SynthClockOffset, withClockOffset } from './synthClock.ts';
 import { XgDrumKitFallback, withXgDrumKitFallback } from './xgDrumKitFallback.ts';
@@ -61,9 +62,15 @@ export async function fetchBundledSoundBank(): Promise<ArrayBuffer> {
   return response.arrayBuffer();
 }
 
-export async function createBuiltinSynthEngine(
-  onStall: (stalledAtMs: number) => void,
-): Promise<BuiltinSynthEngine> {
+export interface BuiltinSynthEngineCallbacks {
+  onStall: (stalledAtMs: number) => void;
+  onProcessorError: (reason: string) => void;
+}
+
+export async function createBuiltinSynthEngine({
+  onStall,
+  onProcessorError,
+}: BuiltinSynthEngineCallbacks): Promise<BuiltinSynthEngine> {
   const context = new AudioContext({ latencyHint: 'interactive' });
   try {
     await context.audioWorklet.addModule(processorUrl);
@@ -101,6 +108,15 @@ export async function createBuiltinSynthEngine(
   });
   const onStateChange = () => output.notifyStateChange();
   context.addEventListener('statechange', onStateChange);
+  const processorFailure = new ProcessorFailure();
+  if (workletNode) {
+    // Chrome does not call processorerror listeners added with addEventListener.
+    workletNode.onprocessorerror = (event) => {
+      processorFailure.fail(new Error(event.message || '内蔵音源が停止しました'));
+      output.halt();
+      onProcessorError(event.message);
+    };
+  }
 
   let pending: Promise<unknown> = Promise.resolve();
   let loadCount = 0;
@@ -150,7 +166,7 @@ export async function createBuiltinSynthEngine(
       applySoundBankKind(options.bundled);
       return 'loaded';
     };
-    const result = pending.then(run, run);
+    const result = processorFailure.guard(pending.then(run, run));
     pending = result.catch(() => {});
     return result;
   };
@@ -162,6 +178,7 @@ export async function createBuiltinSynthEngine(
   };
 
   const prepare = async (): Promise<void> => {
+    if (processorFailure.error) throw processorFailure.error;
     await resumeAudio();
     await pending;
     if (!hasSoundBank) throw new Error('音源が読み込まれていません');
@@ -172,6 +189,7 @@ export async function createBuiltinSynthEngine(
   const destroy = () => {
     context.removeEventListener('statechange', onStateChange);
     workletNode?.port.removeEventListener('message', onWorkletMessage);
+    if (workletNode) workletNode.onprocessorerror = null;
     synth.destroy();
     void context.close();
   };
