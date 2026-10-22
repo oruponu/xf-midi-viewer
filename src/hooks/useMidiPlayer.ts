@@ -11,7 +11,7 @@ import { MidiScheduler } from '../lib/player/scheduler.ts';
 import { createSchedulerTimers } from '../lib/player/workerTimers.ts';
 import type { KeyShiftChange } from '../lib/smf/fixedKey.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
-import { isBuiltinSynthSupported } from '../lib/synth/engine.ts';
+import { isBuiltinSynthSupported } from '../lib/synth/support.ts';
 import { useBuiltinSynth } from './useBuiltinSynth.ts';
 import type { BuiltinSynth } from './useBuiltinSynth.ts';
 import { useMediaQuery } from './useMediaQuery.ts';

@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { BuiltinSynthOutput } from '../lib/synth/builtinOutput.ts';
-import {
-  builtinSynthUnsupportedReason,
-  createBuiltinSynthEngine,
-  fetchBundledSoundBank,
-  isBuiltinSynthSupported,
-} from '../lib/synth/engine.ts';
 import type {
   BuiltinSynthEngine,
   BuiltinSynthEngineCallbacks,
@@ -27,6 +21,11 @@ import {
   loadSavedSoundBank,
   saveSoundBank,
 } from '../lib/synth/soundBankStore.ts';
+import {
+  builtinSynthUnsupportedReason,
+  fetchBundledSoundBank,
+  isBuiltinSynthSupported,
+} from '../lib/synth/support.ts';
 
 export type BuiltinSynthStatus = 'unsupported' | 'idle' | 'loading' | 'ready' | 'error';
 
@@ -254,6 +253,7 @@ export function useBuiltinSynth({ active, onStall }: BuiltinSynthOptions): Built
 }
 
 async function loadEngine(callbacks: BuiltinSynthEngineCallbacks): Promise<LoadedEngine> {
+  const { createBuiltinSynthEngine } = await import('../lib/synth/engine.ts');
   const engine = await createBuiltinSynthEngine(callbacks);
   try {
     const saved = await loadSavedSoundBank().catch(() => null);
