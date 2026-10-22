@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { BuiltinSynthOutput } from '../lib/synth/builtinOutput.ts';
-import {
-  builtinSynthUnsupportedReason,
-  createBuiltinSynthEngine,
-  fetchBundledSoundBank,
-  isBuiltinSynthSupported,
-} from '../lib/synth/engine.ts';
+import { createBuiltinSynthEngine } from '../lib/synth/engine.ts';
 import type {
   BuiltinSynthEngine,
   BuiltinSynthEngineCallbacks,
@@ -27,6 +22,11 @@ import {
   loadSavedSoundBank,
   saveSoundBank,
 } from '../lib/synth/soundBankStore.ts';
+import {
+  builtinSynthUnsupportedReason,
+  fetchBundledSoundBank,
+  isBuiltinSynthSupported,
+} from '../lib/synth/support.ts';
 
 export type BuiltinSynthStatus = 'unsupported' | 'idle' | 'loading' | 'ready' | 'error';
 

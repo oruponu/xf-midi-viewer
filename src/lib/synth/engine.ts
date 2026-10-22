@@ -21,8 +21,6 @@ export interface BuiltinSynthEngine {
   destroy(): void;
 }
 
-export const BUNDLED_SOUND_BANK_URL = `${import.meta.env.BASE_URL}soundfonts/GeneralUser-GS-XG.sf3`;
-
 const MAIN_SOUND_BANK_ID = 'main';
 
 // Cancels SPESSASYNTH_GAIN_FACTOR (0.6) that spessasynth applies to every voice.
@@ -40,27 +38,6 @@ const LIMITER_OPTIONS: DynamicsCompressorOptions = {
 const LIMITER_LATENCY_SECONDS = 0.006;
 
 type AudioSessionNavigator = Navigator & { audioSession?: { type: string } };
-
-export function isBuiltinSynthSupported(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    window.isSecureContext &&
-    typeof AudioContext === 'function' &&
-    typeof AudioWorkletNode === 'function'
-  );
-}
-
-export function builtinSynthUnsupportedReason(): string {
-  return typeof window !== 'undefined' && !window.isSecureContext
-    ? '内蔵音源を使うには HTTPS で開いてください'
-    : 'このブラウザは内蔵音源に対応していません';
-}
-
-export async function fetchBundledSoundBank(): Promise<ArrayBuffer> {
-  const response = await fetch(BUNDLED_SOUND_BANK_URL);
-  if (!response.ok) throw new Error(`標準の音源を取得できませんでした (HTTP ${response.status})`);
-  return response.arrayBuffer();
-}
 
 export interface BuiltinSynthEngineCallbacks {
   onStall: (stalledAtMs: number) => void;
