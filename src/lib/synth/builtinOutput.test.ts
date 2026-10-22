@@ -257,6 +257,29 @@ describe('BuiltinSynthOutput', () => {
     expect(stalls()).toBe(1);
   });
 
+  test('halt() reports a stall at the current position once and drops later messages', () => {
+    const { output, calls, clock, stalls, stallTimes } = setupOutput();
+    output.activate();
+    const before = calls.length;
+    clock.currentTime = 12;
+
+    output.halt();
+    output.halt();
+    output.send([0x90, 60, 100], 3010);
+
+    expect(stalls()).toBe(1);
+    expect(stallTimes[0]).toBeCloseTo(3000, 6);
+    expect(calls).toHaveLength(before);
+    expect(output.isActive).toBe(false);
+  });
+
+  test('halt() does nothing while inactive', () => {
+    const { output, stalls, gainCalls } = setupOutput();
+    output.halt();
+    expect(stalls()).toBe(0);
+    expect(gainCalls).toEqual([]);
+  });
+
   test('latencyMs() falls back from outputLatency to baseLatency to 0', () => {
     expect(setupOutput({ outputLatency: 0.03, baseLatency: 0.01 }).output.latencyMs()).toBeCloseTo(
       30,
