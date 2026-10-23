@@ -25,4 +25,4 @@ dist-ssr
 
 # Generated
 public/third-party-licenses.txt
-public/soundfonts/GeneralUser-GS-XG.sf3
+src/generated/GeneralUser-GS-XG.sf3

@@ -1,4 +1,6 @@
-export const BUNDLED_SOUND_BANK_URL = `${import.meta.env.BASE_URL}soundfonts/GeneralUser-GS-XG.sf3`;
+import bundledSoundBankUrl from '../../generated/GeneralUser-GS-XG.sf3?url';
+
+export const BUNDLED_SOUND_BANK_URL = bundledSoundBankUrl;
 
 export function isBuiltinSynthSupported(): boolean {
   return (
