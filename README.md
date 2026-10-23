@@ -78,7 +78,7 @@ bun run dev
 `bun run dev` と `bun run build` は、Vite を起動する前に次の 2 つのファイルを生成します。どちらもリポジトリには含めていません。
 
 - `public/third-party-licenses.txt`：使用しているライブラリのライセンス一覧
-- `public/soundfonts/GeneralUser-GS-XG.sf3`：`assets/soundfonts/GeneralUser-GS.sf3` に XG のドラムキット、SFX の音色、バリエーション音色のプリセットを加えて音量のバランスを調整した SoundFont
+- `src/generated/GeneralUser-GS-XG.sf3`：`assets/soundfonts/GeneralUser-GS.sf3` に XG のドラムキット、SFX の音色、バリエーション音色のプリセットを加えて音量のバランスを調整した SoundFont
 
 ### スクリプト
 

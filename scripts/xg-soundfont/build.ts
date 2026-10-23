@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { SoundBankLoader, SpessaLog } from 'spessasynth_core';
 import type { BasicSoundBank } from 'spessasynth_core';
 import {
@@ -87,5 +88,6 @@ if (import.meta.main) {
     readCorrections(CORRECTIONS_PATH),
     (message) => console.warn(message),
   );
+  mkdirSync(dirname(OUTPUT_SOUND_BANK_PATH), { recursive: true });
   writeFileSync(OUTPUT_SOUND_BANK_PATH, new Uint8Array(output));
 }
