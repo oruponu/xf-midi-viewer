@@ -274,10 +274,9 @@ describe('BuiltinSynthOutput', () => {
   });
 
   test('deactivate() drops later messages and ignores a suspend without reporting a stall', () => {
-    const { output, calls, clock, stalls, gainCalls } = setupOutput();
+    const { output, calls, clock, stalls } = setupOutput();
     output.activate();
     const before = calls.length;
-    const gainBefore = gainCalls.length;
 
     output.deactivate();
     clock.state = 'suspended';
@@ -286,8 +285,18 @@ describe('BuiltinSynthOutput', () => {
 
     expect(stalls()).toBe(0);
     expect(calls).toHaveLength(before);
-    expect(gainCalls).toHaveLength(gainBefore);
     expect(output.isActive).toBe(false);
+  });
+
+  test('deactivate() mutes the output so frozen voices stay silent on resume', () => {
+    const { output, clock, gainCalls } = setupOutput();
+    output.activate();
+    clock.currentTime = 20;
+    const before = gainCalls.length;
+
+    output.deactivate();
+
+    expect(gainCalls.slice(before)).toEqual(['cancel 20', 'set 0 20']);
   });
 
   test('resets the synth on the next activate() after deactivate()', () => {

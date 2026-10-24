@@ -115,11 +115,13 @@ export class BuiltinSynthOutput implements MidiOutputLike {
     if (this.active) this.stall();
   }
 
+  // Muted so that voices still held when the context suspends stay silent after a resume.
   // Messages dropped while inactive (e.g. the reset on opening a file) are made up for by
   // resetting on the next activate().
   deactivate(): void {
     this.active = false;
     this.resetPending = true;
+    this.mute();
   }
 
   activate(): void {
@@ -152,10 +154,14 @@ export class BuiltinSynthOutput implements MidiOutputLike {
   private stall(): void {
     this.active = false;
     this.resetPending = true;
+    this.mute();
+    this.onStall((this.clock.currentTime - this.anchor) * 1000);
+  }
+
+  private mute(): void {
     const current = this.clock.currentTime;
     this.gain.cancelScheduledValues(current);
     this.gain.setValueAtTime(0, current);
-    this.onStall((this.clock.currentTime - this.anchor) * 1000);
   }
 }
 
