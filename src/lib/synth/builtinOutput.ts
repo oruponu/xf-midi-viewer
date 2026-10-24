@@ -115,6 +115,13 @@ export class BuiltinSynthOutput implements MidiOutputLike {
     if (this.active) this.stall();
   }
 
+  // Messages dropped while inactive (e.g. the reset on opening a file) are made up for by
+  // resetting on the next activate().
+  deactivate(): void {
+    this.active = false;
+    this.resetPending = true;
+  }
+
   activate(): void {
     const current = this.clock.currentTime;
     const drainUntil = Math.max(current, this.lastQueuedTime);
