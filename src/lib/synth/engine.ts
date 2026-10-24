@@ -160,21 +160,26 @@ export async function createBuiltinSynthEngine({
 
   // A resume requested after scheduling (a play click) wins even if the timer fires before
   // the caller cancels it. Sound bank loads may not progress while suspended, so wait for them.
+  // An interrupted context returns to running on its own, so keep watching until then.
   const scheduleSuspend = (delayMs: number): (() => void) => {
     const scheduledAt = resumeCount;
     let cancelled = false;
+    const suspendIfIdle = () => {
+      if (cancelled || resumeCount !== scheduledAt || context.state !== 'running') return;
+      output.deactivate();
+      void context.suspend().catch(() => {});
+    };
     const timer = setTimeout(() => {
-      void pending
-        .then(() => {
-          if (cancelled || resumeCount !== scheduledAt || context.state !== 'running') return;
-          output.deactivate();
-          return context.suspend();
-        })
-        .catch(() => {});
+      void pending.then(() => {
+        if (cancelled) return;
+        context.addEventListener('statechange', suspendIfIdle);
+        suspendIfIdle();
+      });
     }, delayMs);
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      context.removeEventListener('statechange', suspendIfIdle);
     };
   };
 
