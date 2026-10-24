@@ -273,6 +273,51 @@ describe('BuiltinSynthOutput', () => {
     expect(output.isActive).toBe(false);
   });
 
+  test('deactivate() drops later messages and ignores a suspend without reporting a stall', () => {
+    const { output, calls, clock, stalls } = setupOutput();
+    output.activate();
+    const before = calls.length;
+
+    output.deactivate();
+    clock.state = 'suspended';
+    output.notifyStateChange();
+    output.send([0x90, 60, 100], 1010);
+
+    expect(stalls()).toBe(0);
+    expect(calls).toHaveLength(before);
+    expect(output.isActive).toBe(false);
+  });
+
+  test('deactivate() mutes the output so frozen voices stay silent on resume', () => {
+    const { output, clock, gainCalls } = setupOutput();
+    output.activate();
+    clock.currentTime = 20;
+    const before = gainCalls.length;
+
+    output.deactivate();
+
+    expect(gainCalls.slice(before)).toEqual(['cancel 20', 'set 0 20']);
+  });
+
+  test('resets the synth on the next activate() after deactivate()', () => {
+    const { output, calls } = setupOutput();
+    output.activate();
+    const before = calls.length;
+
+    output.deactivate();
+    output.activate();
+
+    expect(
+      calls
+        .slice(before)
+        .filter((c) => c.data[0] === 0xf0)
+        .map((c) => c.data),
+    ).toEqual([
+      [0xf0, 0x7e, 0x7f, 0x09, 0x01, 0xf7],
+      [0xf0, 0x43, 0x10, 0x4c, 0x00, 0x00, 0x7e, 0x00, 0xf7],
+    ]);
+  });
+
   test('halt() does nothing while inactive', () => {
     const { output, stalls, gainCalls } = setupOutput();
     output.halt();

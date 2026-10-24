@@ -47,6 +47,7 @@ export interface BuiltinSynth {
 
 interface BuiltinSynthOptions {
   active: boolean;
+  audioIdle: boolean;
   onStall: (stalledAtMs: number) => void;
 }
 
@@ -62,7 +63,10 @@ interface LoadedEngine {
   result: Promise<InitialLoadResult>;
 }
 
-export function useBuiltinSynth({ active, onStall }: BuiltinSynthOptions): BuiltinSynth {
+// Long enough for release tails at the end of a song to fade out before suspending.
+const AUDIO_IDLE_SUSPEND_MS = 10_000;
+
+export function useBuiltinSynth({ active, audioIdle, onStall }: BuiltinSynthOptions): BuiltinSynth {
   const [supported] = useState(isBuiltinSynthSupported);
   const [engine, setEngine] = useState<BuiltinSynthEngine | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +76,7 @@ export function useBuiltinSynth({ active, onStall }: BuiltinSynthOptions): Built
   const [notice, setNotice] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [processorFailure, setProcessorFailure] = useState<ProcessorFailureNotice | null>(null);
+  const [unlockCount, setUnlockCount] = useState(0);
   const onStallRef = useRef(onStall);
   const soundBankRef = useRef(soundBank);
 
@@ -136,6 +141,11 @@ export function useBuiltinSynth({ active, onStall }: BuiltinSynthOptions): Built
 
   useEffect(() => () => engine?.destroy(), [engine]);
 
+  useEffect(() => {
+    if (!engine || !audioIdle || isBusy) return;
+    return engine.scheduleSuspend(AUDIO_IDLE_SUSPEND_MS);
+  }, [engine, audioIdle, isBusy, unlockCount]);
+
   const prepare = useCallback(
     () => (engine ? engine.prepare() : Promise.reject(new Error('内蔵音源の準備ができていません'))),
     [engine],
@@ -150,6 +160,7 @@ export function useBuiltinSynth({ active, onStall }: BuiltinSynthOptions): Built
   const loadUserSoundBank = useCallback(
     async (file: File) => {
       if (!engine) return;
+      void engine.resumeAudio().catch(() => {});
       setIsBusy(true);
       setNotice(null);
       try {
@@ -179,7 +190,9 @@ export function useBuiltinSynth({ active, onStall }: BuiltinSynthOptions): Built
   );
 
   const unlockAudio = useCallback(() => {
-    void engine?.resumeAudio().catch(() => {});
+    if (!engine) return;
+    void engine.resumeAudio().catch(() => {});
+    setUnlockCount((n) => n + 1);
   }, [engine]);
 
   const resetSoundBank = useCallback(async () => {
