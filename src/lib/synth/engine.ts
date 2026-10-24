@@ -17,6 +17,7 @@ export interface BuiltinSynthEngine {
   readonly output: BuiltinSynthOutput;
   loadSoundBank(data: ArrayBuffer, options: SoundBankLoadOptions): Promise<SoundBankLoadResult>;
   resumeAudio(): Promise<void>;
+  scheduleSuspend(delayMs: number): () => void;
   prepare(): Promise<void>;
   destroy(): void;
 }
@@ -148,10 +149,33 @@ export async function createBuiltinSynthEngine({
     return result;
   };
 
+  let resumeCount = 0;
+
   const resumeAudio = (): Promise<void> => {
+    resumeCount += 1;
     const nav = navigator as AudioSessionNavigator;
     if (nav.audioSession) nav.audioSession.type = 'playback';
     return context.resume();
+  };
+
+  // A resume requested after scheduling (a play click) wins even if the timer fires before
+  // the caller cancels it. Sound bank loads may not progress while suspended, so wait for them.
+  const scheduleSuspend = (delayMs: number): (() => void) => {
+    const scheduledAt = resumeCount;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void pending
+        .then(() => {
+          if (cancelled || resumeCount !== scheduledAt || context.state !== 'running') return;
+          output.deactivate();
+          return context.suspend();
+        })
+        .catch(() => {});
+    }, delayMs);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   };
 
   const prepare = async (): Promise<void> => {
@@ -171,5 +195,5 @@ export async function createBuiltinSynthEngine({
     void context.close();
   };
 
-  return { output, loadSoundBank, resumeAudio, prepare, destroy };
+  return { output, loadSoundBank, resumeAudio, scheduleSuspend, prepare, destroy };
 }
