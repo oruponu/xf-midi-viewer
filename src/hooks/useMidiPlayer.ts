@@ -88,11 +88,6 @@ export function useMidiPlayer(
     },
     [scheduler],
   );
-  const builtin = useBuiltinSynth({
-    active: isBuiltinPreferred(preferredOutputId, builtinSupported),
-    onStall: pauseOnStall,
-  });
-
   const selectedOutputId = useMemo(
     () =>
       resolveOutputSelection(
@@ -103,6 +98,12 @@ export function useMidiPlayer(
     [preferredOutputId, midiOutputs, builtinSupported],
   );
   const isBuiltinSelected = selectedOutputId === BUILTIN_OUTPUT_ID;
+  const isPlaying = schedulerState.isPlaying;
+  const builtin = useBuiltinSynth({
+    active: isBuiltinPreferred(preferredOutputId, builtinSupported),
+    audioIdle: !(isBuiltinSelected && (isPlaying || isPreparing)),
+    onStall: pauseOnStall,
+  });
   const builtinOutput = builtin.status === 'ready' ? builtin.output : null;
   const outputReady = isBuiltinSelected
     ? builtinOutput !== null && !builtin.isBusy
@@ -172,7 +173,6 @@ export function useMidiPlayer(
     builtinSelectedRef.current = isBuiltinSelected;
   }, [isBuiltinSelected]);
 
-  const isPlaying = schedulerState.isPlaying;
   useEffect(() => {
     if (!isBuiltinSelected || !builtinOutput || !isPlaying) return;
     const handle = window.setInterval(() => builtinOutput.checkClock(), CLOCK_CHECK_INTERVAL_MS);
