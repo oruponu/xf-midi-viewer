@@ -1940,4 +1940,87 @@
   .toast-stack {
     top: 12px;
   }
+
+  .player-dock {
+    padding-top: 6px;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  }
+
+  .playback-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .playback-position-group {
+    display: contents;
+  }
+
+  .transport-button {
+    flex: none;
+  }
+
+  .playback-position {
+    box-sizing: border-box;
+    padding: 0 8px;
+    font-size: 14px;
+  }
+
+  .playback-tempo,
+  .playback-key {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    box-sizing: border-box;
+    height: 36px;
+    min-width: 0;
+    padding: 0 6px;
+  }
+
+  .playback-tempo-header,
+  .playback-key-header {
+    flex-direction: row;
+    gap: 4px;
+  }
+
+  /* Reserve the widest value so the buttons after it don't move */
+  .playback-tempo-value {
+    min-width: 3ch;
+    text-align: end;
+  }
+
+  .playback-key-value {
+    min-width: 3ch;
+    text-align: center;
+  }
+
+  .playback-key-shift .playback-rate-value {
+    min-width: 2ch;
+    text-align: center;
+  }
+
+  .playback-time-sig-value {
+    min-width: 4ch;
+  }
+
+  .playback-tempo-rate,
+  .playback-key-shift {
+    padding-top: 0;
+    padding-left: 4px;
+    border-top: none;
+    border-left: 1px solid var(--border);
+  }
+
+  .playback-time-sig {
+    flex-direction: row;
+    gap: 4px;
+    align-self: auto;
+    box-sizing: border-box;
+    height: 36px;
+  }
+
+  .playback-timeline {
+    flex: 1 1 100%;
+  }
 }
