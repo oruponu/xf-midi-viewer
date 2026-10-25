@@ -1915,3 +1915,15 @@
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   }
 }
+
+/* Short screens such as phones in landscape: only the player dock stays fixed. */
+@media (max-height: 500px) {
+  .app-bar,
+  .viewer-chrome {
+    position: static;
+  }
+
+  .toast-stack {
+    top: 12px;
+  }
+}
