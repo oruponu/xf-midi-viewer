@@ -775,6 +775,12 @@
   background: var(--bg);
 }
 
+@media (max-height: 500px) {
+  .card {
+    padding: 8px 10px;
+  }
+}
+
 .card h3 {
   margin: 0 0 12px;
   font-size: 15px;
@@ -1921,6 +1927,14 @@
   .app-bar,
   .viewer-chrome {
     position: static;
+  }
+
+  .viewer-chrome {
+    padding: 8px 0 6px;
+  }
+
+  .info-panel {
+    margin-top: 8px;
   }
 
   .toast-stack {
