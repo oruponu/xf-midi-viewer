@@ -45,6 +45,12 @@ html {
   scroll-padding-bottom: max(var(--dock-height, 0px), var(--part-panel-cover, 0px));
 }
 
+@media (max-height: 500px) {
+  html {
+    scroll-padding-top: 0;
+  }
+}
+
 :root[data-theme='light'] {
   color-scheme: light;
 }
