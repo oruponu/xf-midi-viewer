@@ -908,11 +908,6 @@
 
 .lyric ruby rt {
   font-size: 0.55em;
-  color: var(--text);
-}
-
-.lyric--active ruby rt {
-  color: inherit;
 }
 
 .part-badge {
