@@ -602,7 +602,7 @@ function renderRun(run: LyricRun, index: number): ReactNode {
   }
   return (
     <ruby key={index}>
-      {run.base}
+      <span>{run.base}</span>
       <rt>{run.reading}</rt>
     </ruby>
   );
