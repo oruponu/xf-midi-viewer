@@ -187,6 +187,12 @@ export const LeadSheet = memo(function LeadSheet({
     const lyricEls = Array.from(container.querySelectorAll<HTMLElement>('.score-lyric'));
     const chordTicks = chordEls.map((el) => Number(el.dataset.tick ?? '0'));
     const lyricTicks = lyricEls.map((el) => Number(el.dataset.tick ?? '0'));
+    // Gaps shorter than a quarter note would only make the highlight blink between syllables.
+    const lyricEndTicks = lyricEls.map((el, i) => {
+      const end = el.dataset.endTick === undefined ? Infinity : Number(el.dataset.endTick);
+      const next = lyricTicks[i + 1] ?? Infinity;
+      return next - end < timing.ppq ? Infinity : end;
+    });
     let raf = 0;
     let cancelled = false;
     let lastPos = NaN;
@@ -232,7 +238,7 @@ export const LeadSheet = memo(function LeadSheet({
         const initial = Number.isNaN(lastTick);
         lastTick = tickValue;
         markProgress(chordEls, chordTicks, tickValue, 'score-chord');
-        markProgress(lyricEls, lyricTicks, tickValue, 'score-lyric');
+        markProgress(lyricEls, lyricTicks, tickValue, 'score-lyric', lyricEndTicks);
         // Row layout has already resolved the unplayed colors, so the first marking would fade.
         if (initial) for (const a of container.getAnimations({ subtree: true })) a.finish();
       }
@@ -303,14 +309,21 @@ export const LeadSheet = memo(function LeadSheet({
   );
 });
 
-function markProgress(els: HTMLElement[], ticks: number[], tick: number, block: string): void {
+function markProgress(
+  els: HTMLElement[],
+  ticks: number[],
+  tick: number,
+  block: string,
+  endTicks?: number[],
+): void {
   let current = -1;
   for (let i = 0; i < ticks.length; i += 1) {
     if (ticks[i]! <= tick) current = i;
   }
+  const sounding = current >= 0 && tick < (endTicks?.[current] ?? Infinity);
   for (let i = 0; i < els.length; i += 1) {
-    els[i]!.classList.toggle(`${block}--passed`, i < current);
-    els[i]!.classList.toggle(`${block}--current`, i === current);
+    els[i]!.classList.toggle(`${block}--passed`, i < current || (i === current && !sounding));
+    els[i]!.classList.toggle(`${block}--current`, i === current && sounding);
   }
 }
 
@@ -542,6 +555,7 @@ function LyricLabel({
     <span
       className="score-lyric"
       data-tick={syllable.tick}
+      data-end-tick={syllable.endTick ?? undefined}
       data-bar={bar}
       style={left === undefined ? undefined : { left: `${left}%` }}
     >
