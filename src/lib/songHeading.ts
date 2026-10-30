@@ -10,19 +10,24 @@ export function songHeading(xf: XfData, fileName: string): SongHeading {
   const performer = header?.performer ?? xf.commonHeader?.performer;
   return {
     title:
-      header?.songName !== undefined ? stripReading(header.songName) : stripExtension(fileName),
-    performer: performer !== undefined ? stripReading(performer) : undefined,
+      header?.songName !== undefined
+        ? splitReading(header.songName).text
+        : stripExtension(fileName),
+    performer: performer !== undefined ? splitReading(performer).text : undefined,
   };
 }
 
-function stripReading(text: string): string {
+export function splitReading(text: string): { text: string; reading: string | undefined } {
   const paren = text.lastIndexOf('(');
-  if (paren === -1) return text;
+  if (paren === -1) return { text, reading: undefined };
   const stripped = text.slice(0, paren).trimEnd();
-  return stripped === '' ? text : stripped;
+  if (stripped === '') return { text, reading: undefined };
+  const close = text.indexOf(')', paren);
+  const reading = text.slice(paren + 1, close === -1 ? undefined : close).trim();
+  return { text: stripped, reading: reading === '' ? undefined : reading };
 }
 
-function stripExtension(fileName: string): string {
+export function stripExtension(fileName: string): string {
   const dot = fileName.lastIndexOf('.');
   return dot > 0 ? fileName.slice(0, dot) : fileName;
 }
