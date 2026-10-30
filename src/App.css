@@ -906,8 +906,22 @@
   display: none;
 }
 
+.lyric ruby {
+  display: inline-grid;
+  justify-items: center;
+  line-height: 1;
+}
+
+.lyric ruby > * {
+  grid-area: 1 / 1;
+}
+
 .lyric ruby rt {
+  align-self: start;
+  transform: translateY(calc(-100% - 1.2px));
   font-size: 0.55em;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .part-badge {
