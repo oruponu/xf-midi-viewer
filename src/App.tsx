@@ -41,6 +41,7 @@ function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPartPanelOpen, setIsPartPanelOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
   const togglePartPanel = useCallback(() => setIsPartPanelOpen((open) => !open), []);
   const closePartPanel = useCallback(() => setIsPartPanelOpen(false), []);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -289,6 +290,8 @@ function App() {
             fixedKeyShifts={fixedKeyShifts}
             outputReady={outputReady}
             onPlay={play}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
             isPartPanelOpen={isPartPanelOpen}
             onTogglePartPanel={togglePartPanel}
             onClosePartPanel={closePartPanel}
@@ -424,6 +427,8 @@ function PlayerScope({
   fixedKeyShifts,
   outputReady,
   onPlay,
+  activeTab,
+  onTabChange,
   isPartPanelOpen,
   onTogglePartPanel,
   onClosePartPanel,
@@ -438,11 +443,12 @@ function PlayerScope({
   fixedKeyShifts: readonly KeyShiftChange[] | null;
   outputReady: boolean;
   onPlay: () => void;
+  activeTab: InfoPanelTab;
+  onTabChange: (tab: InfoPanelTab) => void;
   isPartPanelOpen: boolean;
   onTogglePartPanel: () => void;
   onClosePartPanel: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
   const dockRef = useRef<HTMLDivElement | null>(null);
   const chromeRef = useRef<HTMLDivElement | null>(null);
   const manualKeyShifts = useMemo<KeyShiftChange[]>(
@@ -484,7 +490,7 @@ function PlayerScope({
   return (
     <>
       <div className="viewer-chrome" ref={chromeRef}>
-        <ViewTabs activeTab={activeTab} onChange={setActiveTab} />
+        <ViewTabs activeTab={activeTab} onChange={onTabChange} />
       </div>
       <InfoPanel
         file={file}
