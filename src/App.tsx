@@ -16,6 +16,7 @@ import type { Settings } from './hooks/useSettings.ts';
 import { useSongLoader } from './hooks/useSongLoader.ts';
 import { useTheme } from './hooks/useTheme.ts';
 import { useWakeLock } from './hooks/useWakeLock.ts';
+import { MIDI_EXTENSIONS } from './lib/library/midiFiles.ts';
 import type { MidiScheduler } from './lib/player/scheduler.ts';
 import { buildFixedKeyShifts } from './lib/smf/fixedKey.ts';
 import type { KeyShiftChange } from './lib/smf/fixedKey.ts';
@@ -27,7 +28,6 @@ import type { Theme } from './lib/theme.ts';
 
 const APP_NAME = 'XF MIDI Viewer';
 const PART_PANEL_ID = 'part-panel';
-const MIDI_EXTENSIONS = ['.mid', '.midi', '.kar', '.xih', '.xkm'];
 const FILE_ACCEPT = [...MIDI_EXTENSIONS, 'audio/midi'].join(',');
 
 const THEME_LABELS: Record<Theme, string> = {
