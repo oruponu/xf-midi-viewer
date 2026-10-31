@@ -346,6 +346,7 @@ function App() {
         settings={settings}
         onChange={updateSettings}
         player={player}
+        library={library}
         onClose={() => setIsSettingsOpen(false)}
       />
     </>

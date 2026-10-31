@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
+import type { Library } from '../hooks/useLibrary.ts';
 import type { MidiPlayer } from '../hooks/useMidiPlayer.ts';
 import type { Settings } from '../hooks/useSettings.ts';
 import { BUILTIN_OUTPUT_ID } from '../lib/player/outputSelection.ts';
 import { BUNDLED_SOUND_BANK } from '../lib/synth/soundBank.ts';
 import type { BuiltinSynth } from '../hooks/useBuiltinSynth.ts';
 import { CloseIcon } from './CloseIcon.tsx';
+import { LibraryFolderButton } from './LibraryFolderButton.tsx';
 
 export type PlayerOutputProps = Pick<
   MidiPlayer,
@@ -23,12 +25,14 @@ export function SettingsDialog({
   settings,
   onChange,
   player,
+  library,
   onClose,
 }: {
   open: boolean;
   settings: Settings;
   onChange: (patch: Partial<Settings>) => void;
   player: PlayerOutputProps;
+  library: Library;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
@@ -103,6 +107,35 @@ export function SettingsDialog({
               checked={settings.fixKeyToC}
               onChange={(v) => onChange({ fixKeyToC: v })}
             />
+          </section>
+
+          <section className="settings-section">
+            <h3>曲の一覧</h3>
+            <p className="settings-section-desc">曲の一覧に使うフォルダを選択します</p>
+            <div className="settings-midi">
+              <p className="settings-midi-status">
+                選択中のフォルダ: {library.folderName ?? '未選択'}
+              </p>
+              <div className="settings-midi-row">
+                <LibraryFolderButton
+                  library={library}
+                  mode="replace"
+                  className="midi-request-button"
+                >
+                  {library.folderName === null ? 'フォルダを選択' : 'フォルダを変更'}
+                </LibraryFolderButton>
+                {library.sourceKind === 'folder' && (
+                  <button className="midi-request-button" type="button" onClick={library.rereadAll}>
+                    全曲を読み直す
+                  </button>
+                )}
+              </div>
+              {library.sourceKind === 'folder' && (
+                <p className="settings-section-desc">
+                  同じ名前のまま中身が変わった曲があるときに使います
+                </p>
+              )}
+            </div>
           </section>
 
           <section className="settings-section">
