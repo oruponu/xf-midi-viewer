@@ -173,9 +173,17 @@
   color: var(--text);
 }
 
-.file-select-button {
-  height: 40px;
+.drop-zone-actions {
   margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.file-select-button,
+.folder-select-button {
+  height: 40px;
   padding: 0 20px;
   border: 1px solid var(--text-h);
   border-radius: var(--radius-md);
@@ -187,11 +195,59 @@
   cursor: pointer;
 }
 
-.file-select-button:hover {
+.folder-select-button {
+  background: transparent;
+  color: var(--text-h);
+}
+
+.file-select-button:hover,
+.folder-select-button:hover {
   opacity: 0.88;
 }
 
-.file-select-button:focus-visible {
+.file-select-button:focus-visible,
+.folder-select-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.library-start {
+  --song-library-sticky-top: var(--app-bar-height);
+  width: min(640px, 100%);
+  margin: 8px auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Reaches up to the app bar, so the folder name and the search bar start where they stick */
+.library-start .song-library-top {
+  margin-top: calc(-8px - var(--app-padding-top));
+  padding-top: calc(8px + var(--app-padding-top));
+}
+
+.library-start .song-library {
+  align-self: stretch;
+}
+
+.library-start-file {
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.library-start-file:hover {
+  color: var(--accent);
+}
+
+.library-start-file:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -2164,6 +2220,15 @@
   .app-bar,
   .viewer-chrome {
     position: static;
+  }
+
+  .library-start {
+    --song-library-sticky-top: 0px;
+  }
+
+  .library-start .song-library-top {
+    margin-top: -6px;
+    padding-top: 6px;
   }
 
   .viewer-chrome {

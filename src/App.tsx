@@ -5,10 +5,13 @@ import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { ErrorToast } from './components/ErrorToast.tsx';
 import { InfoPanel } from './components/InfoPanel.tsx';
 import type { InfoPanelTab } from './components/InfoPanel.tsx';
+import { LibraryFolderButton } from './components/LibraryFolderButton.tsx';
 import { PartPanel } from './components/PartPanel.tsx';
 import { PlaybackPanel } from './components/PlaybackPanel.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
+import { SongLibrary } from './components/SongLibrary.tsx';
 import { useFailureNotice } from './hooks/useFailureNotice.ts';
+import { useLibrary } from './hooks/useLibrary.ts';
 import { useMediaQuery } from './hooks/useMediaQuery.ts';
 import { useMidiPlayer } from './hooks/useMidiPlayer.ts';
 import { useSettings } from './hooks/useSettings.ts';
@@ -48,6 +51,7 @@ function App() {
   const isTouchPrimary = useMediaQuery('(pointer: coarse)');
   const { settings, updateSettings } = useSettings();
   useTheme(settings.theme);
+  const library = useLibrary();
   const song = songState.current?.song ?? null;
   const file = songState.current?.file ?? null;
   const loadFailure = songState.failure;
@@ -83,6 +87,15 @@ function App() {
       });
     },
     [scheduler, stop, loadFile],
+  );
+
+  const { openSong } = library;
+  const openLibrarySong = useCallback(
+    async (fileName: string) => {
+      const f = await openSong(fileName);
+      if (f) openFile(f);
+    },
+    [openSong, openFile],
   );
 
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -234,7 +247,24 @@ function App() {
           </section>
         )}
 
-        {!songState.current && (
+        {!songState.current && library.status === 'ready' && (
+          <section className="library-start">
+            <SongLibrary
+              library={library}
+              currentFileName={null}
+              onSelect={(fileName) => void openLibrarySong(fileName)}
+            />
+            <button
+              type="button"
+              className="library-start-file"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              ファイルを開く
+            </button>
+          </section>
+        )}
+
+        {!songState.current && library.status === 'empty' && (
           <section className="empty-state">
             <div className="drop-zone">
               <span className="drop-zone-icon">
@@ -244,13 +274,25 @@ function App() {
                 {isTouchPrimary ? 'MIDI ファイルを開く' : 'MIDI ファイルをここにドロップ'}
               </p>
               <p className="muted">YAMAHA XF フォーマットの歌詞とコードを表示します</p>
-              <button
-                type="button"
-                className="file-select-button"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                ファイルを選択
-              </button>
+              <div className="drop-zone-actions">
+                <button
+                  type="button"
+                  className="file-select-button"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  ファイルを選択
+                </button>
+                <LibraryFolderButton
+                  library={library}
+                  mode="replace"
+                  className="folder-select-button"
+                >
+                  フォルダを選択
+                </LibraryFolderButton>
+              </div>
+              <p className="muted">
+                MIDI ファイルをまとめたフォルダを選択すると、曲の一覧から開けます
+              </p>
               <p className="drop-zone-formats">対応形式: {MIDI_EXTENSIONS.join(' ')}</p>
             </div>
           </section>
