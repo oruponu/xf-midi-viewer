@@ -267,6 +267,234 @@
   color: inherit;
 }
 
+.song-library {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.song-library-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.song-library-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.song-library-folder {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.song-library-count {
+  flex: none;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.song-library-add {
+  flex: none;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.song-library-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.song-library-add:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.song-library-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.song-library-notice-message {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.song-library-notice-close {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin: -4px -6px -4px 0;
+  border-color: transparent;
+  background: transparent;
+  color: inherit;
+}
+
+.song-library-top {
+  position: sticky;
+  top: var(--song-library-sticky-top, 0px);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: -6px 0;
+  padding: 6px 0;
+  background: var(--bg);
+}
+
+.song-library-search {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  /* 16px keeps iOS from zooming in on focus */
+  font-size: 16px;
+}
+
+.song-library-search:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.song-library-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.song-library-list li {
+  border-bottom: 1px solid var(--border);
+}
+
+.song-library-song {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  /* The second row stays as tall as the vocal badge, even when a song has no details */
+  grid-template-rows: auto minmax(20px, auto);
+  align-items: center;
+  gap: 2px 12px;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-h);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.song-library-song:hover {
+  background: var(--surface);
+}
+
+.song-library-song:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.song-library-song[aria-current='true'] {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+}
+
+.song-library-song[aria-current='true'] .song-library-song-title {
+  color: var(--accent);
+}
+
+.song-library-song-title {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.song-library-song-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.song-library-song-meta > * {
+  flex: none;
+}
+
+.song-library-song-meta > .song-library-song-performer {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.song-library-vocal {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 3em;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.song-library-vocal--male {
+  background: var(--part-male);
+}
+
+.song-library-vocal--female {
+  background: var(--part-female);
+}
+
+.song-library-vocal--mixed {
+  background: var(--part-base);
+}
+
+.song-library-vocal--none {
+  background: var(--text);
+}
+
+.song-library-empty {
+  padding: 16px 0;
+  text-align: center;
+}
+
 .viewer-chrome {
   position: sticky;
   top: var(--app-bar-height);
