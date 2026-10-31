@@ -1,6 +1,11 @@
 :root {
   --app-bar-height: 56px;
   --app-padding-top: 14px;
+  --library-width: 320px;
+}
+
+:root.library-docked body {
+  padding-left: var(--library-width);
 }
 
 .app {
@@ -634,6 +639,28 @@
 .library-drawer-body .song-library-top {
   margin-top: 0;
   padding-top: 12px;
+}
+
+.library-drawer-header .icon-button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.library-drawer--docked {
+  position: fixed;
+  z-index: 36;
+  width: var(--library-width);
+  display: flex;
+  flex-direction: column;
+  box-shadow: none;
+}
+
+:root.library-docked .player-dock {
+  left: var(--library-width);
+}
+
+:root.library-docked .toast-stack {
+  right: max(24px, calc((100% - var(--library-width) - 1120px) / 2));
 }
 
 .viewer-chrome {

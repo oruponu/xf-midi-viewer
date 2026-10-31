@@ -45,16 +45,25 @@ function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
-  const closeLibrary = useCallback(() => setIsLibraryOpen(false), []);
   const [isPartPanelOpen, setIsPartPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
   const togglePartPanel = useCallback(() => setIsPartPanelOpen((open) => !open), []);
   const closePartPanel = useCallback(() => setIsPartPanelOpen(false), []);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const isTouchPrimary = useMediaQuery('(pointer: coarse)');
+  const canDockLibrary = useMediaQuery('(min-width: 1100px)');
   const { settings, updateSettings } = useSettings();
   useTheme(settings.theme);
   const library = useLibrary();
+  const isLibraryDocked = settings.libraryDocked && canDockLibrary && songState.current !== null;
+  const closeLibrary = useCallback(() => {
+    setIsLibraryOpen(false);
+    if (isLibraryDocked) updateSettings({ libraryDocked: false });
+  }, [isLibraryDocked, updateSettings]);
+  const toggleLibraryDock = useCallback(() => {
+    updateSettings({ libraryDocked: !isLibraryDocked });
+    setIsLibraryOpen(isLibraryDocked);
+  }, [isLibraryDocked, updateSettings]);
   const song = songState.current?.song ?? null;
   const file = songState.current?.file ?? null;
   const loadFailure = songState.failure;
@@ -103,9 +112,17 @@ function App() {
   );
 
   const { refresh: refreshLibrary } = library;
+  const isLibraryShown = isLibraryOpen || isLibraryDocked;
   useEffect(() => {
-    if (isLibraryOpen) refreshLibrary({ prompt: false });
-  }, [isLibraryOpen, refreshLibrary]);
+    if (isLibraryShown) refreshLibrary({ prompt: false });
+  }, [isLibraryShown, refreshLibrary]);
+
+  useEffect(() => {
+    if (!isLibraryDocked) return;
+    const root = document.documentElement;
+    root.classList.add('library-docked');
+    return () => root.classList.remove('library-docked');
+  }, [isLibraryDocked]);
 
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -179,8 +196,10 @@ function App() {
                 className="icon-button"
                 title="曲の一覧"
                 aria-label="曲の一覧"
-                aria-expanded={isLibraryOpen}
-                onClick={() => setIsLibraryOpen((open) => !open)}
+                aria-expanded={isLibraryShown}
+                onClick={() =>
+                  isLibraryDocked ? closeLibrary() : setIsLibraryOpen((open) => !open)
+                }
               >
                 <ListIcon />
               </button>
@@ -376,7 +395,10 @@ function App() {
       {songState.current && (
         <LibraryDrawer
           open={isLibraryOpen}
+          docked={isLibraryDocked}
+          canDock={canDockLibrary}
           onClose={closeLibrary}
+          onToggleDock={toggleLibraryDock}
           title={<SongLibraryHead library={library} />}
         >
           <SongLibrary
