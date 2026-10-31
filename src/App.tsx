@@ -5,11 +5,12 @@ import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { ErrorToast } from './components/ErrorToast.tsx';
 import { InfoPanel } from './components/InfoPanel.tsx';
 import type { InfoPanelTab } from './components/InfoPanel.tsx';
+import { LibraryDrawer } from './components/LibraryDrawer.tsx';
 import { LibraryFolderButton } from './components/LibraryFolderButton.tsx';
 import { PartPanel } from './components/PartPanel.tsx';
 import { PlaybackPanel } from './components/PlaybackPanel.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
-import { SongLibrary } from './components/SongLibrary.tsx';
+import { SongLibrary, SongLibraryHead } from './components/SongLibrary.tsx';
 import { useFailureNotice } from './hooks/useFailureNotice.ts';
 import { useLibrary } from './hooks/useLibrary.ts';
 import { useMediaQuery } from './hooks/useMediaQuery.ts';
@@ -43,6 +44,8 @@ function App() {
   const { state: songState, loadFile } = useSongLoader();
   const [isDragging, setIsDragging] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const closeLibrary = useCallback(() => setIsLibraryOpen(false), []);
   const [isPartPanelOpen, setIsPartPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
   const togglePartPanel = useCallback(() => setIsPartPanelOpen((open) => !open), []);
@@ -91,12 +94,18 @@ function App() {
 
   const { openSong } = library;
   const openLibrarySong = useCallback(
-    async (fileName: string) => {
+    async (fileName: string): Promise<boolean> => {
       const f = await openSong(fileName);
       if (f) openFile(f);
+      return f !== null;
     },
     [openSong, openFile],
   );
+
+  const { refresh: refreshLibrary } = library;
+  useEffect(() => {
+    if (isLibraryOpen) refreshLibrary({ prompt: false });
+  }, [isLibraryOpen, refreshLibrary]);
 
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -148,7 +157,7 @@ function App() {
       if (e.code !== 'Space') return;
       if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
       if (e.repeat) return;
-      if (isSettingsOpen) return;
+      if (isSettingsOpen || isLibraryOpen) return;
       if (!song || songFailed) return;
       if (isEditableTarget(e.target)) return;
       e.preventDefault();
@@ -157,26 +166,40 @@ function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isPlaying, isSettingsOpen, song, songFailed, scheduler, play]);
+  }, [isPlaying, isSettingsOpen, isLibraryOpen, song, songFailed, scheduler, play]);
 
   return (
     <>
       <header className="app-bar">
         <div className="app-bar-inner">
-          {heading ? (
-            <div className="app-bar-song">
-              <h1 className="app-bar-title app-bar-song-title" title={heading.title}>
-                {heading.title}
-              </h1>
-              {heading.performer && (
-                <p className="app-bar-song-performer" title={heading.performer}>
-                  {heading.performer}
-                </p>
-              )}
-            </div>
-          ) : (
-            <h1 className="app-bar-title">{APP_NAME}</h1>
-          )}
+          <div className="app-bar-lead">
+            {songState.current && (
+              <button
+                type="button"
+                className="icon-button"
+                title="曲の一覧"
+                aria-label="曲の一覧"
+                aria-expanded={isLibraryOpen}
+                onClick={() => setIsLibraryOpen((open) => !open)}
+              >
+                <ListIcon />
+              </button>
+            )}
+            {heading ? (
+              <div className="app-bar-song">
+                <h1 className="app-bar-title app-bar-song-title" title={heading.title}>
+                  {heading.title}
+                </h1>
+                {heading.performer && (
+                  <p className="app-bar-song-performer" title={heading.performer}>
+                    {heading.performer}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <h1 className="app-bar-title">{APP_NAME}</h1>
+            )}
+          </div>
           <div className="app-bar-actions">
             <input type="file" accept={FILE_ACCEPT} hidden onChange={onChange} ref={fileInputRef} />
             <button
@@ -349,6 +372,25 @@ function App() {
         library={library}
         onClose={() => setIsSettingsOpen(false)}
       />
+
+      {songState.current && (
+        <LibraryDrawer
+          open={isLibraryOpen}
+          onClose={closeLibrary}
+          title={<SongLibraryHead library={library} />}
+        >
+          <SongLibrary
+            library={library}
+            showHead={false}
+            currentFileName={file?.name ?? null}
+            onSelect={(fileName) => {
+              void openLibrarySong(fileName).then((opened) => {
+                if (opened) setIsLibraryOpen(false);
+              });
+            }}
+          />
+        </LibraryDrawer>
+      )}
     </>
   );
 }
@@ -389,6 +431,24 @@ function LoadErrorMessage({
         </>
       );
   }
+}
+
+function ListIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
 }
 
 function FolderOpenIcon({ size = 20 }: { size?: number }) {

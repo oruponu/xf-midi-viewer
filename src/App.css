@@ -57,6 +57,17 @@
   color: var(--text-h);
 }
 
+.app-bar-lead {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-bar-lead > .icon-button {
+  flex: none;
+}
+
 .app-bar-song {
   min-width: 0;
   display: flex;
@@ -549,6 +560,80 @@
 .song-library-empty {
   padding: 16px 0;
   text-align: center;
+}
+
+.library-drawer {
+  box-sizing: border-box;
+  inset: 0 auto 0 0;
+  width: min(360px, 85vw);
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+  box-shadow: 0 0 60px -20px color-mix(in srgb, black 50%, transparent);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.library-drawer[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.library-drawer::backdrop {
+  background: color-mix(in srgb, black 45%, transparent);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.library-drawer-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--app-bar-height);
+  box-sizing: border-box;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.library-drawer-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.library-drawer-title .song-library-title {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  line-height: 1.3;
+}
+
+.library-drawer-title .song-library-folder {
+  max-width: 100%;
+}
+
+.library-drawer-title .song-library-count {
+  font-size: 12px;
+}
+
+.library-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+/* The search bar starts where it sticks, so it does not move when the list scrolls */
+.library-drawer-body .song-library-top {
+  margin-top: 0;
+  padding-top: 12px;
 }
 
 .viewer-chrome {
