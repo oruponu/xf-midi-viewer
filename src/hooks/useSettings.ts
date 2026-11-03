@@ -8,6 +8,7 @@ export interface Settings {
   autoScrollLeadSheet: boolean;
   autoScrollLyrics: boolean;
   showPitchBar: boolean;
+  chordDegrees: boolean;
   fixKeyToC: boolean;
   libraryDocked: boolean;
   theme: Theme;
@@ -17,6 +18,7 @@ const DEFAULT_SETTINGS: Settings = {
   autoScrollLeadSheet: true,
   autoScrollLyrics: true,
   showPitchBar: true,
+  chordDegrees: false,
   fixKeyToC: false,
   libraryDocked: false,
   theme: 'system',
@@ -33,6 +35,7 @@ function loadSettings(): Settings {
       autoScrollLeadSheet: readBoolean(parsed, 'autoScrollLeadSheet'),
       autoScrollLyrics: readBoolean(parsed, 'autoScrollLyrics'),
       showPitchBar: readBoolean(parsed, 'showPitchBar'),
+      chordDegrees: readBoolean(parsed, 'chordDegrees'),
       fixKeyToC: readBoolean(parsed, 'fixKeyToC'),
       libraryDocked: readBoolean(parsed, 'libraryDocked'),
       theme: isTheme(parsed.theme) ? parsed.theme : DEFAULT_SETTINGS.theme,

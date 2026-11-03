@@ -22,6 +22,7 @@ import type {
   TimeSignature,
   TimeSignatureChange,
 } from '../lib/smf/timing.ts';
+import { formatDegreeChord } from '../lib/xf/degree.ts';
 import { formatChord } from '../lib/xf/format.ts';
 import type { LyricSyllable } from '../lib/xf/lyrics.ts';
 import { transposeChord } from '../lib/xf/transpose.ts';
@@ -68,6 +69,7 @@ interface LeadSheetProps {
   sequence: PlaybackSequence;
   scheduler: MidiScheduler;
   autoScroll: boolean;
+  chordDegrees: boolean;
   keyShifts: readonly KeyShiftChange[];
   playbackRate: number;
 }
@@ -80,6 +82,7 @@ export const LeadSheet = memo(function LeadSheet({
   sequence,
   scheduler,
   autoScroll,
+  chordDegrees,
   keyShifts,
   playbackRate,
 }: LeadSheetProps) {
@@ -126,7 +129,7 @@ export const LeadSheet = memo(function LeadSheet({
       cancelled = true;
       observer.disconnect();
     };
-  }, [chords, renderable, timing, keyShifts, totalBars]);
+  }, [chords, renderable, timing, keyShifts, chordDegrees, totalBars]);
 
   const builtRows = useMemo<ScoreRowSpec[]>(() => {
     const sectionStartBars = rehearsals.flatMap((r) => tickToBarBeat(r.tick, timing)?.bar ?? []);
@@ -283,6 +286,7 @@ export const LeadSheet = memo(function LeadSheet({
               barKeySignatures={barKeySignatures}
               barTempoBpms={barTempoBpms}
               keyShifts={keyShifts}
+              chordDegrees={chordDegrees}
             />
           );
         })}
@@ -296,6 +300,7 @@ export const LeadSheet = memo(function LeadSheet({
               bar={barNumberAt(c.tick, timing)}
               timing={timing}
               keyShifts={keyShifts}
+              chordDegrees={chordDegrees}
             />
           ))}
         </div>
@@ -349,6 +354,7 @@ function ScoreRow({
   barKeySignatures,
   barTempoBpms,
   keyShifts,
+  chordDegrees,
 }: {
   startBar: number;
   barCount: number;
@@ -363,6 +369,7 @@ function ScoreRow({
   barKeySignatures: Map<number, KeySignatureChange>;
   barTempoBpms: Map<number, number>;
   keyShifts: readonly KeyShiftChange[];
+  chordDegrees: boolean;
 }) {
   const startPos = startBar - 1;
   const endPos = startPos + barCount;
@@ -416,7 +423,7 @@ function ScoreRow({
       cancelled = true;
       observer.disconnect();
     };
-  }, [placedChords, placedSyllables, barCount, keyShifts, chordScale, lyricScale]);
+  }, [placedChords, placedSyllables, barCount, keyShifts, chordDegrees, chordScale, lyricScale]);
 
   const bars = useMemo(
     () => Array.from({ length: barCount }, (_, i) => startBar + i),
@@ -497,6 +504,7 @@ function ScoreRow({
               left={p.xPercent}
               timing={timing}
               keyShifts={keyShifts}
+              chordDegrees={chordDegrees}
             />
           ))}
         </div>
@@ -523,12 +531,14 @@ function ChordLabel({
   left,
   timing,
   keyShifts,
+  chordDegrees,
 }: {
   msg: ChordMessage;
   bar: number;
   left?: number;
   timing: SmfTiming;
   keyShifts: readonly KeyShiftChange[];
+  chordDegrees: boolean;
 }) {
   return (
     <span
@@ -537,7 +547,7 @@ function ChordLabel({
       data-bar={bar}
       style={left === undefined ? undefined : { left: `${left}%` }}
     >
-      <AccidentalText text={formatTransposedChord(msg, timing, keyShifts)} />
+      <AccidentalText text={formatChordLabel(msg, timing, keyShifts, chordDegrees)} />
     </span>
   );
 }
@@ -599,11 +609,16 @@ function findKeySignatureAt(tick: number, changes: KeySignatureChange[]): KeySig
   return result;
 }
 
-function formatTransposedChord(
+function formatChordLabel(
   chord: ChordMessage,
   timing: SmfTiming,
   keyShifts: readonly KeyShiftChange[],
+  degrees: boolean,
 ): string {
+  if (degrees && timing.keySignatures.length > 0) {
+    const key = findKeySignatureAt(chord.tick, timing.keySignatures);
+    return formatDegreeChord(chord.root, chord.typeIndex, chord.bass, key);
+  }
   const keyShift = keyShiftAt(chord.tick, keyShifts);
   if (keyShift === 0) return formatChord(chord.root, chord.typeIndex, chord.bass);
   const key = shiftKeySignature(findKeySignatureAt(chord.tick, timing.keySignatures), keyShift);
