@@ -91,7 +91,7 @@ function mod(n: number, m: number): number {
   return ((n % m) + m) % m;
 }
 
-function semitoneOf(root: ChordRoot): number {
+export function semitoneOf(root: ChordRoot): number {
   const letter = LETTERS.indexOf(root.note as Letter);
   return mod(LETTER_TO_SEMITONE[letter]! + ACCIDENTAL_TO_OFFSET[root.accidental], 12);
 }
@@ -113,16 +113,16 @@ function simplify(semitone: number, sharp: boolean): ChordRoot {
   return { note: LETTERS[letter]!, accidental: OFFSET_TO_ACCIDENTAL[offset]! };
 }
 
-function keyOf(signature: KeySignature): Key {
-  const minor = signature.mode === 'minor';
+export function tonicOf(signature: KeySignature): { letter: number; semitone: number } {
   const majorLetter = mod(4 * signature.sharps, 7);
   const majorSemitone = mod(7 * signature.sharps, 12);
-  return {
-    letter: minor ? mod(majorLetter + 5, 7) : majorLetter,
-    semitone: minor ? mod(majorSemitone + 9, 12) : majorSemitone,
-    scale: minor ? MINOR_SCALE : MAJOR_SCALE,
-    minor,
-  };
+  if (signature.mode === 'major') return { letter: majorLetter, semitone: majorSemitone };
+  return { letter: mod(majorLetter + 5, 7), semitone: mod(majorSemitone + 9, 12) };
+}
+
+function keyOf(signature: KeySignature): Key {
+  const minor = signature.mode === 'minor';
+  return { ...tonicOf(signature), scale: minor ? MINOR_SCALE : MAJOR_SCALE, minor };
 }
 
 function prefersSharp(key: Key, interval: number, typeIndex: number): boolean {
