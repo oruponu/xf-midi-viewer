@@ -90,6 +90,16 @@ export function SettingsDialog({
           </section>
 
           <section className="settings-section">
+            <h3>リードシート</h3>
+            <p className="settings-section-desc">リードシートの表示内容を切り替えます</p>
+            <ToggleRow
+              label="コードをディグリーネームで表示"
+              checked={settings.chordDegrees}
+              onChange={(v) => onChange({ chordDegrees: v })}
+            />
+          </section>
+
+          <section className="settings-section">
             <h3>カラオケビュー</h3>
             <p className="settings-section-desc">カラオケビューの表示内容を切り替えます</p>
             <ToggleRow

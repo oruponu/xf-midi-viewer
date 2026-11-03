@@ -42,6 +42,7 @@ type InfoPanelProps = {
   autoScrollLeadSheet?: boolean;
   autoScrollLyrics?: boolean;
   showPitchBar?: boolean;
+  chordDegrees?: boolean;
   keyShifts: readonly KeyShiftChange[];
   playbackRate?: number;
 };
@@ -71,6 +72,7 @@ function ActiveView({
   autoScrollLeadSheet = true,
   autoScrollLyrics = true,
   showPitchBar = true,
+  chordDegrees = false,
   keyShifts,
   playbackRate = 1,
 }: InfoPanelProps) {
@@ -114,6 +116,7 @@ function ActiveView({
             sequence={sequence}
             scheduler={scheduler}
             autoScroll={autoScrollLeadSheet}
+            chordDegrees={chordDegrees}
             keyShifts={keyShifts}
             playbackRate={playbackRate}
           />
