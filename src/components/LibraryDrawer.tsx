@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { useSwipeToClose } from '../hooks/useSwipeToClose.ts';
 import { CloseIcon } from './CloseIcon.tsx';
 
 export function LibraryDrawer({
@@ -20,6 +21,7 @@ export function LibraryDrawer({
   children: ReactNode;
 }) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
+  useSwipeToClose(dialogRef, onClose, !docked);
 
   // A layout effect, so the dialog is shown before the list's effects scroll to the current song.
   useLayoutEffect(() => {

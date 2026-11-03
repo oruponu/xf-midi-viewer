@@ -585,6 +585,16 @@
   user-select: none;
 }
 
+.library-drawer--settling {
+  transition: transform 0.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .library-drawer--settling {
+    transition: none;
+  }
+}
+
 .library-drawer[open] {
   display: flex;
   flex-direction: column;
