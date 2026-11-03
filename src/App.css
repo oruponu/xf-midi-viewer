@@ -1,6 +1,11 @@
 :root {
   --app-bar-height: 56px;
   --app-padding-top: 14px;
+  --library-width: 320px;
+}
+
+:root.library-docked body {
+  padding-left: var(--library-width);
 }
 
 .app {
@@ -55,6 +60,17 @@
   font-weight: 700;
   letter-spacing: -0.2px;
   color: var(--text-h);
+}
+
+.app-bar-lead {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-bar-lead > .icon-button {
+  flex: none;
 }
 
 .app-bar-song {
@@ -143,7 +159,14 @@
 .empty-state {
   margin-top: 48px;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.empty-state .song-library-notice {
+  box-sizing: border-box;
+  width: min(560px, 100%);
 }
 
 .drop-zone {
@@ -173,9 +196,17 @@
   color: var(--text);
 }
 
-.file-select-button {
-  height: 40px;
+.drop-zone-actions {
   margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.file-select-button,
+.folder-select-button {
+  height: 40px;
   padding: 0 20px;
   border: 1px solid var(--text-h);
   border-radius: var(--radius-md);
@@ -187,11 +218,59 @@
   cursor: pointer;
 }
 
-.file-select-button:hover {
+.folder-select-button {
+  background: transparent;
+  color: var(--text-h);
+}
+
+.file-select-button:hover,
+.folder-select-button:hover {
   opacity: 0.88;
 }
 
-.file-select-button:focus-visible {
+.file-select-button:focus-visible,
+.folder-select-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.library-start {
+  --song-library-sticky-top: var(--app-bar-height);
+  width: min(640px, 100%);
+  margin: 8px auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Reaches up to the app bar, so the folder name and the search bar start where they stick */
+.library-start .song-library-top {
+  margin-top: calc(-8px - var(--app-padding-top));
+  padding-top: calc(8px + var(--app-padding-top));
+}
+
+.library-start .song-library {
+  align-self: stretch;
+}
+
+.library-start-file {
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.library-start-file:hover {
+  color: var(--accent);
+}
+
+.library-start-file:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -265,6 +344,340 @@
   border-color: transparent;
   background: transparent;
   color: inherit;
+}
+
+.song-library {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.song-library-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.song-library-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.song-library-folder {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.song-library-count {
+  flex: none;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.song-library-add {
+  flex: none;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.song-library-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.song-library-add:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.song-library-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.song-library-notice-message {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.song-library-notice-close {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin: -4px -6px -4px 0;
+  border-color: transparent;
+  background: transparent;
+  color: inherit;
+}
+
+.song-library-top {
+  position: sticky;
+  top: var(--song-library-sticky-top, 0px);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: -6px 0;
+  padding: 6px 0;
+  background: var(--bg);
+}
+
+.song-library-search {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  /* 16px keeps iOS from zooming in on focus */
+  font-size: 16px;
+}
+
+.song-library-search:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.song-library-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.song-library-list li {
+  border-bottom: 1px solid var(--border);
+}
+
+.song-library-song {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  /* The second row stays as tall as the vocal badge, even when a song has no details */
+  grid-template-rows: auto minmax(20px, auto);
+  align-items: center;
+  gap: 2px 12px;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-h);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.song-library-song:hover {
+  background: var(--surface);
+}
+
+.song-library-song:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.song-library-song[aria-current='true'] {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+}
+
+.song-library-song[aria-current='true'] .song-library-song-title {
+  color: var(--accent);
+}
+
+.song-library-song-title {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.song-library-song-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.song-library-song-meta > * {
+  flex: none;
+}
+
+.song-library-song-meta > .song-library-song-performer {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.song-library-vocal {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 3em;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.song-library-vocal--male {
+  background: var(--part-male);
+}
+
+.song-library-vocal--female {
+  background: var(--part-female);
+}
+
+.song-library-vocal--mixed {
+  background: var(--part-base);
+}
+
+.song-library-vocal--none {
+  background: var(--text);
+}
+
+.song-library-empty {
+  padding: 16px 0;
+  text-align: center;
+}
+
+.library-drawer {
+  box-sizing: border-box;
+  inset: 0 auto 0 0;
+  width: min(360px, 85vw);
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+  box-shadow: 0 0 60px -20px color-mix(in srgb, black 50%, transparent);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.library-drawer--settling {
+  transition: transform 0.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .library-drawer--settling {
+    transition: none;
+  }
+}
+
+.library-drawer[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.library-drawer::backdrop {
+  background: color-mix(in srgb, black 45%, transparent);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.library-drawer-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--app-bar-height);
+  box-sizing: border-box;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.library-drawer-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.library-drawer-title .song-library-title {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  line-height: 1.3;
+}
+
+.library-drawer-title .song-library-folder {
+  max-width: 100%;
+}
+
+.library-drawer-title .song-library-count {
+  font-size: 12px;
+}
+
+.library-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+/* The search bar starts where it sticks, so it does not move when the list scrolls */
+.library-drawer-body .song-library-top {
+  margin-top: 0;
+  padding-top: 12px;
+}
+
+.library-drawer-header .icon-button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.library-drawer--docked {
+  position: fixed;
+  z-index: 36;
+  width: var(--library-width);
+  display: flex;
+  flex-direction: column;
+  box-shadow: none;
+}
+
+:root.library-docked .player-dock {
+  left: var(--library-width);
+}
+
+:root.library-docked .toast-stack {
+  right: max(24px, calc((100% - var(--library-width) - 1120px) / 2));
 }
 
 .viewer-chrome {
@@ -1936,6 +2349,15 @@
   .app-bar,
   .viewer-chrome {
     position: static;
+  }
+
+  .library-start {
+    --song-library-sticky-top: 0px;
+  }
+
+  .library-start .song-library-top {
+    margin-top: -6px;
+    padding-top: 6px;
   }
 
   .viewer-chrome {

@@ -9,6 +9,7 @@ export interface Settings {
   autoScrollLyrics: boolean;
   showPitchBar: boolean;
   fixKeyToC: boolean;
+  libraryDocked: boolean;
   theme: Theme;
 }
 
@@ -17,6 +18,7 @@ const DEFAULT_SETTINGS: Settings = {
   autoScrollLyrics: true,
   showPitchBar: true,
   fixKeyToC: false,
+  libraryDocked: false,
   theme: 'system',
 };
 
@@ -32,6 +34,7 @@ function loadSettings(): Settings {
       autoScrollLyrics: readBoolean(parsed, 'autoScrollLyrics'),
       showPitchBar: readBoolean(parsed, 'showPitchBar'),
       fixKeyToC: readBoolean(parsed, 'fixKeyToC'),
+      libraryDocked: readBoolean(parsed, 'libraryDocked'),
       theme: isTheme(parsed.theme) ? parsed.theme : DEFAULT_SETTINGS.theme,
     };
   } catch {

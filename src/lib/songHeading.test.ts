@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { songHeading } from './songHeading.ts';
+import { songHeading, splitReading } from './songHeading.ts';
 import type { XfData, XfInfoHeaderCommon, XfInfoHeaderLanguageSpecific } from './xf/types.ts';
 
 const makeXf = (
@@ -105,5 +105,19 @@ describe('songHeading', () => {
     const xf = makeXf([], { performer: 'Taro Yamada' });
 
     expect(songHeading(xf, 'song.mid')).toEqual({ title: 'song', performer: 'Taro Yamada' });
+  });
+});
+
+describe('splitReading', () => {
+  test('splits the reading in the last ASCII parentheses', () => {
+    expect(splitReading('HELLO WORLD!(はろーわーるど)（コード付）')).toEqual({
+      text: 'HELLO WORLD!',
+      reading: 'はろーわーるど',
+    });
+  });
+
+  test('returns the text as is without a reading', () => {
+    expect(splitReading('Hello')).toEqual({ text: 'Hello', reading: undefined });
+    expect(splitReading('(よみ)')).toEqual({ text: '(よみ)', reading: undefined });
   });
 });

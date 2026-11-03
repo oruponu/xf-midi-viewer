@@ -5,10 +5,14 @@ import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { ErrorToast } from './components/ErrorToast.tsx';
 import { InfoPanel } from './components/InfoPanel.tsx';
 import type { InfoPanelTab } from './components/InfoPanel.tsx';
+import { LibraryDrawer } from './components/LibraryDrawer.tsx';
+import { LibraryFolderButton } from './components/LibraryFolderButton.tsx';
 import { PartPanel } from './components/PartPanel.tsx';
 import { PlaybackPanel } from './components/PlaybackPanel.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
+import { SongLibrary, SongLibraryHead, SongLibraryNotice } from './components/SongLibrary.tsx';
 import { useFailureNotice } from './hooks/useFailureNotice.ts';
+import { useLibrary } from './hooks/useLibrary.ts';
 import { useMediaQuery } from './hooks/useMediaQuery.ts';
 import { useMidiPlayer } from './hooks/useMidiPlayer.ts';
 import { useSettings } from './hooks/useSettings.ts';
@@ -16,6 +20,7 @@ import type { Settings } from './hooks/useSettings.ts';
 import { useSongLoader } from './hooks/useSongLoader.ts';
 import { useTheme } from './hooks/useTheme.ts';
 import { useWakeLock } from './hooks/useWakeLock.ts';
+import { MIDI_EXTENSIONS } from './lib/library/midiFiles.ts';
 import type { MidiScheduler } from './lib/player/scheduler.ts';
 import { buildFixedKeyShifts } from './lib/smf/fixedKey.ts';
 import type { KeyShiftChange } from './lib/smf/fixedKey.ts';
@@ -27,7 +32,6 @@ import type { Theme } from './lib/theme.ts';
 
 const APP_NAME = 'XF MIDI Viewer';
 const PART_PANEL_ID = 'part-panel';
-const MIDI_EXTENSIONS = ['.mid', '.midi', '.kar', '.xih', '.xkm'];
 const FILE_ACCEPT = [...MIDI_EXTENSIONS, 'audio/midi'].join(',');
 
 const THEME_LABELS: Record<Theme, string> = {
@@ -40,13 +44,26 @@ function App() {
   const { state: songState, loadFile } = useSongLoader();
   const [isDragging, setIsDragging] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isPartPanelOpen, setIsPartPanelOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
   const togglePartPanel = useCallback(() => setIsPartPanelOpen((open) => !open), []);
   const closePartPanel = useCallback(() => setIsPartPanelOpen(false), []);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const isTouchPrimary = useMediaQuery('(pointer: coarse)');
+  const canDockLibrary = useMediaQuery('(min-width: 1100px)');
   const { settings, updateSettings } = useSettings();
   useTheme(settings.theme);
+  const library = useLibrary();
+  const isLibraryDocked = settings.libraryDocked && canDockLibrary && songState.current !== null;
+  const closeLibrary = useCallback(() => {
+    setIsLibraryOpen(false);
+    if (isLibraryDocked) updateSettings({ libraryDocked: false });
+  }, [isLibraryDocked, updateSettings]);
+  const toggleLibraryDock = useCallback(() => {
+    updateSettings({ libraryDocked: !isLibraryDocked });
+    setIsLibraryOpen(isLibraryDocked);
+  }, [isLibraryDocked, updateSettings]);
   const song = songState.current?.song ?? null;
   const file = songState.current?.file ?? null;
   const loadFailure = songState.failure;
@@ -83,6 +100,29 @@ function App() {
     },
     [scheduler, stop, loadFile],
   );
+
+  const { openSong } = library;
+  const openLibrarySong = useCallback(
+    async (fileName: string): Promise<boolean> => {
+      const f = await openSong(fileName);
+      if (f) openFile(f);
+      return f !== null;
+    },
+    [openSong, openFile],
+  );
+
+  const { refresh: refreshLibrary } = library;
+  const isLibraryShown = isLibraryOpen || isLibraryDocked;
+  useEffect(() => {
+    if (isLibraryShown) refreshLibrary({ prompt: false });
+  }, [isLibraryShown, refreshLibrary]);
+
+  useEffect(() => {
+    if (!isLibraryDocked) return;
+    const root = document.documentElement;
+    root.classList.add('library-docked');
+    return () => root.classList.remove('library-docked');
+  }, [isLibraryDocked]);
 
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -134,7 +174,7 @@ function App() {
       if (e.code !== 'Space') return;
       if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
       if (e.repeat) return;
-      if (isSettingsOpen) return;
+      if (isSettingsOpen || isLibraryOpen) return;
       if (!song || songFailed) return;
       if (isEditableTarget(e.target)) return;
       e.preventDefault();
@@ -143,26 +183,42 @@ function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isPlaying, isSettingsOpen, song, songFailed, scheduler, play]);
+  }, [isPlaying, isSettingsOpen, isLibraryOpen, song, songFailed, scheduler, play]);
 
   return (
     <>
       <header className="app-bar">
         <div className="app-bar-inner">
-          {heading ? (
-            <div className="app-bar-song">
-              <h1 className="app-bar-title app-bar-song-title" title={heading.title}>
-                {heading.title}
-              </h1>
-              {heading.performer && (
-                <p className="app-bar-song-performer" title={heading.performer}>
-                  {heading.performer}
-                </p>
-              )}
-            </div>
-          ) : (
-            <h1 className="app-bar-title">{APP_NAME}</h1>
-          )}
+          <div className="app-bar-lead">
+            {songState.current && (
+              <button
+                type="button"
+                className="icon-button"
+                title="曲の一覧"
+                aria-label="曲の一覧"
+                aria-expanded={isLibraryShown}
+                onClick={() =>
+                  isLibraryDocked ? closeLibrary() : setIsLibraryOpen((open) => !open)
+                }
+              >
+                <ListIcon />
+              </button>
+            )}
+            {heading ? (
+              <div className="app-bar-song">
+                <h1 className="app-bar-title app-bar-song-title" title={heading.title}>
+                  {heading.title}
+                </h1>
+                {heading.performer && (
+                  <p className="app-bar-song-performer" title={heading.performer}>
+                    {heading.performer}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <h1 className="app-bar-title">{APP_NAME}</h1>
+            )}
+          </div>
           <div className="app-bar-actions">
             <input type="file" accept={FILE_ACCEPT} hidden onChange={onChange} ref={fileInputRef} />
             <button
@@ -233,8 +289,26 @@ function App() {
           </section>
         )}
 
-        {!songState.current && (
+        {!songState.current && library.status === 'ready' && (
+          <section className="library-start">
+            <SongLibrary
+              library={library}
+              currentFileName={null}
+              onSelect={(fileName) => void openLibrarySong(fileName)}
+            />
+            <button
+              type="button"
+              className="library-start-file"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              ファイルを開く
+            </button>
+          </section>
+        )}
+
+        {!songState.current && library.status === 'empty' && (
           <section className="empty-state">
+            <SongLibraryNotice library={library} />
             <div className="drop-zone">
               <span className="drop-zone-icon">
                 <FolderOpenIcon size={36} />
@@ -243,13 +317,25 @@ function App() {
                 {isTouchPrimary ? 'MIDI ファイルを開く' : 'MIDI ファイルをここにドロップ'}
               </p>
               <p className="muted">YAMAHA XF フォーマットの歌詞とコードを表示します</p>
-              <button
-                type="button"
-                className="file-select-button"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                ファイルを選択
-              </button>
+              <div className="drop-zone-actions">
+                <button
+                  type="button"
+                  className="file-select-button"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  ファイルを選択
+                </button>
+                <LibraryFolderButton
+                  library={library}
+                  mode="replace"
+                  className="folder-select-button"
+                >
+                  フォルダを選択
+                </LibraryFolderButton>
+              </div>
+              <p className="muted">
+                MIDI ファイルをまとめたフォルダを選択すると、曲の一覧から開けます
+              </p>
               <p className="drop-zone-formats">対応形式: {MIDI_EXTENSIONS.join(' ')}</p>
             </div>
           </section>
@@ -289,6 +375,8 @@ function App() {
             fixedKeyShifts={fixedKeyShifts}
             outputReady={outputReady}
             onPlay={play}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
             isPartPanelOpen={isPartPanelOpen}
             onTogglePartPanel={togglePartPanel}
             onClosePartPanel={closePartPanel}
@@ -301,8 +389,31 @@ function App() {
         settings={settings}
         onChange={updateSettings}
         player={player}
+        library={library}
         onClose={() => setIsSettingsOpen(false)}
       />
+
+      {songState.current && (
+        <LibraryDrawer
+          open={isLibraryOpen}
+          docked={isLibraryDocked}
+          canDock={canDockLibrary}
+          onClose={closeLibrary}
+          onToggleDock={toggleLibraryDock}
+          title={<SongLibraryHead library={library} />}
+        >
+          <SongLibrary
+            library={library}
+            showHead={false}
+            currentFileName={file?.name ?? null}
+            onSelect={(fileName) => {
+              void openLibrarySong(fileName).then((opened) => {
+                if (opened) setIsLibraryOpen(false);
+              });
+            }}
+          />
+        </LibraryDrawer>
+      )}
     </>
   );
 }
@@ -343,6 +454,24 @@ function LoadErrorMessage({
         </>
       );
   }
+}
+
+function ListIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
 }
 
 function FolderOpenIcon({ size = 20 }: { size?: number }) {
@@ -424,6 +553,8 @@ function PlayerScope({
   fixedKeyShifts,
   outputReady,
   onPlay,
+  activeTab,
+  onTabChange,
   isPartPanelOpen,
   onTogglePartPanel,
   onClosePartPanel,
@@ -438,11 +569,12 @@ function PlayerScope({
   fixedKeyShifts: readonly KeyShiftChange[] | null;
   outputReady: boolean;
   onPlay: () => void;
+  activeTab: InfoPanelTab;
+  onTabChange: (tab: InfoPanelTab) => void;
   isPartPanelOpen: boolean;
   onTogglePartPanel: () => void;
   onClosePartPanel: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
   const dockRef = useRef<HTMLDivElement | null>(null);
   const chromeRef = useRef<HTMLDivElement | null>(null);
   const manualKeyShifts = useMemo<KeyShiftChange[]>(
@@ -484,7 +616,7 @@ function PlayerScope({
   return (
     <>
       <div className="viewer-chrome" ref={chromeRef}>
-        <ViewTabs activeTab={activeTab} onChange={setActiveTab} />
+        <ViewTabs activeTab={activeTab} onChange={onTabChange} />
       </div>
       <InfoPanel
         file={file}
