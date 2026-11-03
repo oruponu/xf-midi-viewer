@@ -172,14 +172,18 @@ export function createLibraryController(onChange: (state: LibraryState) => void)
     }
   };
 
-  const startScan = (listed?: string[]): Promise<void> => {
-    if (scan) return scan;
-    if (source?.kind !== 'folder') return Promise.resolve();
-    const run: Promise<void> = runScan(source.handle, generation, listed).finally(() => {
+  const trackScan = (task: Promise<void>): Promise<void> => {
+    const run: Promise<void> = task.finally(() => {
       if (scan === run) scan = null;
     });
     scan = run;
     return run;
+  };
+
+  const startScan = (): Promise<void> => {
+    if (scan) return scan;
+    if (source?.kind !== 'folder') return Promise.resolve();
+    return trackScan(runScan(source.handle, generation, undefined));
   };
 
   const ensurePermission = async (handle: FileSystemDirectoryHandle, prompt: boolean) =>
@@ -290,14 +294,18 @@ export function createLibraryController(onChange: (state: LibraryState) => void)
     generation += 1;
     const gen = generation;
     const running = scan;
-    scan = null;
-    if (running) await running;
-    await enqueue(async () => {
-      if (gen === generation) await clearSongInfos();
-    });
-    if (gen !== generation) return;
-    update({ songs: [], progress: null });
-    void startScan(names);
+    // Registered as the running scan right away, so a refresh in the meantime does not start another scan
+    await trackScan(
+      (async () => {
+        if (running) await running;
+        await enqueue(async () => {
+          if (gen === generation) await clearSongInfos();
+        });
+        if (gen !== generation) return;
+        update({ songs: [], progress: null });
+        await runScan(current.handle, gen, names);
+      })(),
+    );
   };
 
   const openSong = async (fileName: string): Promise<File | null> => {
