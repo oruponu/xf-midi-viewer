@@ -159,7 +159,14 @@
 .empty-state {
   margin-top: 48px;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.empty-state .song-library-notice {
+  box-sizing: border-box;
+  width: min(560px, 100%);
 }
 
 .drop-zone {

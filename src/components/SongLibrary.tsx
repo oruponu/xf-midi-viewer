@@ -82,22 +82,7 @@ export function SongLibrary({
           曲の情報を読み込み中（{library.progress.done} / {library.progress.total}）
         </p>
       )}
-      {library.notice && (
-        <section className="song-library-notice" role="status">
-          <div className="song-library-notice-message">
-            <NoticeMessage notice={library.notice} />
-          </div>
-          <button
-            type="button"
-            className="icon-button song-library-notice-close"
-            title="閉じる"
-            aria-label="閉じる"
-            onClick={library.dismissNotice}
-          >
-            <CloseIcon />
-          </button>
-        </section>
-      )}
+      <SongLibraryNotice library={library} />
       {songs.length > 0 ? (
         <ul className="song-library-list">
           {songs.map((song) => {
@@ -145,6 +130,26 @@ function VocalBadge({ song }: { song: SongInfo }) {
   if (badge === null) return null;
   return (
     <span className={`song-library-vocal song-library-vocal--${badge.tone}`}>{badge.label}</span>
+  );
+}
+
+export function SongLibraryNotice({ library }: { library: Library }) {
+  if (!library.notice) return null;
+  return (
+    <section className="song-library-notice" role="status">
+      <div className="song-library-notice-message">
+        <NoticeMessage notice={library.notice} />
+      </div>
+      <button
+        type="button"
+        className="icon-button song-library-notice-close"
+        title="閉じる"
+        aria-label="閉じる"
+        onClick={library.dismissNotice}
+      >
+        <CloseIcon />
+      </button>
+    </section>
   );
 }
 

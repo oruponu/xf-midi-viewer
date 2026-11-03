@@ -10,7 +10,7 @@ import { LibraryFolderButton } from './components/LibraryFolderButton.tsx';
 import { PartPanel } from './components/PartPanel.tsx';
 import { PlaybackPanel } from './components/PlaybackPanel.tsx';
 import { SettingsDialog } from './components/SettingsDialog.tsx';
-import { SongLibrary, SongLibraryHead } from './components/SongLibrary.tsx';
+import { SongLibrary, SongLibraryHead, SongLibraryNotice } from './components/SongLibrary.tsx';
 import { useFailureNotice } from './hooks/useFailureNotice.ts';
 import { useLibrary } from './hooks/useLibrary.ts';
 import { useMediaQuery } from './hooks/useMediaQuery.ts';
@@ -308,6 +308,7 @@ function App() {
 
         {!songState.current && library.status === 'empty' && (
           <section className="empty-state">
+            <SongLibraryNotice library={library} />
             <div className="drop-zone">
               <span className="drop-zone-icon">
                 <FolderOpenIcon size={36} />
