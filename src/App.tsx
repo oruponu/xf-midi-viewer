@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import './App.css';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { ErrorToast } from './components/ErrorToast.tsx';
@@ -27,6 +27,7 @@ import type { KeyShiftChange } from './lib/smf/fixedKey.ts';
 import type { Song } from './lib/song.ts';
 import { songHeading } from './lib/songHeading.ts';
 import type { FileSummary, SongErrorReason } from './lib/songLoader.ts';
+import { tabIndexForKey } from './lib/tabNavigation.ts';
 import { nextTheme } from './lib/theme.ts';
 import type { Theme } from './lib/theme.ts';
 
@@ -619,6 +620,8 @@ function PlayerScope({
         <ViewTabs activeTab={activeTab} onChange={onTabChange} />
       </div>
       <InfoPanel
+        id={VIEW_PANEL_ID}
+        labelledBy={viewTabId(activeTab)}
         file={file}
         song={song}
         activeTab={activeTab}
@@ -674,6 +677,12 @@ const VIEW_TABS: ReadonlyArray<{
   { id: 'details', label: '詳細' },
 ];
 
+const VIEW_PANEL_ID = 'view-panel';
+
+function viewTabId(tab: InfoPanelTab): string {
+  return `view-tab-${tab}`;
+}
+
 function ViewTabs({
   activeTab,
   onChange,
@@ -681,20 +690,41 @@ function ViewTabs({
   activeTab: InfoPanelTab;
   onChange: (tab: InfoPanelTab) => void;
 }) {
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const current = VIEW_TABS.findIndex((tab) => tab.id === activeTab);
+    const next = tabIndexForKey(e.key, current, VIEW_TABS.length);
+    if (next === null) return;
+    e.preventDefault();
+    onChange(VIEW_TABS[next]!.id);
+    tabRefs.current[next]?.focus();
+  };
+
   return (
-    <nav className="viewer-tabs" aria-label="表示切り替え">
-      {VIEW_TABS.map((tab) => (
-        <button
-          key={tab.id}
-          className="viewer-tab"
-          type="button"
-          aria-selected={activeTab === tab.id}
-          onClick={() => onChange(tab.id)}
-        >
-          <span className="viewer-tab-label">{tab.label}</span>
-        </button>
-      ))}
-    </nav>
+    <div className="viewer-tabs" role="tablist" aria-label="表示切り替え" onKeyDown={onKeyDown}>
+      {VIEW_TABS.map((tab, i) => {
+        const selected = activeTab === tab.id;
+        return (
+          <button
+            key={tab.id}
+            ref={(el) => {
+              tabRefs.current[i] = el;
+            }}
+            id={viewTabId(tab.id)}
+            className="viewer-tab"
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            aria-controls={VIEW_PANEL_ID}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onChange(tab.id)}
+          >
+            <span className="viewer-tab-label">{tab.label}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from 'react';
 import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
 import { bottomCover, PANEL_INSET_CHANGE_EVENT } from '../lib/layout/panelCover.ts';
 import { isChannelAudible } from '../lib/player/channelMask.ts';
@@ -81,15 +88,22 @@ export function PartPanel({
     };
   }, []);
 
+  const close = useCallback(() => {
+    if (panelRef.current?.contains(document.activeElement)) {
+      document.querySelector<HTMLElement>(`[aria-controls="${id}"]`)?.focus();
+    }
+    onClose();
+  }, [id, onClose]);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (document.querySelector('dialog[open]')) return;
-      onClose();
+      close();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  }, [close]);
 
   return (
     <section id={id} ref={panelRef} className="part-panel" aria-labelledby={`${id}-title`}>
@@ -110,7 +124,7 @@ export function PartPanel({
           className="icon-button"
           aria-label="閉じる"
           title="閉じる"
-          onClick={onClose}
+          onClick={close}
         >
           <CloseIcon />
         </button>
