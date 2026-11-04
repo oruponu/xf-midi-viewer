@@ -64,12 +64,8 @@ export async function createBuiltinSynthEngine({
   });
   const clockOffset = new SynthClockOffset();
   const kitFallback = new XgDrumKitFallback();
-  const onWorkletMessage = (event: MessageEvent<unknown>) => {
-    const data = event.data;
-    if (typeof data !== 'object' || data === null || !('currentTime' in data)) return;
-    if (typeof data.currentTime === 'number')
-      clockOffset.observe(context.currentTime, data.currentTime);
-  };
+  const onWorkletMessage = (event: MessageEvent<unknown>) =>
+    clockOffset.observeWorkletMessages(context.currentTime, event.data);
   workletNode?.port.addEventListener('message', onWorkletMessage);
   synth.setSystemParameter('gain', MASTER_GAIN);
   const gain = context.createGain();

@@ -21,6 +21,26 @@ describe('SynthClockOffset', () => {
   });
 });
 
+describe('SynthClockOffset.observeWorkletMessages', () => {
+  test('reads the synth time of every message in a batch', () => {
+    const offset = new SynthClockOffset();
+    offset.observeWorkletMessages(2.1, [
+      { type: 'eventCall', currentTime: 1.99 },
+      { type: 'voiceCountChange', currentTime: 2.0 },
+    ]);
+    expect(offset.seconds).toBeCloseTo(0.1, 9);
+  });
+
+  test('ignores messages without a numeric synth time', () => {
+    const offset = new SynthClockOffset();
+    offset.observeWorkletMessages(2.1, [null, 1, { type: 'x' }, { currentTime: '2.0' }]);
+    offset.observeWorkletMessages(2.1, { currentTime: 2.0 });
+    expect(offset.seconds).toBe(0);
+    offset.observeWorkletMessages(2.1, [{ currentTime: 2.05 }]);
+    expect(offset.seconds).toBeCloseTo(0.05, 9);
+  });
+});
+
 describe('withClockOffset', () => {
   function setup(offsetSeconds: number) {
     const calls: { data: number[]; channelOffset?: number; time?: number }[] = [];
