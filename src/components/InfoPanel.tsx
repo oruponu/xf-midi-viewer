@@ -35,6 +35,8 @@ import { LeadSheet } from './LeadSheet.tsx';
 export type InfoPanelTab = 'leadSheet' | 'lyrics' | 'karaoke' | 'details';
 
 type InfoPanelProps = {
+  id: string;
+  labelledBy: string;
   file: FileSummary | null;
   song: Song;
   activeTab: InfoPanelTab;
@@ -49,7 +51,12 @@ type InfoPanelProps = {
 
 export function InfoPanel(props: InfoPanelProps) {
   return (
-    <section className="info-panel">
+    <section
+      id={props.id}
+      className="info-panel"
+      role="tabpanel"
+      aria-labelledby={props.labelledBy}
+    >
       <ErrorBoundary
         key={props.activeTab}
         fallback={(error) => (
