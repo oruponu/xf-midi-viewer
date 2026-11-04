@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import {
   GeneratorTypes,
   Modulator,
-  ModulatorSource,
   ModulatorControllerSources,
   SoundBankLoader,
   SpessaLog,
@@ -254,15 +253,9 @@ describe('buildKitPreset', () => {
 
   test('refuses to move zones with key-number modulators', () => {
     const [zone] = sourceZonesAt(0, 38);
-    zone.addModulators(
-      new Modulator(
-        ModulatorSource.fromSourceEnum(ModulatorControllerSources.noteOnKeyNum),
-        ModulatorSource.fromSourceEnum(ModulatorControllerSources.noController),
-        GeneratorTypes.pan,
-        100,
-        0,
-      ),
-    );
+    const modulator = new Modulator(undefined, undefined, GeneratorTypes.pan, 100);
+    modulator.primarySource.index = ModulatorControllerSources.noteOnKeyNum;
+    zone.modulators.push(modulator);
     expect(() => buildKitPreset(bank, kit({ 31: { name: 'Snare L', from: gs(0, 38) } }))).toThrow(
       'ノート番号で変化するモジュレーター',
     );

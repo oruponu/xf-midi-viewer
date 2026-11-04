@@ -22,7 +22,7 @@ const VOICES_PER_RENDER = 20;
 let sf3DecoderIsReady = false;
 
 export async function sf3DecoderReady(): Promise<void> {
-  await BasicSoundBank.isSF3DecoderReady;
+  await BasicSoundBank.ready;
   sf3DecoderIsReady = true;
 }
 

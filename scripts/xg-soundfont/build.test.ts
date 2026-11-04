@@ -186,8 +186,8 @@ describe('buildXgSoundBank', () => {
             m.destination,
             m.transformAmount,
             m.transformType,
-            m.primarySource.toSourceEnum(),
-            m.secondarySource.toSourceEnum(),
+            m.primarySource.toString(),
+            m.secondarySource.toString(),
           ]),
       }));
     const data = readSoundBank(SOURCE_SOUND_BANK_PATH);
