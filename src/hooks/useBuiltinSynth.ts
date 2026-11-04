@@ -105,6 +105,7 @@ export function useBuiltinSynth({ active, audioIdle, onStall }: BuiltinSynthOpti
     }).then(
       (loaded) => {
         if (cancelled) {
+          loaded.result.catch(() => {});
           loaded.engine.destroy();
           return;
         }
