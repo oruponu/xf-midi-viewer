@@ -13,6 +13,15 @@ export class SynthClockOffset implements ClockOffsetLike {
     if (lag < this.minLag) this.minLag = lag;
   }
 
+  // spessasynth_lib posts the messages of each audio block as one array.
+  observeWorkletMessages(contextTime: number, messages: unknown): void {
+    if (!Array.isArray(messages)) return;
+    for (const message of messages) {
+      if (typeof message !== 'object' || message === null || !('currentTime' in message)) continue;
+      if (typeof message.currentTime === 'number') this.observe(contextTime, message.currentTime);
+    }
+  }
+
   get seconds(): number {
     return Number.isFinite(this.minLag) ? Math.max(0, this.minLag) : 0;
   }
