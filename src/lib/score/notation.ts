@@ -56,7 +56,9 @@ const MIDDLE_C = 60;
 
 export function buildScoreModel(input: ScoreInput): ScoreModel {
   const { sequence, timing, parts, sectionTicks, keyShifts } = input;
-  const ppq = sequence.ticksPerQuarter || 480;
+  const ppq = sequence.ticksPerQuarter;
+  // SMPTE files count frames, not quarter notes, so they have no bars to draw.
+  if (ppq <= 0) return { bars: [], staves: [], gridTicks: 1 };
   const gridTicks = ppq / 4;
   const bars = buildBars(timing, sequence.durationTicks, ppq);
   assignKeys(bars, timing, keyShifts);
