@@ -103,9 +103,9 @@ function beatEndAfter(pos: number, bars: readonly ScoreBar[], gridTicks: number)
   while (bi > 0 && Math.round(bars[bi]!.startTick / gridTicks) > pos) bi -= 1;
   const bar = bars[bi]!;
   const b0 = Math.round(bar.startTick / gridTicks);
-  // A 32nd-note beat is shorter than the grid.
-  const beat = Math.max(1, 16 / bar.denominator);
-  return b0 + (Math.floor((pos - b0) / beat) + 1) * beat;
+  const b1 = b0 + Math.round(bar.ticks / gridTicks);
+  const beat = beatOf(bar);
+  return Math.min(b1, b0 + (Math.floor((pos - b0) / beat) + 1) * beat);
 }
 
 const QUARTER_BEAT = 4;

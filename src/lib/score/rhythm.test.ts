@@ -51,6 +51,12 @@ describe('layoutNotes', () => {
     expect(firstBar([note(0, 100)])[0]).toEqual([0, 4, [60], false]);
   });
 
+  test('holds a one-grid note to the beat the meter is spelled in', () => {
+    const firstItem = (b: ScoreBar) => rows(layoutNotes([note(0, 100)], [b], GRID, false)[0]!)[0];
+    expect(firstItem(bar(0, 2, 2))).toEqual([0, 4, [60], false]);
+    expect(firstItem(bar(0, 6, 8))).toEqual([0, 6, [60], false]);
+  });
+
   test('keeps an eighth rest after an eighth note', () => {
     expect(firstBar([note(0, 240), note(480, 720)]).slice(0, 3)).toEqual([
       [0, 2, [60], false],
@@ -115,10 +121,7 @@ describe('layoutNotes', () => {
 
   test('keeps items on the grid in a 32nd-note time signature', () => {
     const items = layoutNotes([note(0, 100)], [bar(0, 4, 32)], GRID, false)[0]!;
-    expect(rows(items)).toEqual([
-      [0, 1, [60], false],
-      [1, 1, [], false],
-    ]);
+    expect(rows(items)).toEqual([[0, 2, [60], false]]);
   });
 
   test('never ties drum hits', () => {
