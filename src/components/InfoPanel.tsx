@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
 import { centeredScrollTop, PANEL_INSET_CHANGE_EVENT } from '../lib/layout/panelCover.ts';
@@ -32,7 +32,15 @@ import { partColorOf } from '../lib/xf/vocalPart.ts';
 import { ErrorBoundary } from './ErrorBoundary.tsx';
 import { KaraokeView } from './KaraokeView.tsx';
 import { LeadSheet } from './LeadSheet.tsx';
-import { ScoreView } from './ScoreView.tsx';
+
+// VexFlow and its Bravura font are large, and phones never show the score, so they load on demand.
+// The score measures Bravura glyphs on its first render, so the font must be ready first.
+const ScoreView = lazy(() =>
+  import('./ScoreView.tsx').then(async (module) => {
+    await document.fonts.load('30px Bravura');
+    return { default: module.ScoreView };
+  }),
+);
 
 export type InfoPanelTab = 'leadSheet' | 'score' | 'lyrics' | 'karaoke' | 'details';
 
@@ -90,15 +98,17 @@ function ActiveView({
   // The score needs only the notes, so it does not depend on the song carrying XF data.
   if (activeTab === 'score') {
     return (
-      <ScoreView
-        sequence={sequence}
-        timing={timing}
-        parts={song.channelParts}
-        rehearsals={rehearsals}
-        keyShifts={keyShifts}
-        scheduler={scheduler}
-        title={file ? songHeading(data, file.name).title : ''}
-      />
+      <Suspense fallback={null}>
+        <ScoreView
+          sequence={sequence}
+          timing={timing}
+          parts={song.channelParts}
+          rehearsals={rehearsals}
+          keyShifts={keyShifts}
+          scheduler={scheduler}
+          title={file ? songHeading(data, file.name).title : ''}
+        />
+      </Suspense>
     );
   }
   const hasKaraoke = data.karaoke.header !== null || data.karaoke.events.length > 0;
