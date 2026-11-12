@@ -11,6 +11,7 @@ import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatKeySignature, formatTickAsBarBeat } from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 import type { Song } from '../lib/song.ts';
+import { songHeading } from '../lib/songHeading.ts';
 import type { FileSummary } from '../lib/songLoader.ts';
 import { formatStyleDetail } from '../lib/xf/format.ts';
 import { computeKaraokeSectionBreaks } from '../lib/xf/lyricSections.ts';
@@ -31,8 +32,9 @@ import { partColorOf } from '../lib/xf/vocalPart.ts';
 import { ErrorBoundary } from './ErrorBoundary.tsx';
 import { KaraokeView } from './KaraokeView.tsx';
 import { LeadSheet } from './LeadSheet.tsx';
+import { ScoreView } from './ScoreView.tsx';
 
-export type InfoPanelTab = 'leadSheet' | 'lyrics' | 'karaoke' | 'details';
+export type InfoPanelTab = 'leadSheet' | 'score' | 'lyrics' | 'karaoke' | 'details';
 
 type InfoPanelProps = {
   id: string;
@@ -85,6 +87,20 @@ function ActiveView({
 }: InfoPanelProps) {
   const { xf: data, karaoke: parsedKaraoke, chords, rehearsals, timing, sequence } = song;
   const { metaEvents } = song;
+  // The score needs only the notes, so it does not depend on the song carrying XF data.
+  if (activeTab === 'score') {
+    return (
+      <ScoreView
+        sequence={sequence}
+        timing={timing}
+        parts={song.channelParts}
+        rehearsals={rehearsals}
+        keyShifts={keyShifts}
+        scheduler={scheduler}
+        title={file ? songHeading(data, file.name).title : ''}
+      />
+    );
+  }
   const hasKaraoke = data.karaoke.header !== null || data.karaoke.events.length > 0;
   const hasStyle = data.style.events.length > 0;
   const empty =

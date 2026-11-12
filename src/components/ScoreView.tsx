@@ -195,7 +195,7 @@ export function ScoreView({
           className="score-view-viewport"
           ref={viewportRef}
           role="img"
-          aria-label={`${title} の譜面`}
+          aria-label={title ? `${title} の譜面` : '譜面'}
           style={{ left: LABEL_WIDTH }}
         >
           <div

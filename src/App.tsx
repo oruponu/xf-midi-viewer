@@ -672,6 +672,7 @@ const VIEW_TABS: ReadonlyArray<{
   label: string;
 }> = [
   { id: 'leadSheet', label: 'リードシート' },
+  { id: 'score', label: '譜面' },
   { id: 'lyrics', label: '歌詞' },
   { id: 'karaoke', label: 'カラオケ' },
   { id: 'details', label: '詳細' },
