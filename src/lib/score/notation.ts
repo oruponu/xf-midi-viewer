@@ -60,7 +60,9 @@ export function buildScoreModel(input: ScoreInput): ScoreModel {
   // SMPTE files count frames, not quarter notes, so they have no bars to draw.
   if (ppq <= 0) return { bars: [], staves: [], gridTicks: 1 };
   const gridTicks = ppq / 4;
-  const bars = buildBars(timing, sequence.durationTicks, ppq);
+  // A zero-length note can start exactly where the song ends.
+  const lastOnset = sequence.notes.reduce((max, n) => Math.max(max, n.startTick), -gridTicks);
+  const bars = buildBars(timing, Math.max(sequence.durationTicks, lastOnset + gridTicks), ppq);
   assignKeys(bars, timing, keyShifts);
   markSections(bars, sectionTicks);
 

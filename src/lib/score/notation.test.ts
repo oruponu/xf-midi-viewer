@@ -32,8 +32,8 @@ function model(
   parts: ChannelPart[],
   keyShifts: KeyShiftChange[] = [],
   ppq = 480,
+  durationTicks = Math.max(BAR, ...notes.map((n) => n.endTick)),
 ): ReturnType<typeof buildScoreModel> {
-  const durationTicks = Math.max(BAR, ...notes.map((n) => n.endTick));
   const sequence: PlaybackSequence = {
     notes,
     midiMessages: [],
@@ -59,6 +59,13 @@ function writtenKeys(staff: ScoreStaff, bars: ScoreStaff['bars'] = staff.bars): 
 describe('buildScoreModel', () => {
   test('returns no staves for a song without notes', () => {
     expect(model([], [part(0, [voice(0, 0)])]).staves).toEqual([]);
+  });
+
+  test('adds bars for zero-length notes at the end of the song', () => {
+    const atStart = model([note(0, 0, 60, 0)], [part(0, [voice(0, 0)])], [], 480, 0);
+    expect(writtenKeys(atStart.staves[0]!)).toEqual([60]);
+    const atBarLine = model([note(0, BAR, 62, 0)], [part(0, [voice(0, 0)])], [], 480, BAR);
+    expect(writtenKeys(atBarLine.staves[0]!, atBarLine.staves[0]!.bars.slice(1))).toEqual([62]);
   });
 
   test('returns an empty score for SMPTE timing', () => {
