@@ -22,6 +22,7 @@ interface Onset {
 const DRUM_SUSTAIN = 4;
 const NOTE_LENGTHS = [16, 12, 8, 6, 4, 3, 2, 1];
 const REST_LENGTHS = [16, 8, 4, 2, 1];
+const COMPOUND_REST_LENGTHS = [12, 6, 4, 2, 1];
 
 // Returns, for each bar, its notes and rests with startGrid relative to the bar.
 export function layoutNotes(
@@ -44,20 +45,21 @@ export function layoutNotes(
     const b0 = Math.round(bar.startTick / gridTicks);
     const b1 = b0 + Math.round(bar.ticks / gridTicks);
     const items: ScoreItem[] = [];
+    const beat = beatOf(bar);
     let cursor = b0;
     while (oi < onsets.length && onsets[oi]!.end <= b0) oi += 1;
     for (let j = oi; j < onsets.length && onsets[j]!.start < b1; j += 1) {
       const o = onsets[j]!;
       const s = Math.max(o.start, b0);
       const e = Math.min(o.end, b1);
-      if (s > cursor) pushRests(items, cursor - b0, s - cursor);
+      if (s > cursor) pushRests(items, cursor - b0, s - cursor, beat);
       const continued = o.start < b0;
-      if (!drums) pushTied(items, s - b0, e - s, o.keys, continued);
-      else if (continued) pushRests(items, s - b0, e - s);
-      else pushUntied(items, s - b0, e - s, o.keys);
+      if (!drums) pushTied(items, s - b0, e - s, o.keys, continued, beat);
+      else if (continued) pushRests(items, s - b0, e - s, beat);
+      else pushUntied(items, s - b0, e - s, o.keys, beat);
       cursor = e;
     }
-    if (cursor < b1) pushRests(items, cursor - b0, b1 - cursor);
+    if (cursor < b1) pushRests(items, cursor - b0, b1 - cursor, beat);
     const silent = items.every((it) => it.keys.length === 0);
     result.push(
       silent ? [{ startGrid: 0, lenGrid: b1 - b0, keys: [], tieFromPrev: false }] : items,
@@ -106,15 +108,26 @@ function beatEndAfter(pos: number, bars: readonly ScoreBar[], gridTicks: number)
   return b0 + (Math.floor((pos - b0) / beat) + 1) * beat;
 }
 
-// Notes shorter than a quarter stay within one beat; longer ones start on a beat.
-function fitsAt(len: number, pos: number): boolean {
-  if (len < 4) return (pos % 4) + len <= 4;
-  if (len === 12) return pos % 8 === 0;
-  return pos % 4 === 0;
+const QUARTER_BEAT = 4;
+const DOTTED_QUARTER_BEAT = 6;
+
+// Compound meters (6/8, 9/8, 12/8, ...) count in dotted quarters; all others, 3/8 and 2/2
+// included, use quarter beats.
+function beatOf(bar: ScoreBar): number {
+  const compound = bar.denominator === 8 && bar.numerator % 3 === 0 && bar.numerator > 3;
+  return compound ? DOTTED_QUARTER_BEAT : QUARTER_BEAT;
 }
 
-function longestNote(pos: number, len: number): number {
-  return NOTE_LENGTHS.find((v) => v <= len && fitsAt(v, pos)) ?? 1;
+// Notes shorter than a beat stay within it; longer ones start on a beat.
+function fitsAt(len: number, pos: number, beat: number): boolean {
+  if (len < beat) return (pos % beat) + len <= beat;
+  if (beat === DOTTED_QUARTER_BEAT) return len % beat === 0 && pos % len === 0;
+  if (len === 12) return pos % 8 === 0;
+  return pos % beat === 0;
+}
+
+function longestNote(pos: number, len: number, beat: number): number {
+  return NOTE_LENGTHS.find((v) => v <= len && fitsAt(v, pos, beat)) ?? 1;
 }
 
 function pushTied(
@@ -123,10 +136,11 @@ function pushTied(
   len: number,
   keys: number[],
   continued: boolean,
+  beat: number,
 ): void {
   let tie = continued;
   while (len > 0) {
-    const l = longestNote(pos, len);
+    const l = longestNote(pos, len, beat);
     items.push({ startGrid: pos, lenGrid: l, keys, tieFromPrev: tie });
     pos += l;
     len -= l;
@@ -135,16 +149,32 @@ function pushTied(
 }
 
 // Drum hits have no length worth tying, so whatever does not fit in one note becomes rests.
-function pushUntied(items: ScoreItem[], pos: number, len: number, keys: number[]): void {
-  const l = longestNote(pos, len);
+function pushUntied(
+  items: ScoreItem[],
+  pos: number,
+  len: number,
+  keys: number[],
+  beat: number,
+): void {
+  const l = longestNote(pos, len, beat);
   items.push({ startGrid: pos, lenGrid: l, keys, tieFromPrev: false });
-  if (len > l) pushRests(items, pos + l, len - l);
+  if (len > l) pushRests(items, pos + l, len - l, beat);
 }
 
 // Rests are undotted and never cross a boundary of their own length, so they follow the beats.
-function pushRests(items: ScoreItem[], pos: number, len: number): void {
+// In compound meters they stay within a dotted-quarter beat instead, and only whole beats are dotted.
+function restFitsAt(len: number, pos: number, beat: number): boolean {
+  if (beat === DOTTED_QUARTER_BEAT) {
+    if (len >= beat) return len % beat === 0 && pos % len === 0;
+    return (pos % beat) + len <= beat && pos % Math.min(len, 2) === 0;
+  }
+  return pos % len === 0;
+}
+
+function pushRests(items: ScoreItem[], pos: number, len: number, beat: number): void {
+  const lengths = beat === DOTTED_QUARTER_BEAT ? COMPOUND_REST_LENGTHS : REST_LENGTHS;
   while (len > 0) {
-    const l = REST_LENGTHS.find((v) => v <= len && pos % v === 0) ?? 1;
+    const l = lengths.find((v) => v <= len && restFitsAt(v, pos, beat)) ?? 1;
     items.push({ startGrid: pos, lenGrid: l, keys: [], tieFromPrev: false });
     pos += l;
     len -= l;

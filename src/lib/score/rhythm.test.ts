@@ -130,6 +130,41 @@ describe('layoutNotes', () => {
     ]);
     expect(rows(second!)).toEqual([[0, 16, [], false]]);
   });
+
+  test('spells compound meters in dotted-quarter beats', () => {
+    const sixEight = [bar(0, 6, 8)];
+    const twelveEight = [bar(0, 12, 8)];
+    const layout = (notes: TimedNote[], bars: ScoreBar[]) =>
+      rows(layoutNotes(notes, bars, GRID, false)[0]!);
+
+    expect(layout([note(0, 720), note(720, 1440)], sixEight)).toEqual([
+      [0, 6, [60], false],
+      [6, 6, [60], false],
+    ]);
+    expect(layout([note(0, 720)], sixEight)).toEqual([
+      [0, 6, [60], false],
+      [6, 6, [], false],
+    ]);
+    expect(layout([note(240, 1200)], sixEight).filter((r) => r[2].length > 0)).toEqual([
+      [2, 4, [60], false],
+      [6, 4, [60], true],
+    ]);
+    expect(
+      layout(
+        [0, 720, 1440, 2160].map((t) => note(t, t + 720)),
+        twelveEight,
+      ),
+    ).toEqual([
+      [0, 6, [60], false],
+      [6, 6, [60], false],
+      [12, 6, [60], false],
+      [18, 6, [60], false],
+    ]);
+    expect(layout([note(0, 1440, 64), note(1440, 2880)], twelveEight)).toEqual([
+      [0, 12, [64], false],
+      [12, 12, [60], false],
+    ]);
+  });
 });
 
 describe('beamGroups', () => {
