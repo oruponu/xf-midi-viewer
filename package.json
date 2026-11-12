@@ -17,7 +17,8 @@
   "dependencies": {
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "spessasynth_lib": "4.4.3"
+    "spessasynth_lib": "4.4.3",
+    "vexflow": "5.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
