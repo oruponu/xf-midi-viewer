@@ -47,7 +47,10 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isPartPanelOpen, setIsPartPanelOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
+  const [selectedTab, setActiveTab] = useState<InfoPanelTab>('leadSheet');
+  const canShowScore = useMediaQuery(SCORE_MEDIA_QUERY);
+  // The selection is kept, so the score comes back when the screen is large enough again.
+  const activeTab = selectedTab === 'score' && !canShowScore ? 'leadSheet' : selectedTab;
   const togglePartPanel = useCallback(() => setIsPartPanelOpen((open) => !open), []);
   const closePartPanel = useCallback(() => setIsPartPanelOpen(false), []);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -678,6 +681,9 @@ const VIEW_TABS: ReadonlyArray<{
   { id: 'details', label: '詳細' },
 ];
 
+// A full score cannot be read on a phone-sized screen in either orientation.
+const SCORE_MEDIA_QUERY = '(min-width: 600px) and (min-height: 500px)';
+
 const VIEW_PANEL_ID = 'view-panel';
 
 function viewTabId(tab: InfoPanelTab): string {
@@ -692,19 +698,22 @@ function ViewTabs({
   onChange: (tab: InfoPanelTab) => void;
 }) {
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  // Removed from the list rather than hidden, so the arrow keys never land on it.
+  const canShowScore = useMediaQuery(SCORE_MEDIA_QUERY);
+  const tabs = canShowScore ? VIEW_TABS : VIEW_TABS.filter((tab) => tab.id !== 'score');
 
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
-    const current = VIEW_TABS.findIndex((tab) => tab.id === activeTab);
-    const next = tabIndexForKey(e.key, current, VIEW_TABS.length);
+    const current = tabs.findIndex((tab) => tab.id === activeTab);
+    const next = tabIndexForKey(e.key, current, tabs.length);
     if (next === null) return;
     e.preventDefault();
-    onChange(VIEW_TABS[next]!.id);
+    onChange(tabs[next]!.id);
     tabRefs.current[next]?.focus();
   };
 
   return (
     <div className="viewer-tabs" role="tablist" aria-label="表示切り替え" onKeyDown={onKeyDown}>
-      {VIEW_TABS.map((tab, i) => {
+      {tabs.map((tab, i) => {
         const selected = activeTab === tab.id;
         return (
           <button
