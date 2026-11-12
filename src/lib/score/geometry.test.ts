@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { buildGeometry, LAST_ITEM_ROOM, offsetInBar, tickToX } from './geometry.ts';
+import { buildGeometry, LAST_ITEM_ROOM, offsetInBar, staffOverhang, tickToX } from './geometry.ts';
 import type { BarGeometry } from './geometry.ts';
 import type { ScoreBar } from './bars.ts';
-import type { ScoreModel } from './notation.ts';
+import type { ScoreModel, ScoreStaff, StaffKind } from './notation.ts';
 import type { ScoreItem } from './rhythm.ts';
 
 const GRID = 120;
@@ -104,5 +104,36 @@ describe('buildGeometry', () => {
 
   test('adds room before the final barline', () => {
     expect(geometry.width[2]).toBeCloseTo(PREFIX[2]! + BAR * geometry.pxPerTick + 10, 9);
+  });
+});
+
+describe('staffOverhang', () => {
+  const staff = (
+    clef: 'treble' | 'bass',
+    keys: number[],
+    kind: StaffKind = 'pitched',
+  ): ScoreStaff => ({
+    channel: 0,
+    kind,
+    clef,
+    bars: [keys.map((k, i) => ({ startGrid: i * 4, lenGrid: 4, keys: [k], tieFromPrev: false }))],
+    continuation: false,
+    marks: [],
+    labels: [],
+  });
+
+  test('measures how far noteheads reach past the outer staff lines', () => {
+    expect(staffOverhang(staff('treble', [64, 77]))).toEqual({ above: 5, below: 5 });
+    expect(staffOverhang(staff('treble', [107])).above).toBe(90);
+    expect(staffOverhang(staff('bass', [0])).below).toBe(130);
+  });
+
+  test('rounds accidentals outwards', () => {
+    expect(staffOverhang(staff('treble', [78])).above).toBe(10);
+    expect(staffOverhang(staff('bass', [42])).below).toBe(10);
+  });
+
+  test('ignores drum staves', () => {
+    expect(staffOverhang(staff('treble', [36], 'drumSet'))).toEqual({ above: 0, below: 0 });
   });
 });

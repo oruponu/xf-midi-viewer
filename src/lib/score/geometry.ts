@@ -1,5 +1,5 @@
 import type { ScoreBar } from './bars.ts';
-import type { ScoreModel } from './notation.ts';
+import type { ScoreModel, ScoreStaff } from './notation.ts';
 import type { ScoreItem } from './rhythm.ts';
 
 // All lengths are in VexFlow units, before the view scales them down.
@@ -92,4 +92,32 @@ export function tickToX(g: BarGeometry, bars: readonly ScoreBar[], tick: number)
   const bar = bars[lo]!;
   const into = Math.min(bar.ticks, Math.max(0, tick - bar.startTick));
   return g.noteStart[lo]! + offsetInBar(g, lo, into);
+}
+
+const STEP = 5;
+const NOTEHEAD_HALF = 5;
+// Diatonic step of each pitch class, with black keys spelled from the note below or above.
+const STEP_DOWN = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
+const STEP_UP = [0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6];
+// Diatonic steps of the top and bottom lines: F5 and E4, A3 and G2.
+const OUTER_LINES = { treble: [38, 30], bass: [26, 18] } as const;
+
+function diatonic(midi: number, steps: readonly number[]): number {
+  return (Math.floor(midi / 12) - 1) * 7 + steps[midi % 12]!;
+}
+
+// How far noteheads reach above the top line and below the bottom line. Drum staves keep their
+// notes on fixed positions near the staff.
+export function staffOverhang(staff: ScoreStaff): { above: number; below: number } {
+  if (staff.kind !== 'pitched' || staff.clef === 'percussion') return { above: 0, below: 0 };
+  const [top, bottom] = OUTER_LINES[staff.clef];
+  let above = 0;
+  let below = 0;
+  for (const it of staff.bars.flat()) {
+    for (const k of it.keys) {
+      above = Math.max(above, (diatonic(k, STEP_UP) - top) * STEP + NOTEHEAD_HALF);
+      below = Math.max(below, (bottom - diatonic(k, STEP_DOWN)) * STEP + NOTEHEAD_HALF);
+    }
+  }
+  return { above, below };
 }

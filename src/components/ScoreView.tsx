@@ -7,7 +7,7 @@ import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 import type { RehearsalMessage } from '../lib/xf/types.ts';
-import { buildGeometry, tickToX } from '../lib/score/geometry.ts';
+import { buildGeometry, staffOverhang, tickToX } from '../lib/score/geometry.ts';
 import { buildScoreModel } from '../lib/score/notation.ts';
 import type { NamedTick, ScoreStaff } from '../lib/score/notation.ts';
 import { drawCell, measurePrefix, SCALE, STAFF_CENTER, STAFF_GAP, TOP } from './scoreCell.ts';
@@ -16,6 +16,11 @@ const LABEL_WIDTH = 120;
 const PLAYHEAD_RATIO = 0.25;
 const FRAME_BUDGET_MS = 6;
 const BOTTOM_ROOM = 30;
+const HALF_STAFF = 20;
+const NOTE_MARGIN = 10;
+// Room the frame leaves above the first staff's top line and below the last staff's bottom line.
+const ROOM_ABOVE = TOP + STAFF_CENTER - HALF_STAFF;
+const ROOM_BELOW = STAFF_GAP - STAFF_CENTER - HALF_STAFF + BOTTOM_ROOM;
 // Extra width rendered beyond the visible area on each side, in score units.
 const RENDER_MARGIN = 200;
 // Cells are keyed as bar * STAFF_KEY + staff.
@@ -81,6 +86,15 @@ export function ScoreView({
   );
   const geometry = useMemo(() => buildGeometry(model, (bi) => measurePrefix(model, bi)), [model]);
   const placements = useMemo(() => labelPlacements(model.staves), [model]);
+  // The frame clips its content, so it grows to fit notes far above or below the outer staves.
+  const pad = useMemo(() => {
+    const first = model.staves[0];
+    const last = model.staves.at(-1);
+    return {
+      top: first ? Math.max(0, staffOverhang(first).above + NOTE_MARGIN - ROOM_ABOVE) : 0,
+      bottom: last ? Math.max(0, staffOverhang(last).below + NOTE_MARGIN - ROOM_BELOW) : 0,
+    };
+  }, [model]);
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [labelKey, setLabelKey] = useState('');
@@ -104,7 +118,7 @@ export function ScoreView({
       div.style.width = `${width * SCALE}px`;
       div.style.height = `${STAFF_GAP * SCALE}px`;
       div.style.left = `${geometry.x[bi]! * SCALE}px`;
-      div.style.top = `${si * STAFF_GAP * SCALE}px`;
+      div.style.top = `${(pad.top + si * STAFF_GAP) * SCALE}px`;
       if (drawCell(ctx, model, bi, si, geometry)) div.classList.add('score-view-cell--mark');
       host.appendChild(div);
       rendered.set(bi * STAFF_KEY + si, div);
@@ -119,7 +133,7 @@ export function ScoreView({
       const viewWidth = viewport.clientWidth / SCALE;
       host.style.transform = `translate3d(${viewport.clientWidth * PLAYHEAD_RATIO - x * SCALE}px, 0, 0)`;
 
-      const top = viewport.getBoundingClientRect().top;
+      const top = viewport.getBoundingClientRect().top + pad.top * SCALE;
       const rowHeight = STAFF_GAP * SCALE;
       const firstRow = Math.max(0, Math.floor((-top - rowHeight) / rowHeight));
       const lastRow = Math.min(
@@ -165,7 +179,7 @@ export function ScoreView({
       cancelAnimationFrame(raf);
       host.replaceChildren();
     };
-  }, [model, geometry, placements, scheduler, sequence]);
+  }, [model, geometry, placements, pad, scheduler, sequence]);
 
   if (model.staves.length === 0) {
     return (
@@ -176,14 +190,15 @@ export function ScoreView({
   }
 
   const labelIndexes = labelKey ? labelKey.split(',').map(Number) : [];
-  const height = (TOP + model.staves.length * STAFF_GAP + BOTTOM_ROOM) * SCALE;
+  const height =
+    (pad.top + TOP + model.staves.length * STAFF_GAP + BOTTOM_ROOM + pad.bottom) * SCALE;
   return (
     <div className="card score-view">
       <div className="score-view-frame" style={{ height }}>
         <div className="score-view-labels" style={{ width: LABEL_WIDTH }}>
           {placements.map((p, i) => {
             const centre =
-              p.first * STAFF_GAP + TOP + STAFF_CENTER + ((p.count - 1) * STAFF_GAP) / 2;
+              pad.top + p.first * STAFF_GAP + TOP + STAFF_CENTER + ((p.count - 1) * STAFF_GAP) / 2;
             return (
               <div key={p.first} className="score-view-label" style={{ top: centre * SCALE }}>
                 {labelText(p.staff, labelIndexes[i] ?? -1)}
