@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { usePlaybackPosition } from '../hooks/usePlaybackPosition.ts';
 import { centeredScrollTop, PANEL_INSET_CHANGE_EVENT } from '../lib/layout/panelCover.ts';
@@ -11,6 +11,7 @@ import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import { formatKeySignature, formatTickAsBarBeat } from '../lib/smf/timing.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 import type { Song } from '../lib/song.ts';
+import { songHeading } from '../lib/songHeading.ts';
 import type { FileSummary } from '../lib/songLoader.ts';
 import { formatStyleDetail } from '../lib/xf/format.ts';
 import { computeKaraokeSectionBreaks } from '../lib/xf/lyricSections.ts';
@@ -32,7 +33,16 @@ import { ErrorBoundary } from './ErrorBoundary.tsx';
 import { KaraokeView } from './KaraokeView.tsx';
 import { LeadSheet } from './LeadSheet.tsx';
 
-export type InfoPanelTab = 'leadSheet' | 'lyrics' | 'karaoke' | 'details';
+// VexFlow and its Bravura font are large, and phones never show the score, so they load on demand.
+// The score measures Bravura glyphs on its first render, so the font must be ready first.
+const ScoreView = lazy(() =>
+  import('./ScoreView.tsx').then(async (module) => {
+    await document.fonts.load('30px Bravura');
+    return { default: module.ScoreView };
+  }),
+);
+
+export type InfoPanelTab = 'leadSheet' | 'score' | 'lyrics' | 'karaoke' | 'details';
 
 type InfoPanelProps = {
   id: string;
@@ -85,6 +95,22 @@ function ActiveView({
 }: InfoPanelProps) {
   const { xf: data, karaoke: parsedKaraoke, chords, rehearsals, timing, sequence } = song;
   const { metaEvents } = song;
+  // The score needs only the notes, so it does not depend on the song carrying XF data.
+  if (activeTab === 'score') {
+    return (
+      <Suspense fallback={null}>
+        <ScoreView
+          sequence={sequence}
+          timing={timing}
+          parts={song.channelParts}
+          rehearsals={rehearsals}
+          keyShifts={keyShifts}
+          scheduler={scheduler}
+          title={file ? songHeading(data, file.name).title : ''}
+        />
+      </Suspense>
+    );
+  }
   const hasKaraoke = data.karaoke.header !== null || data.karaoke.events.length > 0;
   const hasStyle = data.style.events.length > 0;
   const empty =
