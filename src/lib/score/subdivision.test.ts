@@ -109,16 +109,22 @@ describe('detectSwing', () => {
     ticks.map((startTick) => ({ channel, startTick }));
   const beats = (count: number, offsets: number[]) =>
     Array.from({ length: count }, (_, i) => offsets.map((o) => i * 480 + o)).flat();
+  const bars = (count: number, numerator = 4, denominator = 4) => {
+    const ticks = (1920 * numerator) / denominator;
+    return Array.from({ length: count }, (_, i) => bar(i * ticks, numerator, denominator));
+  };
+  const swingOf = (list: { channel: number; startTick: number }[], barList = bars(10)) =>
+    detectSwing(list, barList, GRID);
 
   test('finds a sixteenth-note shuffle', () => {
-    expect(detectSwing(notes(beats(16, [0, 160, 240, 400])), GRID)).toEqual({
+    expect(swingOf(notes(beats(16, [0, 160, 240, 400])))).toEqual({
       eighths: false,
       sixteenths: true,
     });
   });
 
   test('finds an eighth-note shuffle', () => {
-    expect(detectSwing(notes(beats(16, [0, 320])), GRID)).toEqual({
+    expect(swingOf(notes(beats(16, [0, 320])))).toEqual({
       eighths: true,
       sixteenths: false,
     });
@@ -127,17 +133,22 @@ describe('detectSwing', () => {
   test('ignores a few swung beats among straight ones', () => {
     const swung = notes(beats(16, [0, 160, 240, 400]));
     const straight = notes(beats(40, [0, 120, 240, 360]), 1);
-    expect(detectSwing([...swung, ...straight], GRID)).toEqual(NO_SWING);
+    expect(swingOf([...swung, ...straight])).toEqual(NO_SWING);
   });
 
   test('does not take triplets for a shuffle', () => {
-    expect(detectSwing(notes(beats(32, [0, 160, 320])), GRID)).toEqual(NO_SWING);
+    expect(swingOf(notes(beats(32, [0, 160, 320])))).toEqual(NO_SWING);
   });
 
   test('does not take quarter-note triplets for an eighth-note shuffle', () => {
     const quarterTriplets = Array.from({ length: 16 }, (_, i) =>
       [0, 320, 640].map((o) => i * 960 + o),
     ).flat();
-    expect(detectSwing(notes(quarterTriplets), GRID)).toEqual(NO_SWING);
+    expect(swingOf(notes(quarterTriplets))).toEqual(NO_SWING);
+  });
+
+  test('counts beats from the start of each bar in meters with odd eighths', () => {
+    const swung = Array.from({ length: 20 }, (_, i) => [0, 320].map((o) => i * 720 + o)).flat();
+    expect(swingOf(notes(swung), bars(20, 3, 8))).toEqual({ eighths: true, sixteenths: false });
   });
 });

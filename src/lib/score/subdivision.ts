@@ -157,19 +157,28 @@ interface SwingCounts {
 const MIN_SWUNG_BEATS = 16;
 
 // A song is in a shuffle when at least 16 beats are swung and they are at least half as many as
-// the straight ones. Beats are counted per channel and quarter note over sequenced notes only,
-// whatever the meter.
+// the straight ones. Beats are counted per channel and quarter note from the start of each bar
+// over sequenced notes only, whatever the meter.
 export function detectSwing(
   notes: readonly { channel: number; startTick: number }[],
+  bars: readonly ScoreBar[],
   gridTicks: number,
 ): Swing {
+  const quarters: Beat[] = [];
+  for (const bar of bars) {
+    const [b0, b1] = barRange(bar, gridTicks);
+    for (let s = b0; s < b1; s += QUARTER) {
+      quarters.push({ start: s, len: Math.min(QUARTER, b1 - s), step: SIXTEENTH });
+    }
+  }
   const beats = new Map<string, number[]>();
   for (const n of notes) {
     const u = n.startTick / gridTicks;
-    const beat = Math.floor((u + LEAD) / QUARTER);
-    const key = `${n.channel}:${beat}`;
+    const bi = beatIndexAt(quarters, u, LEAD);
+    if (bi < 0) continue;
+    const key = `${n.channel}:${bi}`;
     const list = beats.get(key);
-    const offset = u - beat * QUARTER;
+    const offset = u - quarters[bi]!.start;
     if (list) list.push(offset);
     else beats.set(key, [offset]);
   }
@@ -182,8 +191,11 @@ export function detectSwing(
   const exact = exactWithin(gridTicks);
   for (const [key, offsets] of beats) {
     const has = (p: number) => hasAt(offsets, p, exact);
-    const [channel, beat] = key.split(':');
-    const next = beats.get(`${channel}:${Number(beat) + 1}`) ?? [];
+    const [channel, index] = key.split(':');
+    const bi = Number(index);
+    const q = quarters[bi]!;
+    const contiguous = quarters[bi + 1]?.start === q.start + q.len;
+    const next = (contiguous && beats.get(`${channel}:${bi + 1}`)) || [];
     if (has(16) && swungEighths(offsets, next, exact)) c.swungEighths += 1;
     if (onlyAt(offsets, [0, 6, 12, 18], exact)) {
       if (has(12)) c.straightEighths += 1;

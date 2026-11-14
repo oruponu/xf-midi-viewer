@@ -72,7 +72,7 @@ export function buildScoreModel(input: ScoreInput): ScoreModel {
   // A zero-length note can start exactly where the song ends.
   const lastOnset = sequence.notes.reduce((max, n) => Math.max(max, n.startTick), -sixteenthTicks);
   const bars = buildBars(timing, Math.max(sequence.durationTicks, lastOnset + sixteenthTicks), ppq);
-  const swing = detectSwing(sequence.notes, gridTicks);
+  const swing = detectSwing(sequence.notes, bars, gridTicks);
   assignKeys(bars, timing, keyShifts);
   markSections(bars, sectionTicks);
 
