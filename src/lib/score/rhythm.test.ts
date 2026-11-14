@@ -244,6 +244,32 @@ describe('layoutNotes', () => {
     ]);
   });
 
+  test('writes sixteenth-note triplets per eighth in compound beats', () => {
+    const items = layoutNotes(
+      [note(0, 80), note(80, 160), note(160, 240)],
+      [bar(0, 6, 8)],
+      GRID,
+      false,
+      NO_SWING,
+    )[0]!;
+    expect(tripletRows(items)).toEqual([
+      [0, 4, [60], 12],
+      [4, 4, [60], 12],
+      [8, 4, [60], 12],
+      [12, 24, [], 0],
+      [36, 36, [], 0],
+    ]);
+  });
+
+  test('never joins compound beats of sixteenth-note triplets', () => {
+    const notes = [note(0, 80), note(80, 160), note(160, 800), note(800, 880), note(880, 960)];
+    const items = layoutNotes(notes, [bar(0, 6, 8)], GRID, false, NO_SWING)[0]!;
+    expect(new Set(items.filter((it) => it.triplet).map((it) => it.triplet))).toEqual(
+      new Set([12]),
+    );
+    expect(items.reduce((sum, it) => sum + it.lenGrid, 0)).toBe(72);
+  });
+
   test('keeps a beat of sixteenth-note triplets whole when a note crosses its middle', () => {
     const items = layoutNotes(
       [note(0, 80), note(80, 400), note(400, 480)],

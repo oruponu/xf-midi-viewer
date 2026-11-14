@@ -108,9 +108,9 @@ interface TripletBeat {
   len: number;
 }
 
-// Two full triplet beats starting on an even beat form one quarter-note triplet when a note
-// sounds across the beat between them. A beat of sixteenth-note triplets longer than an eighth
-// splits into two triplets unless a note sounds across its middle.
+// Two full quarter beats of triplets starting on an even beat form one quarter-note triplet when
+// a note sounds across the beat between them. A beat of sixteenth-note triplets splits into one
+// triplet per eighth unless it is a quarter and a note sounds across its middle.
 function tripletGroups(
   tripletBeats: readonly TripletBeat[],
   b0: number,
@@ -131,22 +131,22 @@ function tripletGroups(
     if (groups.has(k)) continue;
     const start = k * beat;
     const next = b0 + start + beat;
-    if (k % 2 === 0 && whole(k) && whole(k + 1) && crosses(next, next - beat)) {
+    const quarter = beat === QUARTER;
+    if (quarter && k % 2 === 0 && whole(k) && whole(k + 1) && crosses(next, next - beat)) {
       const group = { start, len: 2 * beat };
       groups.set(k, [group]);
       groups.set(k + 1, [group]);
       continue;
     }
     const span = 3 * step;
-    const split = span < len && !crosses(b0 + start + span, -Infinity);
+    const split = span < len && !(len === QUARTER && crosses(b0 + start + span, -Infinity));
+    const spans = split ? len / span : 1;
     groups.set(
       k,
-      split
-        ? [
-            { start, len: span },
-            { start: start + span, len: span },
-          ]
-        : [{ start, len }],
+      Array.from({ length: spans }, (_, i) => ({
+        start: start + (i * len) / spans,
+        len: len / spans,
+      })),
     );
   }
   return groups;

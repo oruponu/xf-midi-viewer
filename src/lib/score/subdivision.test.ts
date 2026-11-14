@@ -63,8 +63,12 @@ describe('buildBeats', () => {
   });
 
   test('keeps straight subdivisions in compound meters', () => {
-    expect(stepsOf([0, 160, 320], [bar(0, 6, 8)])).toEqual([6, 6]);
+    expect(stepsOf([0, 120, 240], [bar(0, 6, 8)])).toEqual([6, 6]);
     expect(stepsOf([0, 60, 120], [bar(0, 6, 8)])).toEqual([3, 6]);
+  });
+
+  test('chooses sixteenth-note triplets in compound beats', () => {
+    expect(stepsOf([0, 80, 160, 240], [bar(0, 6, 8)])).toEqual([4, 6]);
   });
 
   test('chooses sixteenth-note triplets in the last eighth of a bar', () => {

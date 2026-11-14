@@ -133,7 +133,7 @@ function chooseStep(
   if (quarterBeat && swing.eighths && swungEighths(offsets, next, exact)) return EIGHTH;
   const steps = quarterBeat
     ? [SIXTEENTH, EIGHTH_TRIPLET, SIXTEENTH_TRIPLET, THIRTY_SECOND]
-    : len === EIGHTH
+    : len % EIGHTH === 0
       ? [SIXTEENTH, SIXTEENTH_TRIPLET, THIRTY_SECOND]
       : [SIXTEENTH, THIRTY_SECOND];
   const fit = steps.find((s) => maxError(offsets, s) <= exact);
