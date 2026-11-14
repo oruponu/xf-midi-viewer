@@ -13,6 +13,7 @@ import {
   StaveNote,
   StaveTie,
   SVGContext,
+  Tuplet,
   Voice,
 } from 'vexflow/bravura';
 import type { RenderContext } from 'vexflow/bravura';
@@ -34,15 +35,22 @@ const MARK_FONT_SIZE = `${12 / SCALE}px`;
 const MARK_Y = TOP + 6;
 
 const DURATIONS: Record<number, [string, number]> = {
-  16: ['w', 0],
-  12: ['h', 1],
-  8: ['h', 0],
-  6: ['q', 1],
-  4: ['q', 0],
-  3: ['8', 1],
-  2: ['8', 0],
-  1: ['16', 0],
+  96: ['w', 0],
+  72: ['h', 1],
+  48: ['h', 0],
+  36: ['q', 1],
+  24: ['q', 0],
+  18: ['8', 1],
+  12: ['8', 0],
+  9: ['16', 1],
+  6: ['16', 0],
+  3: ['32', 0],
 };
+
+// A note in a triplet is written with the value it would have in three halves of its time.
+function writtenDuration(item: ScoreItem): [string, number] {
+  return DURATIONS[item.triplet ? (item.lenGrid * 3) / 2 : item.lenGrid]!;
+}
 
 const SHARP_NAMES = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'];
 const FLAT_NAMES = ['c', 'db', 'd', 'eb', 'e', 'f', 'gb', 'g', 'ab', 'a', 'bb', 'b'];
@@ -122,7 +130,7 @@ function makeNotes(
   const drums = staff.kind !== 'pitched';
   return items.map((item) => {
     const rest = item.keys.length === 0;
-    const [duration, dots] = rest && items.length === 1 ? ['w', 0] : DURATIONS[item.lenGrid]!;
+    const [duration, dots] = rest && items.length === 1 ? ['w', 0] : writtenDuration(item);
     let keys: string[];
     if (rest) keys = [staff.clef === 'bass' ? 'd/3' : REST_KEYS[drumVoice]];
     else if (staff.kind === 'drumSet') keys = [...new Set(item.keys.map(drumSetKey))];
@@ -142,6 +150,37 @@ function makeNotes(
     }
     return note;
   });
+}
+
+// Triplets are created before the notes join a voice, so that their ticks are already scaled.
+function makeTuplets(items: readonly ScoreItem[], notes: readonly StaveNote[]): Tuplet[] {
+  const tuplets: Tuplet[] = [];
+  let group: StaveNote[] = [];
+  let groupKey = '';
+  const flush = () => {
+    if (group.length > 0) tuplets.push(new Tuplet(group, { numNotes: 3, notesOccupied: 2 }));
+    group = [];
+  };
+  items.forEach((it, i) => {
+    const key = it.triplet ? `${it.triplet}:${Math.floor(it.startGrid / it.triplet)}` : '';
+    if (key !== groupKey) flush();
+    groupKey = key;
+    if (it.triplet) group.push(notes[i]!);
+  });
+  flush();
+  return tuplets;
+}
+
+// A triplet whose beam also carries notes outside it gets a bracket to show where it ends.
+function bracketSharedBeams(tuplets: readonly Tuplet[], beams: readonly Beam[]): void {
+  for (const tuplet of tuplets) {
+    const notes = new Set(tuplet.getNotes());
+    const shared = beams.some((b) => {
+      const beamed = b.getNotes();
+      return beamed.some((n) => notes.has(n)) && beamed.some((n) => !notes.has(n));
+    });
+    if (shared) tuplet.setBracketed(true);
+  }
 }
 
 function cellLayers(staff: ScoreStaff, bi: number): { items: ScoreItem[]; drumVoice: DrumVoice }[] {
@@ -200,6 +239,7 @@ export function drawCell(
 
   const layers = cellLayers(staff, bi).map(({ items, drumVoice }) => {
     const notes = makeNotes(items, staff, bar.keySharps, drumVoice);
+    const tuplets = makeTuplets(items, notes);
     const voice = new Voice({ numBeats: bar.numerator, beatValue: bar.denominator }).setMode(
       Voice.Mode.SOFT,
     );
@@ -213,12 +253,13 @@ export function drawCell(
         : Beam.getDefaultBeamGroups(`${bar.numerator}/${bar.denominator}`),
       maintainStemDirections: staff.kind !== 'pitched',
     });
-    return { items, notes, voice, beams };
+    bracketSharedBeams(tuplets, beams);
+    return { items, notes, voice, beams, tuplets };
   });
   const voices = layers.map((l) => l.voice);
   new Formatter().joinVoices(voices).format(voices, Math.max(20, width - prefix - LEFT_PAD));
   const stavePadding = Metrics.get('Stave.padding', 0) as number;
-  for (const { items, notes, voice, beams } of layers) {
+  for (const { items, notes, voice, beams, tuplets } of layers) {
     voice.setStave(stave);
     // A silent bar is one whole rest centred between the bar's signatures and its barline.
     const wholeBarRest = items.length === 1 && items[0]!.keys.length === 0;
@@ -230,6 +271,7 @@ export function drawCell(
     });
     voice.draw(ctx, stave);
     beams.forEach((b) => b.setContext(ctx).draw());
+    tuplets.forEach((t) => t.setContext(ctx).draw());
   }
   if (staff.kind === 'pitched') drawTies(ctx, bi, staff, stave, layers[0]!, geometry);
   return drawMarks(ctx, bar, staff, bi, geometry);
