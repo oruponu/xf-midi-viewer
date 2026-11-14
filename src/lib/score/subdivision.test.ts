@@ -67,6 +67,12 @@ describe('buildBeats', () => {
     expect(stepsOf([0, 60, 120], [bar(0, 6, 8)])).toEqual([3, 6]);
   });
 
+  test('allows for triplets rounded to whole ticks at any resolution', () => {
+    const bar100 = { ...bar(0), ticks: 400 };
+    const steps = buildBeats([0, 33, 67, 100, 117, 133], [bar100], 100 / 24, NO_SWING);
+    expect(steps.map((b) => b.step)).toEqual([8, 4, 6, 6]);
+  });
+
   test('writes swung notes straight in a shuffle', () => {
     expect(
       stepsOf([0, 320, 480, 640, 800], [bar(0)], { eighths: true, sixteenths: false }),

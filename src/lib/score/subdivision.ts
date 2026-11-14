@@ -9,8 +9,10 @@ const EIGHTH_TRIPLET = 8;
 const SIXTEENTH_TRIPLET = 4;
 const THIRTY_SECOND = 3;
 
-// Sequenced notes land on their grid to the tick; this is one tick at 480 per quarter.
-const EXACT = 0.05;
+// Sequenced notes land on their grid to the nearest tick, so a grid fits when it is within a tick.
+function exactWithin(gridTicks: number): number {
+  return Math.min(1 / gridTicks, 0.5);
+}
 // A note played up to a 64th early still counts as the downbeat of the next beat.
 const LEAD = 1.5;
 // Played by hand, a beat is read as triplets only when the sixteenth grid misses a note by
@@ -68,8 +70,9 @@ export function buildBeats(
     const bi = beatIndexAt(beats, u, LEAD);
     if (bi >= 0) offsets[bi]!.push(u - beats[bi]!.start);
   }
+  const exact = exactWithin(gridTicks);
   beats.forEach((b, bi) => {
-    b.step = chooseStep(offsets[bi]!, b.len === QUARTER, swing);
+    b.step = chooseStep(offsets[bi]!, b.len === QUARTER, swing, exact);
   });
   return beats;
 }
@@ -101,19 +104,28 @@ function maxError(offsets: readonly number[], step: number): number {
   return Math.max(...offsets.map((o) => Math.abs(o - Math.round(o / step) * step)));
 }
 
-function onlyAt(offsets: readonly number[], positions: readonly number[]): boolean {
-  return offsets.every((o) => positions.some((p) => Math.abs(o - p) <= EXACT));
+function onlyAt(offsets: readonly number[], positions: readonly number[], exact: number): boolean {
+  return offsets.every((o) => positions.some((p) => Math.abs(o - p) <= exact));
 }
 
-function chooseStep(offsets: readonly number[], quarterBeat: boolean, swing: Swing): number {
+function hasAt(offsets: readonly number[], position: number, exact: number): boolean {
+  return offsets.some((o) => Math.abs(o - position) <= exact);
+}
+
+function chooseStep(
+  offsets: readonly number[],
+  quarterBeat: boolean,
+  swing: Swing,
+  exact: number,
+): number {
   if (offsets.length === 0) return SIXTEENTH;
-  if (quarterBeat && swing.sixteenths && onlyAt(offsets, [0, 8, 12, 20])) return SIXTEENTH;
-  if (quarterBeat && swing.eighths && onlyAt(offsets, [0, 16])) return EIGHTH;
+  if (quarterBeat && swing.sixteenths && onlyAt(offsets, [0, 8, 12, 20], exact)) return SIXTEENTH;
+  if (quarterBeat && swing.eighths && onlyAt(offsets, [0, 16], exact)) return EIGHTH;
   const steps = quarterBeat
     ? [SIXTEENTH, EIGHTH_TRIPLET, SIXTEENTH_TRIPLET, THIRTY_SECOND]
     : [SIXTEENTH, THIRTY_SECOND];
-  const exact = steps.find((s) => maxError(offsets, s) <= EXACT);
-  if (exact !== undefined) return exact;
+  const fit = steps.find((s) => maxError(offsets, s) <= exact);
+  if (fit !== undefined) return fit;
   if (quarterBeat) {
     const sixteenthMiss = maxError(offsets, SIXTEENTH);
     if (sixteenthMiss >= TRIPLET_MISS && maxError(offsets, EIGHTH_TRIPLET) < sixteenthMiss / 2) {
@@ -155,14 +167,15 @@ export function detectSwing(
     swungSixteenths: 0,
     straightSixteenths: 0,
   };
+  const exact = exactWithin(gridTicks);
   for (const offsets of beats.values()) {
-    const has = (p: number) => offsets.some((o) => Math.abs(o - p) <= EXACT);
-    if (has(16) && onlyAt(offsets, [0, 16])) c.swungEighths += 1;
-    if (onlyAt(offsets, [0, 6, 12, 18])) {
+    const has = (p: number) => hasAt(offsets, p, exact);
+    if (has(16) && onlyAt(offsets, [0, 16], exact)) c.swungEighths += 1;
+    if (onlyAt(offsets, [0, 6, 12, 18], exact)) {
       if (has(12)) c.straightEighths += 1;
       if (has(6) || has(18)) c.straightSixteenths += 1;
     }
-    if ((has(12) || has(20)) && (has(8) || has(20)) && onlyAt(offsets, [0, 8, 12, 20])) {
+    if ((has(12) || has(20)) && (has(8) || has(20)) && onlyAt(offsets, [0, 8, 12, 20], exact)) {
       c.swungSixteenths += 1;
     }
   }
