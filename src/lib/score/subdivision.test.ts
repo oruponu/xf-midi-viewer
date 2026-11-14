@@ -62,9 +62,13 @@ describe('buildBeats', () => {
     expect(beats.map((b) => b.step)).toEqual([6, 8, 6, 6]);
   });
 
-  test('keeps straight subdivisions in compound meters and partial beats', () => {
+  test('keeps straight subdivisions in compound meters', () => {
     expect(stepsOf([0, 160, 320], [bar(0, 6, 8)])).toEqual([6, 6]);
     expect(stepsOf([0, 60, 120], [bar(0, 6, 8)])).toEqual([3, 6]);
+  });
+
+  test('chooses sixteenth-note triplets in the last eighth of a bar', () => {
+    expect(stepsOf([480, 560, 640], [bar(0, 3, 8)])).toEqual([6, 4]);
   });
 
   test('allows for triplets rounded to whole ticks at any resolution', () => {

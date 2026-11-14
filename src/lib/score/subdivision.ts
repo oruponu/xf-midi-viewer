@@ -73,7 +73,7 @@ export function buildBeats(
   const exact = exactWithin(gridTicks);
   beats.forEach((b, bi) => {
     const next = beats[bi + 1]?.start === b.start + b.len ? offsets[bi + 1]! : [];
-    b.step = chooseStep(offsets[bi]!, b.len === QUARTER, swing, exact, next);
+    b.step = chooseStep(offsets[bi]!, b.len, swing, exact, next);
   });
   return beats;
 }
@@ -122,17 +122,20 @@ function swungEighths(offsets: readonly number[], next: readonly number[], exact
 
 function chooseStep(
   offsets: readonly number[],
-  quarterBeat: boolean,
+  len: number,
   swing: Swing,
   exact: number,
   next: readonly number[],
 ): number {
   if (offsets.length === 0) return SIXTEENTH;
+  const quarterBeat = len === QUARTER;
   if (quarterBeat && swing.sixteenths && onlyAt(offsets, [0, 8, 12, 20], exact)) return SIXTEENTH;
   if (quarterBeat && swing.eighths && swungEighths(offsets, next, exact)) return EIGHTH;
   const steps = quarterBeat
     ? [SIXTEENTH, EIGHTH_TRIPLET, SIXTEENTH_TRIPLET, THIRTY_SECOND]
-    : [SIXTEENTH, THIRTY_SECOND];
+    : len === EIGHTH
+      ? [SIXTEENTH, SIXTEENTH_TRIPLET, THIRTY_SECOND]
+      : [SIXTEENTH, THIRTY_SECOND];
   const fit = steps.find((s) => maxError(offsets, s) <= exact);
   if (fit !== undefined) return fit;
   if (quarterBeat) {

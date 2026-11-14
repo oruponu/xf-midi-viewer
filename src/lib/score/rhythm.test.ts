@@ -228,6 +228,22 @@ describe('layoutNotes', () => {
     ]);
   });
 
+  test('writes sixteenth-note triplets in the last eighth of a bar', () => {
+    const items = layoutNotes(
+      [note(0, 480), note(480, 560), note(560, 640), note(640, 720)],
+      [bar(0, 3, 8)],
+      GRID,
+      false,
+      NO_SWING,
+    )[0]!;
+    expect(tripletRows(items)).toEqual([
+      [0, 24, [60], 0],
+      [24, 4, [60], 12],
+      [28, 4, [60], 12],
+      [32, 4, [60], 12],
+    ]);
+  });
+
   test('keeps a beat of sixteenth-note triplets whole when a note crosses its middle', () => {
     const items = layoutNotes(
       [note(0, 80), note(80, 400), note(400, 480)],

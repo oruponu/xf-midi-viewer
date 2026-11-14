@@ -75,7 +75,9 @@ export function layoutNotes(
     const tripletBeats: TripletBeat[] = [];
     for (; bi < beats.length && beats[bi]!.start < b1; bi += 1) {
       const b = beats[bi]!;
-      if (isTripletStep(b.step)) tripletBeats.push({ index: (b.start - b0) / beat, step: b.step });
+      if (isTripletStep(b.step)) {
+        tripletBeats.push({ index: (b.start - b0) / beat, step: b.step, len: b.len });
+      }
     }
     while (oi < onsets.length && onsets[oi]!.end <= b0) oi += 1;
     const meter: BarMeter = { beat, groups: tripletGroups(tripletBeats, b0, beat, onsets, oi) };
@@ -103,11 +105,12 @@ export function layoutNotes(
 interface TripletBeat {
   index: number;
   step: number;
+  len: number;
 }
 
-// Two triplet beats starting on an even beat form one quarter-note triplet when a note sounds
-// across the beat between them. A beat of sixteenth-note triplets splits into two triplets
-// unless a note sounds across its middle.
+// Two full triplet beats starting on an even beat form one quarter-note triplet when a note
+// sounds across the beat between them. A beat of sixteenth-note triplets longer than an eighth
+// splits into two triplets unless a note sounds across its middle.
 function tripletGroups(
   tripletBeats: readonly TripletBeat[],
   b0: number,
@@ -123,18 +126,19 @@ function tripletGroups(
     }
     return false;
   };
-  for (const { index: k, step } of tripletBeats) {
+  const whole = (k: number) => tripletBeats.some((t) => t.index === k && t.len === beat);
+  for (const { index: k, step, len } of tripletBeats) {
     if (groups.has(k)) continue;
     const start = k * beat;
     const next = b0 + start + beat;
-    if (k % 2 === 0 && tripletBeats.some((t) => t.index === k + 1) && crosses(next, next - beat)) {
+    if (k % 2 === 0 && whole(k) && whole(k + 1) && crosses(next, next - beat)) {
       const group = { start, len: 2 * beat };
       groups.set(k, [group]);
       groups.set(k + 1, [group]);
       continue;
     }
     const span = 3 * step;
-    const split = span < beat && !crosses(b0 + start + span, -Infinity);
+    const split = span < len && !crosses(b0 + start + span, -Infinity);
     groups.set(
       k,
       split
@@ -142,7 +146,7 @@ function tripletGroups(
             { start, len: span },
             { start: start + span, len: span },
           ]
-        : [{ start, len: beat }],
+        : [{ start, len }],
     );
   }
   return groups;
