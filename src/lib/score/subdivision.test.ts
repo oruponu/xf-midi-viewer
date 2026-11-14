@@ -73,6 +73,11 @@ describe('buildBeats', () => {
     expect(steps.map((b) => b.step)).toEqual([8, 4, 6, 6]);
   });
 
+  test('keeps quarter-note triplets in an eighth-note shuffle', () => {
+    const swing = { eighths: true, sixteenths: false };
+    expect(stepsOf([0, 320, 640, 960, 1280], [bar(0)], swing)).toEqual([8, 8, 12, 6]);
+  });
+
   test('writes swung notes straight in a shuffle', () => {
     expect(
       stepsOf([0, 320, 480, 640, 800], [bar(0)], { eighths: true, sixteenths: false }),
@@ -119,5 +124,12 @@ describe('detectSwing', () => {
 
   test('does not take triplets for a shuffle', () => {
     expect(detectSwing(notes(beats(32, [0, 160, 320])), GRID)).toEqual(NO_SWING);
+  });
+
+  test('does not take quarter-note triplets for an eighth-note shuffle', () => {
+    const quarterTriplets = Array.from({ length: 16 }, (_, i) =>
+      [0, 320, 640].map((o) => i * 960 + o),
+    ).flat();
+    expect(detectSwing(notes(quarterTriplets), GRID)).toEqual(NO_SWING);
   });
 });

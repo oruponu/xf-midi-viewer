@@ -72,7 +72,8 @@ export function buildBeats(
   }
   const exact = exactWithin(gridTicks);
   beats.forEach((b, bi) => {
-    b.step = chooseStep(offsets[bi]!, b.len === QUARTER, swing, exact);
+    const next = beats[bi + 1]?.start === b.start + b.len ? offsets[bi + 1]! : [];
+    b.step = chooseStep(offsets[bi]!, b.len === QUARTER, swing, exact, next);
   });
   return beats;
 }
@@ -112,15 +113,23 @@ function hasAt(offsets: readonly number[], position: number, exact: number): boo
   return offsets.some((o) => Math.abs(o - position) <= exact);
 }
 
+// Notes at the start and two thirds of a beat followed by one at a third of the next beat, with
+// none on its downbeat, are a quarter-note triplet, not a swung pair of eighths.
+function swungEighths(offsets: readonly number[], next: readonly number[], exact: number): boolean {
+  const quarterTriplet = hasAt(next, EIGHTH_TRIPLET, exact) && !hasAt(next, 0, exact);
+  return onlyAt(offsets, [0, 16], exact) && !quarterTriplet;
+}
+
 function chooseStep(
   offsets: readonly number[],
   quarterBeat: boolean,
   swing: Swing,
   exact: number,
+  next: readonly number[],
 ): number {
   if (offsets.length === 0) return SIXTEENTH;
   if (quarterBeat && swing.sixteenths && onlyAt(offsets, [0, 8, 12, 20], exact)) return SIXTEENTH;
-  if (quarterBeat && swing.eighths && onlyAt(offsets, [0, 16], exact)) return EIGHTH;
+  if (quarterBeat && swing.eighths && swungEighths(offsets, next, exact)) return EIGHTH;
   const steps = quarterBeat
     ? [SIXTEENTH, EIGHTH_TRIPLET, SIXTEENTH_TRIPLET, THIRTY_SECOND]
     : [SIXTEENTH, THIRTY_SECOND];
@@ -168,9 +177,11 @@ export function detectSwing(
     straightSixteenths: 0,
   };
   const exact = exactWithin(gridTicks);
-  for (const offsets of beats.values()) {
+  for (const [key, offsets] of beats) {
     const has = (p: number) => hasAt(offsets, p, exact);
-    if (has(16) && onlyAt(offsets, [0, 16], exact)) c.swungEighths += 1;
+    const [channel, beat] = key.split(':');
+    const next = beats.get(`${channel}:${Number(beat) + 1}`) ?? [];
+    if (has(16) && swungEighths(offsets, next, exact)) c.swungEighths += 1;
     if (onlyAt(offsets, [0, 6, 12, 18], exact)) {
       if (has(12)) c.straightEighths += 1;
       if (has(6) || has(18)) c.straightSixteenths += 1;
