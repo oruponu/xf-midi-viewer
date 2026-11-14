@@ -5,7 +5,8 @@ import type { ScoreBar } from './bars.ts';
 import type { ScoreModel, ScoreStaff, StaffKind } from './notation.ts';
 import type { ScoreItem } from './rhythm.ts';
 
-const GRID = 120;
+const GRID = 20;
+const SIXTEENTH_TICKS = 6 * GRID;
 const BAR = 1920;
 
 function bar(index: number): ScoreBar {
@@ -48,9 +49,9 @@ function scoreModel(barItems: ScoreItem[][]): ScoreModel {
 
 // Bar 0 ends with a sixteenth and is followed by a 40-wide signature; bar 1 is a whole rest.
 const MODEL = scoreModel([
-  [item(0, 4), item(4, 4), item(8, 6), item(14, 1), item(15, 1)],
-  [item(0, 16, true)],
-  [item(0, 8), item(8, 8)],
+  [item(0, 24), item(24, 24), item(48, 36), item(84, 6), item(90, 6)],
+  [item(0, 96, true)],
+  [item(0, 48), item(48, 48)],
 ]);
 const PREFIX = [50, 40, 0];
 const geometry = buildGeometry(MODEL, (bi) => PREFIX[bi]!);
@@ -68,8 +69,11 @@ describe('buildGeometry', () => {
   });
 
   test("takes the next bar's prefix from the last segment only", () => {
-    expect(geometry.tailStart[0]).toBe(15 * GRID);
-    expect(offsetInBar(geometry, 0, 15 * GRID)).toBeCloseTo(geometry.pxPerTick * 15 * GRID, 9);
+    expect(geometry.tailStart[0]).toBe(15 * SIXTEENTH_TICKS);
+    expect(offsetInBar(geometry, 0, 15 * SIXTEENTH_TICKS)).toBeCloseTo(
+      geometry.pxPerTick * 15 * SIXTEENTH_TICKS,
+      9,
+    );
     expect(offsetInBar(geometry, 0, BAR)).toBeCloseTo(geometry.pxPerTick * BAR + 40, 9);
   });
 
@@ -83,7 +87,7 @@ describe('buildGeometry', () => {
   });
 
   test('is continuous at segment and bar boundaries', () => {
-    const boundaries = [15 * GRID, BAR, 2 * BAR, 2 * BAR + 8 * GRID];
+    const boundaries = [15 * SIXTEENTH_TICKS, BAR, 2 * BAR, 2 * BAR + 8 * SIXTEENTH_TICKS];
     for (const b of boundaries) {
       const at = tickToX(geometry, MODEL.bars, b);
       const left = at - tickToX(geometry, MODEL.bars, b - 1);
@@ -94,12 +98,36 @@ describe('buildGeometry', () => {
   });
 
   test('gives the last sixteenth room before the barline', () => {
-    expect(geometry.pxPerTick * GRID).toBeGreaterThanOrEqual(LAST_ITEM_ROOM);
+    expect(geometry.pxPerTick * SIXTEENTH_TICKS).toBeGreaterThanOrEqual(LAST_ITEM_ROOM);
     const eighthLast = buildGeometry(
-      scoreModel([[item(0, 1), item(1, 1), item(2, 2), item(4, 4), item(8, 6), item(14, 2)]]),
+      scoreModel([
+        [item(0, 6), item(6, 6), item(12, 12), item(24, 24), item(48, 36), item(84, 12)],
+      ]),
       () => 0,
     );
-    expect(eighthLast.pxPerTick * GRID).toBe(32);
+    expect(eighthLast.pxPerTick * SIXTEENTH_TICKS).toBe(32);
+  });
+
+  test('widens sixteenths for thirty-seconds and narrows them for eighth-note triplets', () => {
+    const sixteenthWidth = (items: ScoreItem[]) =>
+      buildGeometry(scoreModel([items, [item(0, 96)]]), () => 0).pxPerTick * SIXTEENTH_TICKS;
+    expect(sixteenthWidth([item(0, 3), item(3, 3), item(6, 18), item(24, 72)])).toBeCloseTo(40, 9);
+    expect(sixteenthWidth([item(0, 8), item(8, 8), item(16, 8), item(24, 72)])).toBeCloseTo(24, 9);
+  });
+
+  test('gives a last item shorter than a sixteenth its room in the last segment', () => {
+    const g = buildGeometry(
+      scoreModel([
+        [item(0, 48), item(48, 36), item(84, 6), item(90, 3), item(93, 3)],
+        [item(0, 96)],
+      ]),
+      () => 0,
+    );
+    const room = LAST_ITEM_ROOM - 3 * GRID * g.pxPerTick;
+    expect(room).toBeGreaterThan(0);
+    expect(g.tailStart[0]).toBe(93 * GRID);
+    expect(offsetInBar(g, 0, BAR)).toBeCloseTo(g.pxPerTick * BAR + room, 9);
+    expect(g.width[0]).toBeCloseTo(BAR * g.pxPerTick + room, 9);
   });
 
   test('adds room before the final barline', () => {

@@ -1,6 +1,7 @@
 import type { ScoreBar } from './bars.ts';
 import type { ScoreModel, ScoreStaff } from './notation.ts';
 import type { ScoreItem } from './rhythm.ts';
+import { SIXTEENTH } from './subdivision.ts';
 
 // All lengths are in VexFlow units, before the view scales them down.
 export const LEFT_PAD = 16;
@@ -8,6 +9,16 @@ export const LEFT_PAD = 16;
 // notehead (about 12), LEFT_PAD and a little over half a staff space before the barline.
 export const LAST_ITEM_ROOM = 36;
 export const FINAL_BARLINE_ROOM = 10;
+
+// Width of a sixteenth by the shortest note in the song: 32nds and sixteenth-note triplets,
+// sixteenths, eighth-note triplets, eighths, anything longer.
+const SIXTEENTH_WIDTHS: [shortest: number, width: number][] = [
+  [4, 40],
+  [6, 32],
+  [8, 24],
+  [12, 18],
+];
+const LONG_SIXTEENTH_WIDTH = 13;
 
 export interface BarGeometry {
   x: number[];
@@ -27,9 +38,10 @@ function itemLists(model: ScoreModel, bi: number): ScoreItem[][] {
 // Ticks map to x linearly within a bar, so notes never jump at a barline. The width a following
 // bar's clef, key or time signature needs is taken from this bar's last segment, after the last
 // item starts on any staff: only that segment scrolls a little faster, and no note starts in it.
+// A last item shorter than a sixteenth gets the rest of its room the same way.
 export function buildGeometry(model: ScoreModel, prefixWidth: (bi: number) => number): BarGeometry {
-  let finest = 16;
-  let lastShortest = 16;
+  let finest = Infinity;
+  let lastShortest = Infinity;
   model.bars.forEach((_, bi) => {
     for (const items of itemLists(model, bi)) {
       for (const it of items) if (it.keys.length > 0) finest = Math.min(finest, it.lenGrid);
@@ -37,9 +49,11 @@ export function buildGeometry(model: ScoreModel, prefixWidth: (bi: number) => nu
       if (last) lastShortest = Math.min(lastShortest, last.lenGrid);
     }
   });
+  const sixteenthWidth =
+    SIXTEENTH_WIDTHS.find(([shortest]) => finest <= shortest)?.[1] ?? LONG_SIXTEENTH_WIDTH;
   const pxPerGrid = Math.max(
-    finest <= 1 ? 32 : finest <= 2 ? 18 : 13,
-    LAST_ITEM_ROOM / lastShortest,
+    sixteenthWidth / SIXTEENTH,
+    LAST_ITEM_ROOM / Math.max(lastShortest, SIXTEENTH),
   );
   const pxPerTick = pxPerGrid / model.gridTicks;
   const prefix = model.bars.map((_, bi) => prefixWidth(bi));
@@ -63,11 +77,12 @@ export function buildGeometry(model: ScoreModel, prefixWidth: (bi: number) => nu
     const tailStart = lastStart * model.gridTicks;
     const nextPrefix = prefix[bi + 1] ?? 0;
     const endRoom = bi === model.bars.length - 1 ? FINAL_BARLINE_ROOM : 0;
+    const tailRoom = Math.max(0, LAST_ITEM_ROOM - (bar.ticks - tailStart) * pxPerTick);
     g.x.push(cursor);
     g.noteStart.push(cursor + prefix[bi]! + LEFT_PAD);
     g.tailStart.push(tailStart);
-    g.tailPxPerTick.push(pxPerTick + nextPrefix / (bar.ticks - tailStart));
-    g.width.push(prefix[bi]! + bar.ticks * pxPerTick + endRoom);
+    g.tailPxPerTick.push(pxPerTick + (nextPrefix + tailRoom) / (bar.ticks - tailStart));
+    g.width.push(prefix[bi]! + bar.ticks * pxPerTick + tailRoom + endRoom);
     cursor += g.width.at(-1)!;
   });
   g.total = cursor;

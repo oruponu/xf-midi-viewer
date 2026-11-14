@@ -8,6 +8,8 @@ import { assignKeys, buildBars, markSections } from './bars.ts';
 import type { ScoreBar } from './bars.ts';
 import { isDrumSetNote, isFootNote, percussionName } from './drums.ts';
 import { layoutNotes } from './rhythm.ts';
+import { detectSwing, QUARTER } from './subdivision.ts';
+import type { Swing } from './subdivision.ts';
 import type { ScoreItem, TimedNote } from './rhythm.ts';
 
 export type Clef = 'treble' | 'bass' | 'percussion';
@@ -47,6 +49,12 @@ export interface ScoreModel {
   gridTicks: number;
 }
 
+interface Layout {
+  bars: ScoreBar[];
+  gridTicks: number;
+  swing: Swing;
+}
+
 interface VoicedNote extends TimedNote {
   voice: ChannelVoice | undefined;
 }
@@ -59,10 +67,12 @@ export function buildScoreModel(input: ScoreInput): ScoreModel {
   const ppq = sequence.ticksPerQuarter;
   // SMPTE files count frames, not quarter notes, so they have no bars to draw.
   if (ppq <= 0) return { bars: [], staves: [], gridTicks: 1 };
-  const gridTicks = ppq / 4;
+  const gridTicks = ppq / QUARTER;
+  const sixteenthTicks = ppq / 4;
   // A zero-length note can start exactly where the song ends.
-  const lastOnset = sequence.notes.reduce((max, n) => Math.max(max, n.startTick), -gridTicks);
-  const bars = buildBars(timing, Math.max(sequence.durationTicks, lastOnset + gridTicks), ppq);
+  const lastOnset = sequence.notes.reduce((max, n) => Math.max(max, n.startTick), -sixteenthTicks);
+  const bars = buildBars(timing, Math.max(sequence.durationTicks, lastOnset + sixteenthTicks), ppq);
+  const swing = detectSwing(sequence.notes, gridTicks);
   assignKeys(bars, timing, keyShifts);
   markSections(bars, sectionTicks);
 
@@ -74,8 +84,9 @@ export function buildScoreModel(input: ScoreInput): ScoreModel {
     );
     const pitched = notes.filter((n) => !n.voice?.isDrum);
     const drums = notes.filter((n) => n.voice?.isDrum);
-    if (pitched.length > 0) staves.push(...pitchedStaves(part, pitched, bars, gridTicks));
-    if (drums.length > 0) staves.push(...drumStaves(part, drums, bars, gridTicks));
+    const layout = { bars, gridTicks, swing };
+    if (pitched.length > 0) staves.push(...pitchedStaves(part, pitched, layout));
+    if (drums.length > 0) staves.push(...drumStaves(part, drums, layout));
   }
   return { bars, staves, gridTicks };
 }
@@ -109,12 +120,9 @@ function isBassVoice(voice: ChannelVoice): boolean {
   );
 }
 
-function pitchedStaves(
-  part: ChannelPart,
-  notes: VoicedNote[],
-  bars: ScoreBar[],
-  gridTicks: number,
-): ScoreStaff[] {
+function pitchedStaves(part: ChannelPart, notes: VoicedNote[], layout: Layout): ScoreStaff[] {
+  const { bars, gridTicks, swing } = layout;
+  const write = (list: VoicedNote[]) => layoutNotes(list, bars, gridTicks, false, swing);
   const base = {
     channel: part.channel,
     kind: 'pitched' as const,
@@ -124,7 +132,7 @@ function pitchedStaves(
   };
   const bassVoiced = notes.filter((n) => n.voice && isBassVoice(n.voice)).length;
   if (bassVoiced * 2 > notes.length) {
-    return [{ ...base, clef: 'bass', bars: layoutNotes(notes, bars, gridTicks, false) }];
+    return [{ ...base, clef: 'bass', bars: write(notes) }];
   }
   const share = (test: (pitch: number) => boolean) =>
     notes.filter((n) => test(n.note)).length / notes.length;
@@ -132,27 +140,24 @@ function pitchedStaves(
     const upper = notes.filter((n) => n.note >= MIDDLE_C);
     const lower = notes.filter((n) => n.note < MIDDLE_C);
     return [
-      { ...base, clef: 'treble', bars: layoutNotes(upper, bars, gridTicks, false) },
+      { ...base, clef: 'treble', bars: write(upper) },
       {
         ...base,
         clef: 'bass',
         continuation: true,
         marks: [],
-        bars: layoutNotes(lower, bars, gridTicks, false),
+        bars: write(lower),
       },
     ];
   }
   const average = notes.reduce((sum, n) => sum + n.note, 0) / notes.length;
   const clef = average < 57 ? 'bass' : 'treble';
-  return [{ ...base, clef, bars: layoutNotes(notes, bars, gridTicks, false) }];
+  return [{ ...base, clef, bars: write(notes) }];
 }
 
-function drumStaves(
-  part: ChannelPart,
-  notes: VoicedNote[],
-  bars: ScoreBar[],
-  gridTicks: number,
-): ScoreStaff[] {
+function drumStaves(part: ChannelPart, notes: VoicedNote[], layout: Layout): ScoreStaff[] {
+  const { bars, gridTicks, swing } = layout;
+  const write = (list: VoicedNote[]) => layoutNotes(list, bars, gridTicks, true, swing);
   const staves: ScoreStaff[] = [];
   const hands = notes.filter((n) => isDrumSetNote(n.note) && !isFootNote(n.note));
   const feet = notes.filter((n) => isFootNote(n.note));
@@ -163,8 +168,8 @@ function drumStaves(
       kind: 'drumSet',
       clef: 'percussion',
       continuation: false,
-      bars: layoutNotes(hands, bars, gridTicks, true),
-      lowerBars: layoutNotes(feet, bars, gridTicks, true),
+      bars: write(hands),
+      lowerBars: write(feet),
       marks: voiceMarks(notes, gridTicks),
       labels: voiceLabels(part, notes),
     });
@@ -176,7 +181,7 @@ function drumStaves(
       kind: 'percussion',
       clef: 'percussion',
       continuation: false,
-      bars: layoutNotes(percussion, bars, gridTicks, true),
+      bars: write(percussion),
       marks: changes,
       labels: changes,
     });

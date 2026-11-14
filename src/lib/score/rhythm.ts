@@ -1,10 +1,25 @@
 import type { ScoreBar } from './bars.ts';
+import {
+  barRange,
+  beatAt,
+  beatLength,
+  buildBeats,
+  isTripletStep,
+  QUARTER,
+  SIXTEENTH,
+  snapToBeats,
+} from './subdivision.ts';
+import type { Beat, Swing } from './subdivision.ts';
 
 export interface ScoreItem {
   startGrid: number;
   lenGrid: number;
   keys: number[];
   tieFromPrev: boolean;
+  // Length of the triplet the item is written in: an eighth for sixteenth-note triplets, a quarter
+  // for eighth-note triplets, a half for quarter-note triplets. The triplet starts at the multiple
+  // of its length at or before the item.
+  triplet?: number;
 }
 
 export interface TimedNote {
@@ -19,10 +34,14 @@ interface Onset {
   keys: number[];
 }
 
-const DRUM_SUSTAIN = 4;
-const NOTE_LENGTHS = [16, 12, 8, 6, 4, 3, 2, 1];
-const REST_LENGTHS = [16, 8, 4, 2, 1];
-const COMPOUND_REST_LENGTHS = [12, 6, 4, 2, 1];
+const DRUM_SUSTAIN = QUARTER;
+const NOTE_LENGTHS = [96, 72, 48, 36, 24, 18, 12, 9, 6, 3];
+const REST_LENGTHS = [96, 48, 24, 12, 6, 3];
+const COMPOUND_REST_LENGTHS = [72, 36, 24, 12, 6, 3];
+const TRIPLET_NOTE_LENGTHS = [32, 24, 16, 12, 8, 4];
+const TRIPLET_REST_LENGTHS = [16, 8, 4];
+const DOTTED_QUARTER = 36;
+const DOTTED_HALF = 72;
 
 // Returns, for each bar, its notes and rests with startGrid relative to the bar.
 export function layoutNotes(
@@ -30,36 +49,49 @@ export function layoutNotes(
   bars: readonly ScoreBar[],
   gridTicks: number,
   drums: boolean,
+  swing: Swing,
 ): ScoreItem[][] {
-  const onsets = toOnsets(notes, gridTicks);
+  const beats = buildBeats(
+    notes.map((n) => n.startTick),
+    bars,
+    gridTicks,
+    swing,
+  );
+  const onsets = toOnsets(notes, beats, gridTicks);
   onsets.forEach((o, i) => {
     const next = onsets[i + 1]?.start ?? Infinity;
-    if (drums) o.end = Math.min(o.start + DRUM_SUSTAIN, Math.max(o.end, next));
+    if (drums) o.end = drumEnd(o, next, beats);
     o.end = Math.min(o.end, next);
-    if (!drums) o.end = notatedEnd(o, next, bars, gridTicks);
+    if (!drums) o.end = notatedEnd(o, next, beats);
   });
 
   const result: ScoreItem[][] = [];
   let oi = 0;
+  let bi = 0;
   for (const bar of bars) {
-    const b0 = Math.round(bar.startTick / gridTicks);
-    const b1 = b0 + Math.round(bar.ticks / gridTicks);
+    const [b0, b1] = barRange(bar, gridTicks);
     const items: ScoreItem[] = [];
-    const beat = beatOf(bar);
-    let cursor = b0;
+    const beat = beatLength(bar);
+    const tripletBeats: TripletBeat[] = [];
+    for (; bi < beats.length && beats[bi]!.start < b1; bi += 1) {
+      const b = beats[bi]!;
+      if (isTripletStep(b.step)) tripletBeats.push({ index: (b.start - b0) / beat, step: b.step });
+    }
     while (oi < onsets.length && onsets[oi]!.end <= b0) oi += 1;
+    const meter: BarMeter = { beat, groups: tripletGroups(tripletBeats, b0, beat, onsets, oi) };
+    let cursor = b0;
     for (let j = oi; j < onsets.length && onsets[j]!.start < b1; j += 1) {
       const o = onsets[j]!;
       const s = Math.max(o.start, b0);
       const e = Math.min(o.end, b1);
-      if (s > cursor) pushRests(items, cursor - b0, s - cursor, beat);
+      if (s > cursor) pushRests(items, cursor - b0, s - cursor, meter);
       const continued = o.start < b0;
-      if (!drums) pushTied(items, s - b0, e - s, o.keys, continued, beat);
-      else if (continued) pushRests(items, s - b0, e - s, beat);
-      else pushUntied(items, s - b0, e - s, o.keys, beat);
+      if (!drums) pushTied(items, s - b0, e - s, o.keys, continued, meter);
+      else if (continued) pushRests(items, s - b0, e - s, meter);
+      else pushUntied(items, s - b0, e - s, o.keys, meter);
       cursor = e;
     }
-    if (cursor < b1) pushRests(items, cursor - b0, b1 - cursor, beat);
+    if (cursor < b1) pushRests(items, cursor - b0, b1 - cursor, meter);
     const silent = items.every((it) => it.keys.length === 0);
     result.push(
       silent ? [{ startGrid: 0, lenGrid: b1 - b0, keys: [], tieFromPrev: false }] : items,
@@ -68,11 +100,77 @@ export function layoutNotes(
   return result;
 }
 
-function toOnsets(notes: readonly TimedNote[], gridTicks: number): Onset[] {
+interface TripletBeat {
+  index: number;
+  step: number;
+}
+
+// Two triplet beats starting on an even beat form one quarter-note triplet when a note sounds
+// across the beat between them. A beat of sixteenth-note triplets splits into two triplets
+// unless a note sounds across its middle.
+function tripletGroups(
+  tripletBeats: readonly TripletBeat[],
+  b0: number,
+  beat: number,
+  onsets: readonly Onset[],
+  from: number,
+): Map<number, TripletGroup[]> {
+  const groups = new Map<number, TripletGroup[]>();
+  const crosses = (mid: number, since: number) => {
+    for (let j = from; j < onsets.length && onsets[j]!.start < mid; j += 1) {
+      const o = onsets[j]!;
+      if (o.start >= since && o.end > mid) return true;
+    }
+    return false;
+  };
+  for (const { index: k, step } of tripletBeats) {
+    if (groups.has(k)) continue;
+    const start = k * beat;
+    const next = b0 + start + beat;
+    if (k % 2 === 0 && tripletBeats.some((t) => t.index === k + 1) && crosses(next, next - beat)) {
+      const group = { start, len: 2 * beat };
+      groups.set(k, [group]);
+      groups.set(k + 1, [group]);
+      continue;
+    }
+    const span = 3 * step;
+    const split = span < beat && !crosses(b0 + start + span, -Infinity);
+    groups.set(
+      k,
+      split
+        ? [
+            { start, len: span },
+            { start: start + span, len: span },
+          ]
+        : [{ start, len: beat }],
+    );
+  }
+  return groups;
+}
+
+// End of the three-step triplet that pos falls in, before tripletGroups joins any triplets.
+function tripletEnd(beat: Beat, pos: number): number {
+  const span = 3 * beat.step;
+  return beat.start + (Math.floor((pos - beat.start) / span) + 1) * span;
+}
+
+function stepAt(beats: readonly Beat[], pos: number): number {
+  return beatAt(beats, pos)?.step ?? SIXTEENTH;
+}
+
+// A hit is written up to a quarter long. A quarter on from a hit can fall off the grid of the
+// beat it reaches, and a hit in a triplet stays within it so no odd rests follow it.
+function drumEnd(o: Onset, nextStart: number, beats: readonly Beat[]): number {
+  const end = snapToBeats(beats, Math.min(o.start + DRUM_SUSTAIN, Math.max(o.end, nextStart)));
+  const beat = beatAt(beats, o.start);
+  return beat && isTripletStep(beat.step) ? Math.min(end, tripletEnd(beat, o.start)) : end;
+}
+
+function toOnsets(notes: readonly TimedNote[], beats: readonly Beat[], gridTicks: number): Onset[] {
   const byStart = new Map<number, Onset>();
   for (const n of notes) {
-    const start = Math.round(n.startTick / gridTicks);
-    const end = Math.max(start + 1, Math.round(n.endTick / gridTicks));
+    const start = snapToBeats(beats, n.startTick / gridTicks);
+    const end = Math.max(start + stepAt(beats, start), snapToBeats(beats, n.endTick / gridTicks));
     const onset = byStart.get(start);
     if (onset) {
       if (!onset.keys.includes(n.note)) onset.keys.push(n.note);
@@ -87,47 +185,89 @@ function toOnsets(notes: readonly TimedNote[], gridTicks: number): Onset[] {
 }
 
 // Detached playing leaves gaps that would otherwise be spelled as a 16th rest after nearly every note.
-function notatedEnd(
-  o: Onset,
-  nextStart: number,
-  bars: readonly ScoreBar[],
-  gridTicks: number,
-): number {
-  if (nextStart - o.end <= 1) return nextStart;
-  if (o.end - o.start > 1) return o.end;
-  return Math.min(nextStart, beatEndAfter(o.start, bars, gridTicks));
+function notatedEnd(o: Onset, nextStart: number, beats: readonly Beat[]): number {
+  if (nextStart - o.end <= SIXTEENTH) return nextStart;
+  if (o.end - o.start > SIXTEENTH) return o.end;
+  const beat = beatAt(beats, o.start);
+  if (!beat) return o.end;
+  const end = isTripletStep(beat.step) ? tripletEnd(beat, o.start) : beat.start + beat.len;
+  return Math.min(nextStart, end);
 }
 
-function beatEndAfter(pos: number, bars: readonly ScoreBar[], gridTicks: number): number {
-  let bi = bars.length - 1;
-  while (bi > 0 && Math.round(bars[bi]!.startTick / gridTicks) > pos) bi -= 1;
-  const bar = bars[bi]!;
-  const b0 = Math.round(bar.startTick / gridTicks);
-  const b1 = b0 + Math.round(bar.ticks / gridTicks);
-  const beat = beatOf(bar);
-  return Math.min(b1, b0 + (Math.floor((pos - b0) / beat) + 1) * beat);
+interface TripletGroup {
+  start: number;
+  len: number;
 }
 
-const QUARTER_BEAT = 4;
-const DOTTED_QUARTER_BEAT = 6;
-
-// Compound meters (6/8, 9/8, 12/8, ...) count in dotted quarters; all others, 3/8 and 2/2
-// included, use quarter beats.
-function beatOf(bar: ScoreBar): number {
-  const compound = bar.denominator === 8 && bar.numerator % 3 === 0 && bar.numerator > 3;
-  return compound ? DOTTED_QUARTER_BEAT : QUARTER_BEAT;
+interface BarMeter {
+  beat: number;
+  // Triplets by the index of each beat they cover, in order.
+  groups: Map<number, TripletGroup[]>;
 }
 
-// Notes shorter than a beat stay within it; longer ones start on a beat.
-function fitsAt(len: number, pos: number, beat: number): boolean {
+// A piece shorter than a beat stays within it; a longer one starts on a beat. Neither covers
+// only part of a triplet.
+function fitsAt(len: number, pos: number, meter: BarMeter): boolean {
+  const { beat } = meter;
+  const end = pos + len;
+  for (let k = Math.floor(pos / beat); k * beat < end; k += 1) {
+    for (const g of meter.groups.get(k) ?? []) {
+      const overlaps = g.start < end && g.start + g.len > pos;
+      if (overlaps && (g.start < pos || g.start + g.len > end)) return false;
+    }
+  }
   if (len < beat) return (pos % beat) + len <= beat;
-  if (beat === DOTTED_QUARTER_BEAT) return len % beat === 0 && pos % len === 0;
-  if (len === 12) return pos % 8 === 0;
+  if (beat === DOTTED_QUARTER) return len % beat === 0 && pos % len === 0;
+  if (len === DOTTED_HALF) return pos % 48 === 0;
   return pos % beat === 0;
 }
 
-function longestNote(pos: number, len: number, beat: number): number {
-  return NOTE_LENGTHS.find((v) => v <= len && fitsAt(v, pos, beat)) ?? 1;
+// Rests are undotted and never cross a boundary of their own length, so they follow the beats.
+// In compound meters they stay within a dotted-quarter beat instead, and only whole beats are dotted.
+function restFitsAt(len: number, pos: number, meter: BarMeter): boolean {
+  const { beat } = meter;
+  if (beat === DOTTED_QUARTER) {
+    if (len >= beat) return len % beat === 0 && pos % len === 0;
+    return (pos % beat) + len <= beat && pos % Math.min(len, 12) === 0;
+  }
+  return pos % len === 0;
+}
+
+// The triplet a piece is written in, unless the piece covers all of it.
+function tripletAt(pos: number, len: number, meter: BarMeter): TripletGroup | undefined {
+  const g = meter.groups.get(Math.floor(pos / meter.beat))?.find((t) => pos < t.start + t.len);
+  return g && (pos !== g.start || len < g.len) ? g : undefined;
+}
+
+interface Piece {
+  len: number;
+  triplet?: number;
+}
+
+function notePiece(pos: number, len: number, meter: BarMeter): Piece {
+  const g = tripletAt(pos, len, meter);
+  if (g) {
+    const room = Math.min(len, g.start + g.len - pos);
+    return { len: TRIPLET_NOTE_LENGTHS.find((v) => v <= room) ?? room, triplet: g.len };
+  }
+  return { len: NOTE_LENGTHS.find((v) => v <= len && fitsAt(v, pos, meter)) ?? Math.min(len, 3) };
+}
+
+function restPiece(pos: number, len: number, meter: BarMeter): Piece {
+  const g = tripletAt(pos, len, meter);
+  if (g) {
+    const room = Math.min(len, g.start + g.len - pos);
+    const fits = (v: number) => v <= room && (pos - g.start) % Math.min(v, 8) === 0;
+    return { len: TRIPLET_REST_LENGTHS.find(fits) ?? room, triplet: g.len };
+  }
+  const lengths = meter.beat === DOTTED_QUARTER ? COMPOUND_REST_LENGTHS : REST_LENGTHS;
+  return { len: lengths.find((v) => v <= len && restFitsAt(v, pos, meter)) ?? Math.min(len, 3) };
+}
+
+function item(pos: number, piece: Piece, keys: number[], tieFromPrev: boolean): ScoreItem {
+  const it: ScoreItem = { startGrid: pos, lenGrid: piece.len, keys, tieFromPrev };
+  if (piece.triplet) it.triplet = piece.triplet;
+  return it;
 }
 
 function pushTied(
@@ -136,14 +276,14 @@ function pushTied(
   len: number,
   keys: number[],
   continued: boolean,
-  beat: number,
+  meter: BarMeter,
 ): void {
   let tie = continued;
   while (len > 0) {
-    const l = longestNote(pos, len, beat);
-    items.push({ startGrid: pos, lenGrid: l, keys, tieFromPrev: tie });
-    pos += l;
-    len -= l;
+    const piece = notePiece(pos, len, meter);
+    items.push(item(pos, piece, keys, tie));
+    pos += piece.len;
+    len -= piece.len;
     tie = true;
   }
 }
@@ -154,42 +294,37 @@ function pushUntied(
   pos: number,
   len: number,
   keys: number[],
-  beat: number,
+  meter: BarMeter,
 ): void {
-  const l = longestNote(pos, len, beat);
-  items.push({ startGrid: pos, lenGrid: l, keys, tieFromPrev: false });
-  if (len > l) pushRests(items, pos + l, len - l, beat);
+  const piece = notePiece(pos, len, meter);
+  items.push(item(pos, piece, keys, false));
+  if (len > piece.len) pushRests(items, pos + piece.len, len - piece.len, meter);
 }
 
-// Rests are undotted and never cross a boundary of their own length, so they follow the beats.
-// In compound meters they stay within a dotted-quarter beat instead, and only whole beats are dotted.
-function restFitsAt(len: number, pos: number, beat: number): boolean {
-  if (beat === DOTTED_QUARTER_BEAT) {
-    if (len >= beat) return len % beat === 0 && pos % len === 0;
-    return (pos % beat) + len <= beat && pos % Math.min(len, 2) === 0;
-  }
-  return pos % len === 0;
-}
-
-function pushRests(items: ScoreItem[], pos: number, len: number, beat: number): void {
-  const lengths = beat === DOTTED_QUARTER_BEAT ? COMPOUND_REST_LENGTHS : REST_LENGTHS;
+function pushRests(items: ScoreItem[], pos: number, len: number, meter: BarMeter): void {
   while (len > 0) {
-    const l = lengths.find((v) => v <= len && restFitsAt(v, pos, beat)) ?? 1;
-    items.push({ startGrid: pos, lenGrid: l, keys: [], tieFromPrev: false });
-    pos += l;
-    len -= l;
+    const piece = restPiece(pos, len, meter);
+    items.push(item(pos, piece, [], false));
+    pos += piece.len;
+    len -= piece.len;
   }
 }
 
 // In 4/4, a half bar of four plain eighth notes is beamed as one group; anything else per beat.
 export function beamGroups(bar: ScoreBar, items: readonly ScoreItem[]): [number, number][] | null {
   if (bar.numerator !== 4 || bar.denominator !== 4) return null;
+  const half = 2 * QUARTER;
+  const eighth = QUARTER / 2;
   const plainEighths = (h: number) => {
-    const half = items.filter((it) => it.startGrid >= h * 8 && it.startGrid < h * 8 + 8);
+    const inHalf = items.filter((it) => it.startGrid >= h * half && it.startGrid < (h + 1) * half);
     return (
-      half.length === 4 &&
-      half.every(
-        (it, i) => it.startGrid === h * 8 + i * 2 && it.lenGrid === 2 && it.keys.length > 0,
+      inHalf.length === 4 &&
+      inHalf.every(
+        (it, i) =>
+          it.startGrid === h * half + i * eighth &&
+          it.lenGrid === eighth &&
+          it.keys.length > 0 &&
+          !it.triplet,
       )
     );
   };
