@@ -328,10 +328,18 @@ export function ScoreView({
       }
       if (coast) {
         const t = frameStart - coast.startMs;
-        if (coast.vx) viewX = clampX(coast.fromX - momentumOffset(coast.vx, t) / SCALE);
+        // A coast that reaches an edge stops there, so the next press can click.
+        if (coast.vx) {
+          const x = coast.fromX - momentumOffset(coast.vx, t) / SCALE;
+          viewX = clampX(x);
+          if (viewX !== x) coast.vx = 0;
+        }
         if (coast.vy) {
           const y = momentumOffset(coast.vy, t);
-          window.scrollBy(0, coast.scrolledY - y);
+          const by = coast.scrolledY - y;
+          const maxY = document.documentElement.scrollHeight - window.innerHeight;
+          if ((by < 0 && window.scrollY <= 0) || (by > 0 && window.scrollY >= maxY)) coast.vy = 0;
+          else window.scrollBy(0, by);
           coast.scrolledY = y;
         }
         const speed = Math.hypot(momentumSpeed(coast.vx, t), momentumSpeed(coast.vy, t));
