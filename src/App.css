@@ -2491,6 +2491,17 @@
   right: 0;
   bottom: 0;
   overflow: hidden;
+  cursor: grab;
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
+}
+
+.score-view-viewport[data-playing] {
+  cursor: default;
+}
+
+.score-view-viewport[data-dragging] {
+  cursor: grabbing;
 }
 
 .score-view-svg {

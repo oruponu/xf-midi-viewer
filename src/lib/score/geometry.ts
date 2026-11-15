@@ -109,6 +109,32 @@ export function tickToX(g: BarGeometry, bars: readonly ScoreBar[], tick: number)
   return g.noteStart[lo]! + offsetInBar(g, lo, into);
 }
 
+function lastAtOrBefore(starts: readonly number[], x: number): number {
+  let lo = 0;
+  let hi = starts.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (starts[mid]! <= x) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
+}
+
+export function barAtX(g: BarGeometry, x: number): number {
+  return lastAtOrBefore(g.x, x);
+}
+
+export function xToTick(g: BarGeometry, bars: readonly ScoreBar[], x: number): number {
+  if (bars.length === 0) return 0;
+  const bi = lastAtOrBefore(g.noteStart, x);
+  const bar = bars[bi]!;
+  const into = Math.max(0, x - g.noteStart[bi]!);
+  const tailX = g.tailStart[bi]! * g.pxPerTick;
+  const ticks =
+    into <= tailX ? into / g.pxPerTick : g.tailStart[bi]! + (into - tailX) / g.tailPxPerTick[bi]!;
+  return bar.startTick + Math.min(bar.ticks, ticks);
+}
+
 const STEP = 5;
 const NOTEHEAD_HALF = 5;
 // Diatonic step of each pitch class, with black keys spelled from the note below or above.
