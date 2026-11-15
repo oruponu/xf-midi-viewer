@@ -1,6 +1,7 @@
 import { WorkletSynthesizer } from 'spessasynth_lib';
 import processorUrl from 'spessasynth_lib/dist/spessasynth_processor.min.js?url';
-import { BuiltinSynthOutput, waitForClockStart } from './builtinOutput.ts';
+import { BuiltinSynthOutput, waitForClockStart, waitForSteadyClock } from './builtinOutput.ts';
+import { HiddenLatencyMeter } from './hiddenLatency.ts';
 import { ProcessorFailure } from './processorFailure.ts';
 import { soundBankGain } from './soundBank.ts';
 import { SynthClockOffset, withClockOffset } from './synthClock.ts';
@@ -38,6 +39,8 @@ const LIMITER_OPTIONS: DynamicsCompressorOptions = {
 // Look-ahead of DynamicsCompressorNode, measured in Chrome; the API does not expose it.
 const LIMITER_LATENCY_SECONDS = 0.006;
 
+const HIDDEN_LATENCY_SAMPLE_MS = 50;
+
 type AudioSessionNavigator = Navigator & { audioSession?: { type: string } };
 
 export interface BuiltinSynthEngineCallbacks {
@@ -63,6 +66,27 @@ export async function createBuiltinSynthEngine({
     },
   });
   const clockOffset = new SynthClockOffset();
+  // The bursts are only known to turn into latency in WebKit, which alone has audioSession.
+  const hiddenLatency = 'audioSession' in navigator ? new HiddenLatencyMeter() : undefined;
+  let hiddenLatencyTimer: ReturnType<typeof setInterval> | undefined;
+  const sampleHiddenLatency = () =>
+    hiddenLatency?.observe(
+      performance.now() / 1000,
+      context.currentTime,
+      context.state === 'running',
+    );
+  // The timer runs only while running so that a suspended context leaves the page idle.
+  const syncHiddenLatencySampling = () => {
+    if (!hiddenLatency) return;
+    if (context.state === 'running') {
+      hiddenLatencyTimer ??= setInterval(sampleHiddenLatency, HIDDEN_LATENCY_SAMPLE_MS);
+    } else {
+      clearInterval(hiddenLatencyTimer);
+      hiddenLatencyTimer = undefined;
+    }
+    sampleHiddenLatency();
+  };
+  syncHiddenLatencySampling();
   const kitFallback = new XgDrumKitFallback();
   const onWorkletMessage = (event: MessageEvent<unknown>) =>
     clockOffset.observeWorkletMessages(context.currentTime, event.data);
@@ -79,8 +103,12 @@ export async function createBuiltinSynthEngine({
     gain: gain.gain,
     onStall,
     processingLatency: LIMITER_LATENCY_SECONDS,
+    hiddenLatency,
   });
-  const onStateChange = () => output.notifyStateChange();
+  const onStateChange = () => {
+    syncHiddenLatencySampling();
+    output.notifyStateChange();
+  };
   context.addEventListener('statechange', onStateChange);
   const processorFailure = new ProcessorFailure();
   if (workletNode) {
@@ -181,10 +209,12 @@ export async function createBuiltinSynthEngine({
 
   const prepare = async (): Promise<void> => {
     if (processorFailure.error) throw processorFailure.error;
+    const wasRunning = context.state === 'running';
     await resumeAudio();
     await pending;
     if (!hasSoundBank) throw new Error('音源が読み込まれていません');
-    await waitForClockStart(context);
+    if (wasRunning) await waitForClockStart(context);
+    else await waitForSteadyClock(context);
     output.activate();
   };
 
@@ -192,6 +222,7 @@ export async function createBuiltinSynthEngine({
     context.removeEventListener('statechange', onStateChange);
     workletNode?.port.removeEventListener('message', onWorkletMessage);
     if (workletNode) workletNode.onprocessorerror = null;
+    clearInterval(hiddenLatencyTimer);
     synth.destroy();
     void context.close();
   };
