@@ -1,5 +1,6 @@
 import { GM_SYSTEM_ON, XG_SYSTEM_ON } from '../player/messages.ts';
 import type { MidiOutputLike } from '../player/messages.ts';
+import type { HiddenLatencyLike } from './hiddenLatency.ts';
 
 export const STALL_THRESHOLD_SECONDS = 0.25;
 export const CLOCK_START_TIMEOUT_MS = 3000;
@@ -32,6 +33,7 @@ export interface BuiltinSynthOutputOptions {
   now?: () => number;
   onStall?: (stalledAtMs: number) => void;
   processingLatency?: number;
+  hiddenLatency?: HiddenLatencyLike;
 }
 
 export function toContextTime(timestampMs: number, anchorSeconds: number): number {
@@ -65,6 +67,7 @@ export class BuiltinSynthOutput implements MidiOutputLike {
   private readonly now: () => number;
   private readonly onStall: (stalledAtMs: number) => void;
   private readonly processingLatency: number;
+  private readonly hiddenLatency: HiddenLatencyLike;
   private anchor = 0;
   private anchorLead = 0;
   private lastQueuedTime = 0;
@@ -78,6 +81,7 @@ export class BuiltinSynthOutput implements MidiOutputLike {
     this.now = options.now ?? (() => performance.now());
     this.onStall = options.onStall ?? (() => {});
     this.processingLatency = options.processingLatency ?? 0;
+    this.hiddenLatency = options.hiddenLatency ?? { seconds: 0 };
   }
 
   get isActive(): boolean {
@@ -100,7 +104,13 @@ export class BuiltinSynthOutput implements MidiOutputLike {
   }
 
   latencyMs(): number {
-    return (hardwareLatencySeconds(this.clock) + this.processingLatency + this.anchorLead) * 1000;
+    return (
+      (hardwareLatencySeconds(this.clock) +
+        this.processingLatency +
+        this.hiddenLatency.seconds +
+        this.anchorLead) *
+      1000
+    );
   }
 
   notifyStateChange(): void {

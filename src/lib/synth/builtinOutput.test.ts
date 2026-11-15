@@ -383,3 +383,20 @@ describe('waitForClockStart', () => {
     expect(now()).toBeLessThan(CLOCK_START_TIMEOUT_MS + 100);
   });
 });
+
+describe('BuiltinSynthOutput hidden latency', () => {
+  test('latencyMs() includes the hidden latency of the output path', () => {
+    const hiddenLatency = { seconds: 0 };
+    const output = new BuiltinSynthOutput({
+      synth: { sendMessage: () => {} },
+      clock: { currentTime: 10, state: 'running', outputLatency: 0.008 },
+      gain: { cancelScheduledValues: () => {}, setValueAtTime: () => {} },
+      hiddenLatency,
+    });
+    expect(output.latencyMs()).toBeCloseTo(8, 6);
+
+    hiddenLatency.seconds = 0.93;
+
+    expect(output.latencyMs()).toBeCloseTo(938, 6);
+  });
+});
