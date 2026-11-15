@@ -39,6 +39,8 @@ const GLIDE_MS = 250;
 const COAST_START_SPEED = 0.1;
 const COAST_STOP_SPEED = 0.02;
 
+type DragSource = 'mouse' | 'pen' | 'touch';
+
 type ScoreViewProps = {
   sequence: PlaybackSequence;
   timing: SmfTiming;
@@ -131,7 +133,7 @@ export function ScoreView({
     let glide: { from: number; startMs: number } | null = null;
     let drag: {
       id: number;
-      touch: boolean;
+      source: DragSource;
       startClientX: number;
       startClientY: number;
       lastClientY: number;
@@ -183,16 +185,22 @@ export function ScoreView({
       delete viewport.dataset.dragging;
     };
 
-    const startDrag = (id: number, touch: boolean, clientX: number, clientY: number) => {
+    const startDrag = (
+      id: number,
+      source: DragSource,
+      clientX: number,
+      clientY: number,
+      clickable = coast === null,
+    ) => {
       drag = {
         id,
-        touch,
+        source,
         startClientX: clientX,
         startClientY: clientY,
         lastClientY: clientY,
         startX: viewX ?? shownX,
         moved: false,
-        clickable: coast === null,
+        clickable,
         samples: [],
       };
       coast = null;
@@ -207,8 +215,8 @@ export function ScoreView({
       if (!drag.moved && Math.hypot(dx, clientY - drag.startClientY) < DRAG_THRESHOLD_PX) return;
       drag.moved = true;
       viewport.dataset.dragging = '';
-      // The browser already pans the page for touch.
-      if (!drag.touch) {
+      // The browser already pans the page for touch and pen.
+      if (drag.source === 'mouse') {
         window.scrollBy(0, drag.lastClientY - clientY);
         drag.lastClientY = clientY;
       }
@@ -216,22 +224,22 @@ export function ScoreView({
       scrollTo(drag.startX - dx / SCALE);
     };
 
-    const startCoast = (samples: readonly MotionSample[], touch: boolean) => {
+    const startCoast = (samples: readonly MotionSample[], source: DragSource) => {
       if (reducedMotion()) return;
       const now = performance.now();
       const v = releaseVelocity(samples, now);
       const vx = isPlaying() ? 0 : v.vx;
-      const vy = touch ? 0 : v.vy;
+      const vy = source === 'mouse' ? v.vy : 0;
       if (Math.hypot(vx, vy) < COAST_START_SPEED) return;
       coast = { startMs: now, vx, vy, fromX: viewX ?? shownX, scrolledY: 0 };
     };
 
     const finishDrag = (clientX: number) => {
       if (!drag) return;
-      const { moved, clickable, samples, touch } = drag;
+      const { moved, clickable, samples, source } = drag;
       endDrag();
       if (moved) {
-        startCoast(samples, touch);
+        startCoast(samples, source);
         return;
       }
       if (!clickable || isPlaying()) return;
@@ -247,34 +255,43 @@ export function ScoreView({
     };
 
     const onPointerDown = (e: PointerEvent) => {
-      if (e.pointerType !== 'mouse' || e.button !== 0 || drag) return;
-      startDrag(e.pointerId, false, e.clientX, e.clientY);
+      if (e.pointerType === 'touch' || e.button !== 0 || drag) return;
+      startDrag(e.pointerId, e.pointerType === 'pen' ? 'pen' : 'mouse', e.clientX, e.clientY);
       viewport.setPointerCapture(e.pointerId);
     };
-    const isMouseDrag = (e: PointerEvent) => drag?.touch === false && drag.id === e.pointerId;
+    const isPointerDrag = (e: PointerEvent) =>
+      drag !== null && drag.source !== 'touch' && drag.id === e.pointerId;
     const onPointerMove = (e: PointerEvent) => {
-      if (isMouseDrag(e)) moveDrag(e.clientX, e.clientY);
+      if (isPointerDrag(e)) moveDrag(e.clientX, e.clientY);
     };
     const onPointerUp = (e: PointerEvent) => {
-      if (isMouseDrag(e)) finishDrag(e.clientX);
+      if (isPointerDrag(e)) finishDrag(e.clientX);
     };
     const onPointerCancel = (e: PointerEvent) => {
-      if (isMouseDrag(e)) endDrag();
+      if (isPointerDrag(e)) endDrag();
     };
 
     // Touch leaves the vertical pan to the browser and reads touch events, which keep coming while
     // the page scrolls. Scrolling the page from script mid-touch makes iOS report touches off by the
     // scroll offset.
     const draggedTouch = (list: TouchList) =>
-      drag?.touch ? Array.from(list).find((t) => t.identifier === drag?.id) : undefined;
+      drag?.source === 'touch'
+        ? Array.from(list).find((t) => t.identifier === drag?.id)
+        : undefined;
     const onTouchStart = (e: TouchEvent) => {
       // A second finger is a pinch, which the browser handles.
       if (e.touches.length > 1) {
-        if (drag?.touch) endDrag();
+        if (drag?.source === 'touch') endDrag();
         return;
       }
       const t = e.changedTouches[0];
-      if (t && !drag) startDrag(t.identifier, true, t.clientX, t.clientY);
+      if (!t) return;
+      if (!drag) {
+        startDrag(t.identifier, 'touch', t.clientX, t.clientY);
+      } else if (drag.source === 'pen' && !drag.moved) {
+        // iOS also sends touch events for a pencil, which keep coming while the page scrolls.
+        startDrag(t.identifier, 'touch', t.clientX, t.clientY, drag.clickable);
+      }
     };
     const onTouchMove = (e: TouchEvent) => {
       const t = draggedTouch(e.touches);
