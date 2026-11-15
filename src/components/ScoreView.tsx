@@ -10,6 +10,13 @@ import type { RehearsalMessage } from '../lib/xf/types.ts';
 import { barAtX, buildGeometry, staffOverhang, tickToX, xToTick } from '../lib/score/geometry.ts';
 import { buildScoreModel } from '../lib/score/notation.ts';
 import type { NamedTick, ScoreStaff } from '../lib/score/notation.ts';
+import {
+  momentumOffset,
+  momentumSpeed,
+  releaseVelocity,
+  SAMPLE_WINDOW_MS,
+} from '../lib/momentum.ts';
+import type { MotionSample } from '../lib/momentum.ts';
 import { drawCell, measurePrefix, SCALE, STAFF_CENTER, STAFF_GAP, TOP } from './scoreCell.ts';
 
 const LABEL_WIDTH = 120;
@@ -28,6 +35,9 @@ const STAFF_KEY = 1000;
 const DRAG_THRESHOLD_PX = 5;
 const WHEEL_LINE_PX = 16;
 const GLIDE_MS = 250;
+// In client pixels per millisecond.
+const COAST_START_SPEED = 0.1;
+const COAST_STOP_SPEED = 0.02;
 
 type ScoreViewProps = {
   sequence: PlaybackSequence;
@@ -127,9 +137,21 @@ export function ScoreView({
       lastClientY: number;
       startX: number;
       moved: boolean;
+      // A press that stops a coast only stops it.
+      clickable: boolean;
+      samples: MotionSample[];
+    } | null = null;
+    // Velocities are in client pixels per millisecond; vy scrolls the page.
+    let coast: {
+      startMs: number;
+      vx: number;
+      vy: number;
+      fromX: number;
+      scrolledY: number;
     } | null = null;
 
     const isPlaying = () => scheduler.getState().isPlaying;
+    const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const scrollTo = (x: number) => {
       viewX = clampX(x);
       glide = null;
@@ -144,6 +166,7 @@ export function ScoreView({
           : 1);
 
     const onWheel = (e: WheelEvent) => {
+      coast = null;
       if (isPlaying()) return;
       const horizontal = e.deltaX !== 0 ? e.deltaX : e.shiftKey ? e.deltaY : 0;
       if (horizontal === 0) return;
@@ -169,11 +192,17 @@ export function ScoreView({
         lastClientY: clientY,
         startX: viewX ?? shownX,
         moved: false,
+        clickable: coast === null,
+        samples: [],
       };
+      coast = null;
     };
 
     const moveDrag = (clientX: number, clientY: number) => {
       if (!drag) return;
+      const now = performance.now();
+      drag.samples.push({ t: now, x: clientX, y: clientY });
+      while (now - drag.samples[0]!.t > SAMPLE_WINDOW_MS) drag.samples.shift();
       const dx = clientX - drag.startClientX;
       if (!drag.moved && Math.hypot(dx, clientY - drag.startClientY) < DRAG_THRESHOLD_PX) return;
       drag.moved = true;
@@ -187,10 +216,25 @@ export function ScoreView({
       scrollTo(drag.startX - dx / SCALE);
     };
 
+    const startCoast = (samples: readonly MotionSample[], touch: boolean) => {
+      if (reducedMotion()) return;
+      const now = performance.now();
+      const v = releaseVelocity(samples, now);
+      const vx = isPlaying() ? 0 : v.vx;
+      const vy = touch ? 0 : v.vy;
+      if (Math.hypot(vx, vy) < COAST_START_SPEED) return;
+      coast = { startMs: now, vx, vy, fromX: viewX ?? shownX, scrolledY: 0 };
+    };
+
     const finishDrag = (clientX: number) => {
-      const clicked = drag !== null && !drag.moved;
+      if (!drag) return;
+      const { moved, clickable, samples, touch } = drag;
       endDrag();
-      if (!clicked || isPlaying()) return;
+      if (moved) {
+        startCoast(samples, touch);
+        return;
+      }
+      if (!clickable || isPlaying()) return;
       const offset = clientX - viewport.getBoundingClientRect().left;
       const x = shownX + (offset - viewport.clientWidth * PLAYHEAD_RATIO) / SCALE;
       const bar = model.bars[barAtX(geometry, x)];
@@ -199,9 +243,7 @@ export function ScoreView({
       scheduler.seek(tickToSeconds(bar.startTick, sequence));
       lastPosition = scheduler.getPosition();
       viewX = null;
-      glide = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        ? null
-        : { from, startMs: performance.now() };
+      glide = reducedMotion() ? null : { from, startMs: performance.now() };
     };
 
     const onPointerDown = (e: PointerEvent) => {
@@ -282,6 +324,18 @@ export function ScoreView({
         lastPosition = position;
         viewX = null;
         glide = null;
+        if (coast?.vx) coast = null;
+      }
+      if (coast) {
+        const t = frameStart - coast.startMs;
+        if (coast.vx) viewX = clampX(coast.fromX - momentumOffset(coast.vx, t) / SCALE);
+        if (coast.vy) {
+          const y = momentumOffset(coast.vy, t);
+          window.scrollBy(0, coast.scrolledY - y);
+          coast.scrolledY = y;
+        }
+        const speed = Math.hypot(momentumSpeed(coast.vx, t), momentumSpeed(coast.vy, t));
+        if (speed < COAST_STOP_SPEED) coast = null;
       }
       if (playing !== 'playing' in viewport.dataset) {
         if (playing) viewport.dataset.playing = '';
