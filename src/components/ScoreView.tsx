@@ -3,11 +3,11 @@ import { Renderer } from 'vexflow/bravura';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import type { ChannelPart } from '../lib/smf/channelVoices.ts';
 import type { KeyShiftChange } from '../lib/smf/fixedKey.ts';
-import { secondsToTick } from '../lib/smf/playback.ts';
+import { secondsToTick, tickToSeconds } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 import type { RehearsalMessage } from '../lib/xf/types.ts';
-import { buildGeometry, staffOverhang, tickToX, xToTick } from '../lib/score/geometry.ts';
+import { barAtX, buildGeometry, staffOverhang, tickToX, xToTick } from '../lib/score/geometry.ts';
 import { buildScoreModel } from '../lib/score/notation.ts';
 import type { NamedTick, ScoreStaff } from '../lib/score/notation.ts';
 import { drawCell, measurePrefix, SCALE, STAFF_CENTER, STAFF_GAP, TOP } from './scoreCell.ts';
@@ -27,6 +27,7 @@ const RENDER_MARGIN = 200;
 const STAFF_KEY = 1000;
 const DRAG_THRESHOLD_PX = 5;
 const WHEEL_LINE_PX = 16;
+const GLIDE_MS = 250;
 
 type ScoreViewProps = {
   sequence: PlaybackSequence;
@@ -117,6 +118,7 @@ export function ScoreView({
     let viewX: number | null = null;
     let shownX = minX;
     let lastPosition = scheduler.getPosition();
+    let glide: { from: number; startMs: number } | null = null;
     let drag: {
       id: number;
       touch: boolean;
@@ -130,6 +132,7 @@ export function ScoreView({
     const isPlaying = () => scheduler.getState().isPlaying;
     const scrollTo = (x: number) => {
       viewX = clampX(x);
+      glide = null;
     };
 
     const wheelPixels = (e: WheelEvent, delta: number, page: number) =>
@@ -184,6 +187,23 @@ export function ScoreView({
       scrollTo(drag.startX - dx / SCALE);
     };
 
+    const finishDrag = (clientX: number) => {
+      const clicked = drag !== null && !drag.moved;
+      endDrag();
+      if (!clicked || isPlaying()) return;
+      const offset = clientX - viewport.getBoundingClientRect().left;
+      const x = shownX + (offset - viewport.clientWidth * PLAYHEAD_RATIO) / SCALE;
+      const bar = model.bars[barAtX(geometry, x)];
+      if (!bar) return;
+      const from = shownX;
+      scheduler.seek(tickToSeconds(bar.startTick, sequence));
+      lastPosition = scheduler.getPosition();
+      viewX = null;
+      glide = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? null
+        : { from, startMs: performance.now() };
+    };
+
     const onPointerDown = (e: PointerEvent) => {
       if (e.pointerType !== 'mouse' || e.button !== 0 || drag) return;
       startDrag(e.pointerId, false, e.clientX, e.clientY);
@@ -194,7 +214,7 @@ export function ScoreView({
       if (isMouseDrag(e)) moveDrag(e.clientX, e.clientY);
     };
     const onPointerUp = (e: PointerEvent) => {
-      if (isMouseDrag(e)) endDrag();
+      if (isMouseDrag(e)) finishDrag(e.clientX);
     };
     const onPointerCancel = (e: PointerEvent) => {
       if (isMouseDrag(e)) endDrag();
@@ -219,7 +239,8 @@ export function ScoreView({
       if (t) moveDrag(t.clientX, t.clientY);
     };
     const onTouchEnd = (e: TouchEvent) => {
-      if (draggedTouch(e.changedTouches)) endDrag();
+      const t = draggedTouch(e.changedTouches);
+      if (t) finishDrag(t.clientX);
     };
     const onTouchCancel = (e: TouchEvent) => {
       if (draggedTouch(e.changedTouches)) endDrag();
@@ -260,6 +281,7 @@ export function ScoreView({
       if (position !== lastPosition || playing) {
         lastPosition = position;
         viewX = null;
+        glide = null;
       }
       if (playing !== 'playing' in viewport.dataset) {
         if (playing) viewport.dataset.playing = '';
@@ -268,7 +290,12 @@ export function ScoreView({
 
       const tick = secondsToTick(position, sequence);
       const playheadX = tickToX(geometry, model.bars, tick);
-      const x = viewX ?? playheadX;
+      let x = viewX ?? playheadX;
+      if (glide) {
+        const t = (frameStart - glide.startMs) / GLIDE_MS;
+        if (t >= 1) glide = null;
+        else x = glide.from + (playheadX - glide.from) * (1 - (1 - t) ** 3);
+      }
       shownX = x;
       const labelTick = x === playheadX ? tick : xToTick(geometry, model.bars, x);
       setLabelKey(placements.map((p) => labelIndexAt(p.staff.labels, labelTick)).join(','));
