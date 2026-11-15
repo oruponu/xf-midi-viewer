@@ -1,6 +1,6 @@
 import { WorkletSynthesizer } from 'spessasynth_lib';
 import processorUrl from 'spessasynth_lib/dist/spessasynth_processor.min.js?url';
-import { BuiltinSynthOutput, waitForClockStart } from './builtinOutput.ts';
+import { BuiltinSynthOutput, waitForClockStart, waitForSteadyClock } from './builtinOutput.ts';
 import { ProcessorFailure } from './processorFailure.ts';
 import { soundBankGain } from './soundBank.ts';
 import { SynthClockOffset, withClockOffset } from './synthClock.ts';
@@ -181,10 +181,12 @@ export async function createBuiltinSynthEngine({
 
   const prepare = async (): Promise<void> => {
     if (processorFailure.error) throw processorFailure.error;
+    const wasRunning = context.state === 'running';
     await resumeAudio();
     await pending;
     if (!hasSoundBank) throw new Error('音源が読み込まれていません');
-    await waitForClockStart(context);
+    if (wasRunning) await waitForClockStart(context);
+    else await waitForSteadyClock(context);
     output.activate();
   };
 
