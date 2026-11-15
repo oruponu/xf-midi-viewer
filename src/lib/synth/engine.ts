@@ -68,17 +68,25 @@ export async function createBuiltinSynthEngine({
   const clockOffset = new SynthClockOffset();
   // The bursts are only known to turn into latency in WebKit, which alone has audioSession.
   const hiddenLatency = 'audioSession' in navigator ? new HiddenLatencyMeter() : undefined;
-  const hiddenLatencyTimer = hiddenLatency
-    ? setInterval(
-        () =>
-          hiddenLatency.observe(
-            performance.now() / 1000,
-            context.currentTime,
-            context.state === 'running',
-          ),
-        HIDDEN_LATENCY_SAMPLE_MS,
-      )
-    : undefined;
+  let hiddenLatencyTimer: ReturnType<typeof setInterval> | undefined;
+  const sampleHiddenLatency = () =>
+    hiddenLatency?.observe(
+      performance.now() / 1000,
+      context.currentTime,
+      context.state === 'running',
+    );
+  // The timer runs only while running so that a suspended context leaves the page idle.
+  const syncHiddenLatencySampling = () => {
+    if (!hiddenLatency) return;
+    if (context.state === 'running') {
+      hiddenLatencyTimer ??= setInterval(sampleHiddenLatency, HIDDEN_LATENCY_SAMPLE_MS);
+    } else {
+      clearInterval(hiddenLatencyTimer);
+      hiddenLatencyTimer = undefined;
+    }
+    sampleHiddenLatency();
+  };
+  syncHiddenLatencySampling();
   const kitFallback = new XgDrumKitFallback();
   const onWorkletMessage = (event: MessageEvent<unknown>) =>
     clockOffset.observeWorkletMessages(context.currentTime, event.data);
@@ -97,7 +105,10 @@ export async function createBuiltinSynthEngine({
     processingLatency: LIMITER_LATENCY_SECONDS,
     hiddenLatency,
   });
-  const onStateChange = () => output.notifyStateChange();
+  const onStateChange = () => {
+    syncHiddenLatencySampling();
+    output.notifyStateChange();
+  };
   context.addEventListener('statechange', onStateChange);
   const processorFailure = new ProcessorFailure();
   if (workletNode) {
