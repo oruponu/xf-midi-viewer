@@ -1,6 +1,7 @@
 import { WorkletSynthesizer } from 'spessasynth_lib';
 import processorUrl from 'spessasynth_lib/dist/spessasynth_processor.min.js?url';
 import { BuiltinSynthOutput, waitForClockStart, waitForSteadyClock } from './builtinOutput.ts';
+import { HiddenLatencyMeter } from './hiddenLatency.ts';
 import { ProcessorFailure } from './processorFailure.ts';
 import { soundBankGain } from './soundBank.ts';
 import { SynthClockOffset, withClockOffset } from './synthClock.ts';
@@ -38,6 +39,8 @@ const LIMITER_OPTIONS: DynamicsCompressorOptions = {
 // Look-ahead of DynamicsCompressorNode, measured in Chrome; the API does not expose it.
 const LIMITER_LATENCY_SECONDS = 0.006;
 
+const HIDDEN_LATENCY_SAMPLE_MS = 50;
+
 type AudioSessionNavigator = Navigator & { audioSession?: { type: string } };
 
 export interface BuiltinSynthEngineCallbacks {
@@ -63,6 +66,19 @@ export async function createBuiltinSynthEngine({
     },
   });
   const clockOffset = new SynthClockOffset();
+  // The bursts are only known to turn into latency in WebKit, which alone has audioSession.
+  const hiddenLatency = 'audioSession' in navigator ? new HiddenLatencyMeter() : undefined;
+  const hiddenLatencyTimer = hiddenLatency
+    ? setInterval(
+        () =>
+          hiddenLatency.observe(
+            performance.now() / 1000,
+            context.currentTime,
+            context.state === 'running',
+          ),
+        HIDDEN_LATENCY_SAMPLE_MS,
+      )
+    : undefined;
   const kitFallback = new XgDrumKitFallback();
   const onWorkletMessage = (event: MessageEvent<unknown>) =>
     clockOffset.observeWorkletMessages(context.currentTime, event.data);
@@ -79,6 +95,7 @@ export async function createBuiltinSynthEngine({
     gain: gain.gain,
     onStall,
     processingLatency: LIMITER_LATENCY_SECONDS,
+    hiddenLatency,
   });
   const onStateChange = () => output.notifyStateChange();
   context.addEventListener('statechange', onStateChange);
@@ -194,6 +211,7 @@ export async function createBuiltinSynthEngine({
     context.removeEventListener('statechange', onStateChange);
     workletNode?.port.removeEventListener('message', onWorkletMessage);
     if (workletNode) workletNode.onprocessorerror = null;
+    clearInterval(hiddenLatencyTimer);
     synth.destroy();
     void context.close();
   };
