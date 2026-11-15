@@ -5,6 +5,11 @@ import type { HiddenLatencyLike } from './hiddenLatency.ts';
 export const STALL_THRESHOLD_SECONDS = 0.25;
 export const CLOCK_START_TIMEOUT_MS = 3000;
 export const CLOCK_START_POLL_MS = 10;
+export const CLOCK_STEADY_WINDOW_MS = 100;
+
+const CLOCK_START_FAILURE_MESSAGE = '出力が時間内に始まりませんでした';
+const STEADY_RATE_MIN = 0.5;
+const STEADY_RATE_MAX = 1.5;
 
 export interface SynthLike {
   sendMessage(
@@ -55,8 +60,33 @@ export async function waitForClockStart(
   const startTime = clock.currentTime;
   const deadline = now() + CLOCK_START_TIMEOUT_MS;
   while (clock.currentTime <= startTime) {
-    if (now() >= deadline) throw new Error('出力が時間内に始まりませんでした');
+    if (now() >= deadline) throw new Error(CLOCK_START_FAILURE_MESSAGE);
     await sleep(CLOCK_START_POLL_MS);
+  }
+}
+
+// After a resume, WebKit can render one quantum and then freeze for about a second before
+// catching up in a burst, so a single advance does not mean the clock is running.
+export async function waitForSteadyClock(
+  clock: AudioClockLike,
+  options: WaitForClockStartOptions = {},
+): Promise<void> {
+  const now = options.now ?? (() => performance.now());
+  const sleep =
+    options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const deadline = now() + CLOCK_START_TIMEOUT_MS;
+  let windowStart = now();
+  let windowTime = clock.currentTime;
+  for (;;) {
+    await sleep(CLOCK_START_POLL_MS);
+    const elapsedMs = now() - windowStart;
+    if (elapsedMs >= CLOCK_STEADY_WINDOW_MS) {
+      const rate = ((clock.currentTime - windowTime) * 1000) / elapsedMs;
+      if (rate >= STEADY_RATE_MIN && rate <= STEADY_RATE_MAX) return;
+      windowStart = now();
+      windowTime = clock.currentTime;
+    }
+    if (now() >= deadline) throw new Error(CLOCK_START_FAILURE_MESSAGE);
   }
 }
 

@@ -2,9 +2,11 @@ import { describe, expect, test } from 'bun:test';
 import {
   BuiltinSynthOutput,
   CLOCK_START_TIMEOUT_MS,
+  CLOCK_STEADY_WINDOW_MS,
   STALL_THRESHOLD_SECONDS,
   toContextTime,
   waitForClockStart,
+  waitForSteadyClock,
 } from './builtinOutput.ts';
 
 interface ClockState {
@@ -381,6 +383,46 @@ describe('waitForClockStart', () => {
     await expect(waitForClockStart(clock, { now, sleep })).rejects.toThrow();
     expect(now()).toBeGreaterThanOrEqual(CLOCK_START_TIMEOUT_MS);
     expect(now()).toBeLessThan(CLOCK_START_TIMEOUT_MS + 100);
+  });
+});
+
+describe('waitForSteadyClock', () => {
+  function setupFreezingClock(freezeMs: number) {
+    const clock: ClockState = { currentTime: 16.5733, state: 'running' };
+    const start = clock.currentTime;
+    let nowMs = 0;
+    const sleep = (ms: number) => {
+      nowMs += ms;
+      if (nowMs >= freezeMs) clock.currentTime = start + nowMs / 1000;
+      return Promise.resolve();
+    };
+    return { clock, now: () => nowMs, sleep };
+  }
+
+  test('waits out a freeze that follows the first advance of the clock', async () => {
+    const { clock, now, sleep } = setupFreezingClock(1000);
+
+    await waitForSteadyClock(clock, { now, sleep });
+
+    expect(now()).toBeGreaterThanOrEqual(1000 + CLOCK_STEADY_WINDOW_MS);
+    expect(now()).toBeLessThan(1000 + CLOCK_STEADY_WINDOW_MS * 3);
+  });
+
+  test('resolves after one window when the clock keeps pace with the wall clock', async () => {
+    const { now, sleep, clock } = setupFreezingClock(0);
+
+    await waitForSteadyClock(clock, { now, sleep });
+
+    expect(now()).toBeGreaterThanOrEqual(CLOCK_STEADY_WINDOW_MS);
+    expect(now()).toBeLessThan(CLOCK_STEADY_WINDOW_MS * 2);
+  });
+
+  test('rejects when the clock does not become steady before the timeout', async () => {
+    const { clock, now, sleep } = setupFreezingClock(Infinity);
+
+    await expect(waitForSteadyClock(clock, { now, sleep })).rejects.toThrow();
+    expect(now()).toBeGreaterThanOrEqual(CLOCK_START_TIMEOUT_MS);
+    expect(now()).toBeLessThan(CLOCK_START_TIMEOUT_MS + 200);
   });
 });
 
