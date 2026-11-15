@@ -7,7 +7,7 @@ import { secondsToTick } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 import type { RehearsalMessage } from '../lib/xf/types.ts';
-import { buildGeometry, staffOverhang, tickToX } from '../lib/score/geometry.ts';
+import { buildGeometry, staffOverhang, tickToX, xToTick } from '../lib/score/geometry.ts';
 import { buildScoreModel } from '../lib/score/notation.ts';
 import type { NamedTick, ScoreStaff } from '../lib/score/notation.ts';
 import { drawCell, measurePrefix, SCALE, STAFF_CENTER, STAFF_GAP, TOP } from './scoreCell.ts';
@@ -25,6 +25,8 @@ const ROOM_BELOW = STAFF_GAP - STAFF_CENTER - HALF_STAFF + BOTTOM_ROOM;
 const RENDER_MARGIN = 200;
 // Cells are keyed as bar * STAFF_KEY + staff.
 const STAFF_KEY = 1000;
+const DRAG_THRESHOLD_PX = 5;
+const WHEEL_LINE_PX = 16;
 
 type ScoreViewProps = {
   sequence: PlaybackSequence;
@@ -97,15 +99,141 @@ export function ScoreView({
   }, [model]);
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const playheadRef = useRef<HTMLDivElement>(null);
   const [labelKey, setLabelKey] = useState('');
 
   useEffect(() => {
     const host = hostRef.current;
     const viewport = viewportRef.current;
-    if (!host || !viewport) return;
+    const playhead = playheadRef.current;
+    if (!host || !viewport || !playhead) return;
     host.replaceChildren();
     const rendered = new Map<number, HTMLElement>();
     let raf = 0;
+    const minX = tickToX(geometry, model.bars, 0);
+    const maxX = tickToX(geometry, model.bars, Infinity);
+    const clampX = (x: number) => Math.min(maxX, Math.max(minX, x));
+    // The score x shown at the playhead line while scrolled by hand; null follows playback.
+    let viewX: number | null = null;
+    let shownX = minX;
+    let lastPosition = scheduler.getPosition();
+    let drag: {
+      id: number;
+      touch: boolean;
+      startClientX: number;
+      startClientY: number;
+      lastClientY: number;
+      startX: number;
+      moved: boolean;
+    } | null = null;
+
+    const isPlaying = () => scheduler.getState().isPlaying;
+    const scrollTo = (x: number) => {
+      viewX = clampX(x);
+    };
+
+    const wheelPixels = (e: WheelEvent, delta: number, page: number) =>
+      delta *
+      (e.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? WHEEL_LINE_PX
+        : e.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? page
+          : 1);
+
+    const onWheel = (e: WheelEvent) => {
+      if (isPlaying()) return;
+      const horizontal = e.deltaX !== 0 ? e.deltaX : e.shiftKey ? e.deltaY : 0;
+      if (horizontal === 0) return;
+      e.preventDefault();
+      scrollTo((viewX ?? shownX) + wheelPixels(e, horizontal, viewport.clientWidth) / SCALE);
+      // Cancelling the wheel also stops the page's vertical scroll.
+      if (e.deltaX !== 0 && e.deltaY !== 0) {
+        window.scrollBy(0, wheelPixels(e, e.deltaY, window.innerHeight));
+      }
+    };
+
+    const endDrag = () => {
+      drag = null;
+      delete viewport.dataset.dragging;
+    };
+
+    const startDrag = (id: number, touch: boolean, clientX: number, clientY: number) => {
+      drag = {
+        id,
+        touch,
+        startClientX: clientX,
+        startClientY: clientY,
+        lastClientY: clientY,
+        startX: viewX ?? shownX,
+        moved: false,
+      };
+    };
+
+    const moveDrag = (clientX: number, clientY: number) => {
+      if (!drag) return;
+      const dx = clientX - drag.startClientX;
+      if (!drag.moved && Math.hypot(dx, clientY - drag.startClientY) < DRAG_THRESHOLD_PX) return;
+      drag.moved = true;
+      viewport.dataset.dragging = '';
+      // The browser already pans the page for touch.
+      if (!drag.touch) {
+        window.scrollBy(0, drag.lastClientY - clientY);
+        drag.lastClientY = clientY;
+      }
+      if (isPlaying()) return;
+      scrollTo(drag.startX - dx / SCALE);
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse' || e.button !== 0 || drag) return;
+      startDrag(e.pointerId, false, e.clientX, e.clientY);
+      viewport.setPointerCapture(e.pointerId);
+    };
+    const isMouseDrag = (e: PointerEvent) => drag?.touch === false && drag.id === e.pointerId;
+    const onPointerMove = (e: PointerEvent) => {
+      if (isMouseDrag(e)) moveDrag(e.clientX, e.clientY);
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      if (isMouseDrag(e)) endDrag();
+    };
+    const onPointerCancel = (e: PointerEvent) => {
+      if (isMouseDrag(e)) endDrag();
+    };
+
+    // Touch leaves the vertical pan to the browser and reads touch events, which keep coming while
+    // the page scrolls. Scrolling the page from script mid-touch makes iOS report touches off by the
+    // scroll offset.
+    const draggedTouch = (list: TouchList) =>
+      drag?.touch ? Array.from(list).find((t) => t.identifier === drag?.id) : undefined;
+    const onTouchStart = (e: TouchEvent) => {
+      // A second finger is a pinch, which the browser handles.
+      if (e.touches.length > 1) {
+        if (drag?.touch) endDrag();
+        return;
+      }
+      const t = e.changedTouches[0];
+      if (t && !drag) startDrag(t.identifier, true, t.clientX, t.clientY);
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      const t = draggedTouch(e.touches);
+      if (t) moveDrag(t.clientX, t.clientY);
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (draggedTouch(e.changedTouches)) endDrag();
+    };
+    const onTouchCancel = (e: TouchEvent) => {
+      if (draggedTouch(e.changedTouches)) endDrag();
+    };
+
+    viewport.addEventListener('wheel', onWheel, { passive: false });
+    viewport.addEventListener('pointerdown', onPointerDown);
+    viewport.addEventListener('pointermove', onPointerMove);
+    viewport.addEventListener('pointerup', onPointerUp);
+    viewport.addEventListener('pointercancel', onPointerCancel);
+    viewport.addEventListener('touchstart', onTouchStart, { passive: true });
+    viewport.addEventListener('touchmove', onTouchMove, { passive: true });
+    viewport.addEventListener('touchend', onTouchEnd);
+    viewport.addEventListener('touchcancel', onTouchCancel);
 
     const renderCell = (bi: number, si: number) => {
       const div = document.createElement('div');
@@ -126,12 +254,28 @@ export function ScoreView({
 
     const loop = () => {
       const frameStart = performance.now();
-      const tick = secondsToTick(scheduler.getPosition(), sequence);
-      setLabelKey(placements.map((p) => labelIndexAt(p.staff.labels, tick)).join(','));
+      const position = scheduler.getPosition();
+      const playing = isPlaying();
+      // Playing, or a seek from elsewhere, brings the view back to the playhead.
+      if (position !== lastPosition || playing) {
+        lastPosition = position;
+        viewX = null;
+      }
+      if (playing !== 'playing' in viewport.dataset) {
+        if (playing) viewport.dataset.playing = '';
+        else delete viewport.dataset.playing;
+      }
 
-      const x = tickToX(geometry, model.bars, tick);
+      const tick = secondsToTick(position, sequence);
+      const playheadX = tickToX(geometry, model.bars, tick);
+      const x = viewX ?? playheadX;
+      shownX = x;
+      const labelTick = x === playheadX ? tick : xToTick(geometry, model.bars, x);
+      setLabelKey(placements.map((p) => labelIndexAt(p.staff.labels, labelTick)).join(','));
+
       const viewWidth = viewport.clientWidth / SCALE;
       host.style.transform = `translate3d(${viewport.clientWidth * PLAYHEAD_RATIO - x * SCALE}px, 0, 0)`;
+      playhead.style.transform = `translate3d(${(playheadX - x) * SCALE}px, 0, 0)`;
 
       const top = viewport.getBoundingClientRect().top + pad.top * SCALE;
       const rowHeight = STAFF_GAP * SCALE;
@@ -177,6 +321,17 @@ export function ScoreView({
     raf = requestAnimationFrame(loop);
     return () => {
       cancelAnimationFrame(raf);
+      viewport.removeEventListener('wheel', onWheel);
+      viewport.removeEventListener('pointerdown', onPointerDown);
+      viewport.removeEventListener('pointermove', onPointerMove);
+      viewport.removeEventListener('pointerup', onPointerUp);
+      viewport.removeEventListener('pointercancel', onPointerCancel);
+      viewport.removeEventListener('touchstart', onTouchStart);
+      viewport.removeEventListener('touchmove', onTouchMove);
+      viewport.removeEventListener('touchend', onTouchEnd);
+      viewport.removeEventListener('touchcancel', onTouchCancel);
+      delete viewport.dataset.dragging;
+      delete viewport.dataset.playing;
       host.replaceChildren();
     };
   }, [model, geometry, placements, pad, scheduler, sequence]);
@@ -218,7 +373,11 @@ export function ScoreView({
             ref={hostRef}
             style={{ width: geometry.total * SCALE, height }}
           />
-          <div className="score-view-playhead" style={{ left: `${PLAYHEAD_RATIO * 100}%` }} />
+          <div
+            className="score-view-playhead"
+            ref={playheadRef}
+            style={{ left: `${PLAYHEAD_RATIO * 100}%` }}
+          />
         </div>
       </div>
     </div>
