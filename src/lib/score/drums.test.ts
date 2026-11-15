@@ -12,9 +12,10 @@ describe('drum notes', () => {
   });
 
   test('places drum set notes as in band scores', () => {
-    expect([36, 38, 37, 42, 44, 49, 51, 43, 50, 47].map((n) => [n, drumSetKey(n)])).toEqual([
+    expect([36, 38, 34, 37, 42, 44, 49, 51, 43, 50, 47].map((n) => [n, drumSetKey(n)])).toEqual([
       [36, 'f/4'],
       [38, 'c/5'],
+      [34, 'c/5'],
       [37, 'c/5/x2'],
       [42, 'g/5/x2'],
       [44, 'd/4/x2'],

@@ -19,7 +19,7 @@ const DRUM_SET_KEYS: Record<number, string> = {
   31: 'c/5',
   38: 'c/5',
   40: 'c/5',
-  34: 'c/5/x2',
+  34: 'c/5',
   37: 'c/5/x2',
   50: 'e/5',
   48: 'e/5',
