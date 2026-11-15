@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'bun:test';
-import { buildGeometry, LAST_ITEM_ROOM, offsetInBar, staffOverhang, tickToX } from './geometry.ts';
+import {
+  barAtX,
+  buildGeometry,
+  LAST_ITEM_ROOM,
+  offsetInBar,
+  staffOverhang,
+  tickToX,
+  xToTick,
+} from './geometry.ts';
 import type { BarGeometry } from './geometry.ts';
 import type { ScoreBar } from './bars.ts';
 import type { ScoreModel, ScoreStaff, StaffKind } from './notation.ts';
@@ -132,6 +140,37 @@ describe('buildGeometry', () => {
 
   test('adds room before the final barline', () => {
     expect(geometry.width[2]).toBeCloseTo(PREFIX[2]! + BAR * geometry.pxPerTick + 10, 9);
+  });
+});
+
+describe('barAtX', () => {
+  test('finds the bar whose cell holds x, signatures included', () => {
+    expect(barAtX(geometry, 0)).toBe(0);
+    expect(barAtX(geometry, geometry.x[1]! - 0.01)).toBe(0);
+    expect(barAtX(geometry, geometry.x[1]!)).toBe(1);
+    expect(barAtX(geometry, geometry.x[1]! + PREFIX[1]! / 2)).toBe(1);
+    expect(barAtX(geometry, geometry.x[2]! + 1)).toBe(2);
+  });
+
+  test('clamps x outside the score to the first and last bars', () => {
+    expect(barAtX(geometry, -100)).toBe(0);
+    expect(barAtX(geometry, geometry.total + 100)).toBe(2);
+  });
+});
+
+describe('xToTick', () => {
+  test('inverts tickToX across segments and bars', () => {
+    for (let tick = 0; tick <= 3 * BAR; tick += 30) {
+      expect(xToTick(geometry, MODEL.bars, tickToX(geometry, MODEL.bars, tick))).toBeCloseTo(
+        tick,
+        6,
+      );
+    }
+  });
+
+  test('clamps x outside the notes to the start and end of the song', () => {
+    expect(xToTick(geometry, MODEL.bars, 0)).toBe(0);
+    expect(xToTick(geometry, MODEL.bars, geometry.total + 100)).toBe(3 * BAR);
   });
 });
 
