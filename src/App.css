@@ -698,6 +698,18 @@
   margin-top: calc(-1 * var(--app-padding-top));
 }
 
+/* The score scrolls sideways, so only it widens past the column the rest of the app keeps */
+.app:has(.score-view) {
+  max-width: 1800px;
+}
+
+.app:has(.score-view) > .error,
+.app:has(.score-view) .viewer-tabs {
+  box-sizing: border-box;
+  max-width: 1120px;
+  margin-inline: auto;
+}
+
 .viewer-tabs {
   display: grid;
   grid-auto-flow: column;
