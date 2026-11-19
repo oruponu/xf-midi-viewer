@@ -2520,6 +2520,8 @@
   position: absolute;
   top: 0;
   left: 0;
+  /* Anything painted outside this box makes Chrome rebuild its layers on every frame. */
+  overflow: clip;
   will-change: transform;
 }
 

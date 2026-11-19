@@ -30,6 +30,10 @@ const ROOM_ABOVE = TOP + STAFF_CENTER - HALF_STAFF;
 const ROOM_BELOW = STAFF_GAP - STAFF_CENTER - HALF_STAFF + BOTTOM_ROOM;
 // Extra width rendered beyond the visible area on each side, in score units.
 const RENDER_MARGIN = 200;
+// The brace of a grand staff reaches about 8px left of the first cell, and the final barline a
+// little right of the last. The host clips what it paints, so it is this much wider on each side, in
+// CSS pixels.
+const HOST_PAD = 12;
 // Cells are keyed as bar * STAFF_KEY + staff.
 const STAFF_KEY = 1000;
 const DRAG_THRESHOLD_PX = 5;
@@ -325,7 +329,7 @@ export function ScoreView({
       div.className = 'score-view-cell';
       div.style.width = `${width * SCALE}px`;
       div.style.height = `${STAFF_GAP * SCALE}px`;
-      div.style.left = `${geometry.x[bi]! * SCALE}px`;
+      div.style.left = `${geometry.x[bi]! * SCALE + HOST_PAD}px`;
       div.style.top = `${(pad.top + si * STAFF_GAP) * SCALE}px`;
       if (drawCell(ctx, model, bi, si, geometry)) div.classList.add('score-view-cell--mark');
       host.appendChild(div);
@@ -380,7 +384,7 @@ export function ScoreView({
       setLabelKey(placements.map((p) => labelIndexAt(p.staff.labels, labelTick)).join(','));
 
       const viewWidth = viewport.clientWidth / SCALE;
-      host.style.transform = `translate3d(${viewport.clientWidth * PLAYHEAD_RATIO - x * SCALE}px, 0, 0)`;
+      host.style.transform = `translate3d(${viewport.clientWidth * PLAYHEAD_RATIO - x * SCALE - HOST_PAD}px, 0, 0)`;
       playhead.style.transform = `translate3d(${(playheadX - x) * SCALE}px, 0, 0)`;
 
       const top = viewport.getBoundingClientRect().top + pad.top * SCALE;
@@ -477,7 +481,7 @@ export function ScoreView({
           <div
             className="score-view-svg"
             ref={hostRef}
-            style={{ width: geometry.total * SCALE, height }}
+            style={{ width: geometry.total * SCALE + HOST_PAD * 2, height }}
           />
           <div
             className="score-view-playhead"
