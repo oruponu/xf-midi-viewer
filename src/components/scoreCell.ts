@@ -74,8 +74,6 @@ const MAJOR_KEYS: Record<number, string> = {
 
 type DrumVoice = 'single' | 'hands' | 'feet';
 
-const REST_KEYS: Record<DrumVoice, string> = { single: 'b/4', hands: 'e/5', feet: 'e/4' };
-
 function keySpecOf(sharps: number): string {
   return MAJOR_KEYS[sharps] ?? 'C';
 }
@@ -132,7 +130,7 @@ function makeNotes(
     const rest = item.keys.length === 0;
     const [duration, dots] = rest && items.length === 1 ? ['w', 0] : writtenDuration(item);
     let keys: string[];
-    if (rest) keys = [staff.clef === 'bass' ? 'd/3' : REST_KEYS[drumVoice]];
+    if (rest) keys = [staff.clef === 'bass' ? 'd/3' : 'b/4'];
     else if (staff.kind === 'drumSet') keys = [...new Set(item.keys.map(drumSetKey))];
     else if (staff.kind === 'percussion') keys = [...new Set(item.keys.map(percussionKey))];
     else keys = item.keys.map((k) => pitchKey(k, sharps));
@@ -144,6 +142,7 @@ function makeNotes(
       autoStem: !drums,
       stemDirection: drums ? (drumVoice === 'feet' ? -1 : 1) : undefined,
     });
+    if (item.hidden) note.renderOptions.draw = false;
     if (dots > 0) Dot.buildAndAttach([note], { all: true });
     if (staff.kind === 'drumSet' && item.keys.includes(OPEN_HI_HAT)) {
       note.addModifier(new Articulation('ah').setPosition(ModifierPosition.ABOVE), 0);

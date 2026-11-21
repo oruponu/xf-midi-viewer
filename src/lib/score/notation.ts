@@ -7,7 +7,7 @@ import { voiceName } from '../xg/voiceNames.ts';
 import { assignKeys, buildBars, markSections } from './bars.ts';
 import type { ScoreBar } from './bars.ts';
 import { isDrumSetNote, isFootNote, percussionName } from './drums.ts';
-import { layoutNotes } from './rhythm.ts';
+import { layoutNotes, shareRests } from './rhythm.ts';
 import { detectSwing, QUARTER } from './subdivision.ts';
 import type { Swing } from './subdivision.ts';
 import type { ScoreItem, TimedNote } from './rhythm.ts';
@@ -163,13 +163,14 @@ function drumStaves(part: ChannelPart, notes: VoicedNote[], layout: Layout): Sco
   const feet = notes.filter((n) => isFootNote(n.note));
   const percussion = notes.filter((n) => !isDrumSetNote(n.note));
   if (hands.length > 0 || feet.length > 0) {
+    const [upper, lower] = shareRests(write(hands), write(feet), bars);
     staves.push({
       channel: part.channel,
       kind: 'drumSet',
       clef: 'percussion',
       continuation: false,
-      bars: write(hands),
-      lowerBars: write(feet),
+      bars: upper,
+      lowerBars: lower,
       marks: voiceMarks(notes, gridTicks),
       labels: voiceLabels(part, notes),
     });

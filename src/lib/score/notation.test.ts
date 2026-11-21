@@ -146,6 +146,19 @@ describe('buildScoreModel', () => {
     expect(writtenKeys(perc!)).toEqual([54]);
   });
 
+  test('hides the rests of one drum voice while the other sounds', () => {
+    const hiHats = Array.from({ length: 8 }, (_, i) => note(9, i * 240, 42, 120));
+    const m = model(
+      [...hiHats, note(9, 0, 36, 120), note(9, 960, 36, 120)],
+      [part(9, [voice(0, 0, true)])],
+    );
+    const rests = m.staves[0]!.lowerBars![0]!.filter((it) => it.keys.length === 0);
+    expect(rests.map((it) => [it.startGrid, it.hidden])).toEqual([
+      [24, true],
+      [72, true],
+    ]);
+  });
+
   test('splits a channel that switches between melodic and drum voices', () => {
     const m = model(
       [note(0, 0, 60), note(0, BAR, 38)],
