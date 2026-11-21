@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { beamGroups, layoutNotes } from './rhythm.ts';
+import { beamGroups, layoutNotes, shareRests } from './rhythm.ts';
 import type { ScoreItem, TimedNote } from './rhythm.ts';
 import type { ScoreBar } from './bars.ts';
 import { NO_SWING } from './subdivision.ts';
@@ -412,5 +412,132 @@ describe('beamGroups', () => {
 
   test('uses VexFlow defaults outside 4/4', () => {
     expect(beamGroups(bar(0, 3, 4), eighths(0, 72))).toBeNull();
+  });
+});
+
+describe('shareRests', () => {
+  const n = (startGrid: number, lenGrid: number, key: number, triplet?: number): ScoreItem => ({
+    startGrid,
+    lenGrid,
+    keys: [key],
+    tieFromPrev: false,
+    ...(triplet ? { triplet } : {}),
+  });
+  const r = (startGrid: number, lenGrid: number, triplet?: number): ScoreItem => ({
+    startGrid,
+    lenGrid,
+    keys: [],
+    tieFromPrev: false,
+    ...(triplet ? { triplet } : {}),
+  });
+  type SharedRow = [startGrid: number, lenGrid: number, keys: number[], hidden: boolean];
+  const shared = (items: readonly ScoreItem[]): SharedRow[] =>
+    items.map((it) => [it.startGrid, it.lenGrid, it.keys, it.hidden ?? false]);
+  const share = (upper: ScoreItem[], lower: ScoreItem[], b = bar(0)) => {
+    const [u, l] = shareRests([upper], [lower], [b]);
+    return [u[0]!, l[0]!] as const;
+  };
+
+  test('hides the rests of the feet under a steady hi-hat', () => {
+    const upper = [0, 12, 24, 36, 48, 60, 72, 84].map((s) => n(s, 12, 42));
+    const [u, l] = share(upper, [n(0, 24, 36), r(24, 24), n(48, 24, 36), r(72, 24)]);
+    expect(shared(u)).toEqual(upper.map((it) => [it.startGrid, 12, [42], false]));
+    expect(shared(l)).toEqual([
+      [0, 24, [36], false],
+      [24, 24, [], true],
+      [48, 24, [36], false],
+      [72, 24, [], true],
+    ]);
+  });
+
+  test('shows a rest only where neither voice sounds', () => {
+    const [u, l] = share(
+      [r(0, 24), n(24, 24, 38), r(48, 24), n(72, 24, 38)],
+      [n(0, 24, 36), r(24, 24), r(48, 48)],
+    );
+    expect(shared(u)).toEqual([
+      [0, 24, [], true],
+      [24, 24, [38], false],
+      [48, 24, [], false],
+      [72, 24, [38], false],
+    ]);
+    expect(shared(l).filter((row) => row[2].length === 0)).toEqual([
+      [24, 24, [], true],
+      [48, 48, [], true],
+    ]);
+  });
+
+  test('splits a rest the other voice covers in part', () => {
+    const [u] = share(
+      [r(0, 24), n(24, 24, 38), r(48, 48)],
+      [n(0, 24, 36), r(24, 24), n(48, 24, 36), r(72, 24)],
+    );
+    expect(shared(u)).toEqual([
+      [0, 24, [], true],
+      [24, 24, [38], false],
+      [48, 24, [], true],
+      [72, 24, [], false],
+    ]);
+  });
+
+  test('leaves a bar alone when one voice is silent in it', () => {
+    const upper = [r(0, 96)];
+    const lower = [n(0, 24, 36), r(24, 24), r(48, 48)];
+    const [u, l] = share(upper, lower);
+    expect(u).toEqual(upper);
+    expect(l).toEqual(lower);
+  });
+
+  test('keeps a split rest within a dotted-quarter beat in compound meters', () => {
+    const [u] = share(
+      [n(0, 36, 38), r(36, 36)],
+      [r(0, 36), n(36, 12, 36), r(48, 24)],
+      bar(0, 6, 8),
+    );
+    expect(shared(u)).toEqual([
+      [0, 36, [38], false],
+      [36, 12, [], true],
+      [48, 24, [], false],
+    ]);
+  });
+
+  test('splits a rest inside a triplet on the triplet grid', () => {
+    const [u] = share(
+      [n(0, 8, 42, 24), r(8, 16, 24), r(24, 24), r(48, 48)],
+      [r(0, 8, 24), n(8, 8, 36, 24), r(16, 8, 24), r(24, 24), r(48, 48)],
+    );
+    expect(shared(u)).toEqual([
+      [0, 8, [42], false],
+      [8, 8, [], true],
+      [16, 8, [], false],
+      [24, 24, [], false],
+      [48, 48, [], false],
+    ]);
+    expect(u.map((it) => it.triplet ?? 0)).toEqual([24, 24, 24, 0, 0]);
+  });
+
+  test("leaves a beat cut off the grid by the other voice's triplet to that voice's rests", () => {
+    const [u, l] = share(
+      [n(0, 24, 38), r(24, 24), r(48, 48)],
+      [r(0, 48), r(48, 8, 24), n(56, 16, 36, 24), r(72, 24)],
+    );
+    expect(shared(u)).toEqual([
+      [0, 24, [38], false],
+      [24, 24, [], false],
+      [48, 24, [], true],
+      [72, 24, [], false],
+    ]);
+    expect(shared(l)).toEqual([
+      [0, 48, [], true],
+      [48, 8, [], false],
+      [56, 16, [36], false],
+      [72, 24, [], true],
+    ]);
+  });
+
+  test('does not change its arguments', () => {
+    const lower = [n(0, 24, 36), r(24, 72)];
+    share([n(0, 96, 49)], lower);
+    expect(lower[1]!.hidden).toBeUndefined();
   });
 });

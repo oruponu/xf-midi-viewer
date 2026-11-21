@@ -20,6 +20,8 @@ export interface ScoreItem {
   // for eighth-note triplets, a half for quarter-note triplets. The triplet starts at the multiple
   // of its length at or before the item.
   triplet?: number;
+  // A rest that takes its time but is not drawn.
+  hidden?: boolean;
 }
 
 export interface TimedNote {
@@ -312,6 +314,94 @@ function pushRests(items: ScoreItem[], pos: number, len: number, meter: BarMeter
     pos += piece.len;
     len -= piece.len;
   }
+}
+
+// Two voices on one staff share their rests: a rest is drawn once, usually in the upper voice, and
+// only where neither voice sounds. A bar where one voice is silent is left as it is.
+export function shareRests(
+  upper: ScoreItem[][],
+  lower: ScoreItem[][],
+  bars: readonly ScoreBar[],
+): [ScoreItem[][], ScoreItem[][]] {
+  const silent = (items: readonly ScoreItem[]) => items.every((it) => it.keys.length === 0);
+  const outUpper: ScoreItem[][] = [];
+  const outLower: ScoreItem[][] = [];
+  bars.forEach((bar, bi) => {
+    const u = upper[bi] ?? [];
+    const l = lower[bi] ?? [];
+    if (silent(u) || silent(l)) {
+      outUpper.push(u);
+      outLower.push(l);
+      return;
+    }
+    const sounding = l.filter((it) => it.keys.length > 0);
+    const beat = beatLength(bar);
+    const givenUp: [number, number][] = [];
+    outUpper.push(
+      u.flatMap((it) => (it.keys.length > 0 ? [it] : splitRest(it, sounding, beat, givenUp))),
+    );
+    const shown = (it: ScoreItem) =>
+      it.keys.length > 0 ||
+      givenUp.some(([from, to]) => it.startGrid >= from && it.startGrid + it.lenGrid <= to);
+    outLower.push(l.map((it) => (shown(it) ? it : { ...it, hidden: true })));
+  });
+  return [outUpper, outLower];
+}
+
+// A rest that cannot be respelled around the notes covering part of it is taken beat by beat. A
+// beat that still cannot is hidden whole and given up to the rests of the voice covering it.
+function splitRest(
+  rest: ScoreItem,
+  sounding: readonly ScoreItem[],
+  beat: number,
+  givenUp: [number, number][],
+): ScoreItem[] {
+  const start = rest.startGrid;
+  const end = start + rest.lenGrid;
+  const covering = sounding.filter((it) => it.startGrid < end && it.startGrid + it.lenGrid > start);
+  if (covering.length === 0) return [rest];
+  const groups = new Map<number, TripletGroup[]>();
+  if (rest.triplet) {
+    const group = { start: Math.floor(start / rest.triplet) * rest.triplet, len: rest.triplet };
+    for (let k = Math.floor(group.start / beat); k * beat < group.start + group.len; k += 1) {
+      groups.set(k, [group]);
+    }
+  }
+  const meter: BarMeter = { beat, groups };
+  const lengths = rest.triplet
+    ? TRIPLET_REST_LENGTHS
+    : beat === DOTTED_QUARTER
+      ? COMPOUND_REST_LENGTHS
+      : REST_LENGTHS;
+
+  const pieces: ScoreItem[] = [];
+  const push = (from: number, to: number, hidden: boolean) => {
+    const spelled: ScoreItem[] = [];
+    pushRests(spelled, from, to - from, meter);
+    for (const it of spelled) pieces.push(hidden ? { ...it, hidden: true } : it);
+  };
+  let cursor = start;
+  for (const it of covering) {
+    const from = Math.max(start, it.startGrid);
+    const to = Math.min(end, it.startGrid + it.lenGrid);
+    if (from > cursor) push(cursor, from, false);
+    push(from, to, true);
+    cursor = to;
+  }
+  if (cursor < end) push(cursor, end, false);
+  const spellable = pieces.every(
+    (it) => lengths.includes(it.lenGrid) && it.triplet === rest.triplet,
+  );
+  if (spellable) return pieces;
+  if (rest.triplet || rest.lenGrid <= beat) {
+    givenUp.push([start, end]);
+    return [{ ...rest, hidden: true }];
+  }
+  const beats: ScoreItem[] = [];
+  for (let pos = start; pos < end; pos += beat) {
+    beats.push(...splitRest({ ...rest, startGrid: pos, lenGrid: beat }, sounding, beat, givenUp));
+  }
+  return beats;
 }
 
 // In 4/4, a half bar of four plain eighth notes is beamed as one group; anything else per beat.
