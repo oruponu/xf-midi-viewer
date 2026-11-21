@@ -394,7 +394,9 @@ function splitRest(
   );
   if (spellable) return pieces;
   if (rest.triplet || rest.lenGrid <= beat) {
-    givenUp.push([start, end]);
+    const last = givenUp.at(-1);
+    if (last && last[1] === start) last[1] = end;
+    else givenUp.push([start, end]);
     return [{ ...rest, hidden: true }];
   }
   const beats: ScoreItem[] = [];

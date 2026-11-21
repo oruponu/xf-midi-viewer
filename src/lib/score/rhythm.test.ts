@@ -535,6 +535,25 @@ describe('shareRests', () => {
     ]);
   });
 
+  test('shows a rest of the other voice that spans two beats left to it', () => {
+    const [u, l] = share(
+      [n(0, 24, 38), r(24, 24), r(48, 48)],
+      [r(0, 48), n(48, 16, 36, 48), r(64, 16, 48), n(80, 16, 36, 48)],
+    );
+    expect(shared(u)).toEqual([
+      [0, 24, [38], false],
+      [24, 24, [], false],
+      [48, 24, [], true],
+      [72, 24, [], true],
+    ]);
+    expect(shared(l)).toEqual([
+      [0, 48, [], true],
+      [48, 16, [36], false],
+      [64, 16, [], false],
+      [80, 16, [36], false],
+    ]);
+  });
+
   test('does not change its arguments', () => {
     const lower = [n(0, 24, 36), r(24, 72)];
     share([n(0, 96, 49)], lower);
