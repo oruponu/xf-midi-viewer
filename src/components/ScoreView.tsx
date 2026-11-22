@@ -30,9 +30,8 @@ const ROOM_ABOVE = TOP + STAFF_CENTER - HALF_STAFF;
 const ROOM_BELOW = STAFF_GAP - STAFF_CENTER - HALF_STAFF + BOTTOM_ROOM;
 // Extra width rendered beyond the visible area on each side, in score units.
 const RENDER_MARGIN = 200;
-// The brace of a grand staff reaches about 8px left of the first cell, and the final barline a
-// little right of the last. The host clips what it paints, so it is this much wider on each side, in
-// CSS pixels.
+// The brace of a grand staff reaches about 8px left of the first cell. The host clips what it
+// paints, so the cells start this far inside it, in CSS pixels.
 const HOST_PAD = 12;
 // Cells are keyed as bar * STAFF_KEY + staff.
 const STAFF_KEY = 1000;
@@ -481,7 +480,9 @@ export function ScoreView({
           <div
             className="score-view-svg"
             ref={hostRef}
-            style={{ width: geometry.total * SCALE + HOST_PAD * 2, height }}
+            // A label in the last bar can run any distance past the end of the score, so the host
+            // reaches as far beyond it as the viewport can show.
+            style={{ width: `calc(${geometry.total * SCALE + HOST_PAD}px + 100vw)`, height }}
           />
           <div
             className="score-view-playhead"
