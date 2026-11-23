@@ -100,6 +100,18 @@ export function SettingsDialog({
           </section>
 
           <section className="settings-section">
+            <h3>譜面</h3>
+            <p className="settings-section-desc">
+              再生位置に合わせて流さずにページごとに切り替えます
+            </p>
+            <ToggleRow
+              label="ページ単位で表示"
+              checked={settings.scorePaged}
+              onChange={(v) => onChange({ scorePaged: v })}
+            />
+          </section>
+
+          <section className="settings-section">
             <h3>カラオケビュー</h3>
             <p className="settings-section-desc">カラオケビューの表示内容を切り替えます</p>
             <ToggleRow

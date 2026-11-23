@@ -52,6 +52,7 @@ type ScoreViewProps = {
   keyShifts: readonly KeyShiftChange[];
   scheduler: MidiScheduler;
   title: string;
+  paged: boolean;
 };
 
 interface LabelPlacement {
