@@ -2,7 +2,15 @@ import { describe, expect, test } from 'bun:test';
 import { LEFT_PAD } from './geometry.ts';
 import type { BarGeometry } from './geometry.ts';
 import type { ScoreBar } from './bars.ts';
-import { buildScorePages, pageIndexAt, pageStartTick, turnPage } from './pages.ts';
+import {
+  buildScorePages,
+  createWheelPager,
+  dragTurn,
+  pageIndexAt,
+  pageStartTick,
+  turnPage,
+  wheelTurn,
+} from './pages.ts';
 
 const BAR = 1920;
 
@@ -121,5 +129,80 @@ describe('turnPage', () => {
     expect(turnPage(pages, 2, -1)).toBe(1);
     expect(turnPage(pages, 0, -1)).toBe(0);
     expect(turnPage(pages, 6, 1)).toBe(6);
+  });
+});
+
+describe('wheelTurn', () => {
+  test('turns by the horizontal direction when it dominates', () => {
+    expect(wheelTurn(40, 0, false)).toBe(1);
+    expect(wheelTurn(-40, 10, false)).toBe(-1);
+  });
+
+  test('ignores the sideways drift of a vertical scroll', () => {
+    expect(wheelTurn(2, 60, false)).toBe(0);
+    expect(wheelTurn(-30, 30, false)).toBe(0);
+    expect(wheelTurn(0, 60, false)).toBe(0);
+  });
+
+  test('reads a vertical wheel as horizontal while Shift is held', () => {
+    expect(wheelTurn(0, 60, true)).toBe(1);
+    expect(wheelTurn(0, -60, true)).toBe(-1);
+    expect(wheelTurn(0, 0, true)).toBe(0);
+  });
+});
+
+describe('dragTurn', () => {
+  test('turns forward on a drag to the left and back on a drag to the right', () => {
+    expect(dragTurn(-120, 10)).toBe(1);
+    expect(dragTurn(50, 0)).toBe(-1);
+  });
+
+  test('ignores a short drag', () => {
+    expect(dragTurn(-49, 0)).toBe(0);
+  });
+
+  test('ignores a mostly vertical drag that drifts sideways', () => {
+    expect(dragTurn(-60, 200)).toBe(0);
+    expect(dragTurn(60, -60)).toBe(0);
+  });
+});
+
+describe('createWheelPager', () => {
+  test('turns a page on every notch of a stepped wheel', () => {
+    const pager = createWheelPager();
+    expect(pager(100, true, 1000)).toBe(1);
+    expect(pager(100, true, 1100)).toBe(1);
+    expect(pager(100, true, 1180)).toBe(1);
+    expect(pager(-100, true, 1260)).toBe(-1);
+  });
+
+  test('adds up the small steps of a stepped wheel', () => {
+    const pager = createWheelPager();
+    expect([10, 10, 10, 10].map((delta, i) => pager(delta, true, 1000 + i * 16))).toEqual([
+      0, 0, 0, 1,
+    ]);
+  });
+
+  test('starts over when a stepped wheel turns the other way or pauses', () => {
+    const pager = createWheelPager();
+    expect(pager(30, true, 1000)).toBe(0);
+    expect(pager(-30, true, 1016)).toBe(0);
+    expect(pager(-30, true, 1032)).toBe(-1);
+    expect(pager(30, true, 1048)).toBe(0);
+    expect(pager(30, true, 1400)).toBe(0);
+  });
+
+  test('turns one page for a run of swipe events, inertia included', () => {
+    const pager = createWheelPager();
+    const turns = Array.from({ length: 70 }, (_, i) => pager(30, false, 1000 + i * 16));
+    expect(turns.filter((t) => t !== 0)).toEqual([1]);
+    expect(turns[0]).toBe(1);
+  });
+
+  test('turns again for the next swipe after a pause', () => {
+    const pager = createWheelPager();
+    expect(pager(30, false, 1000)).toBe(1);
+    expect(pager(30, false, 1016)).toBe(0);
+    expect(pager(-30, false, 1316)).toBe(-1);
   });
 });

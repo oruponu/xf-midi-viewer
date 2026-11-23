@@ -10,7 +10,15 @@ import type { RehearsalMessage } from '../lib/xf/types.ts';
 import { barAtX, buildGeometry, staffOverhang, tickToX, xToTick } from '../lib/score/geometry.ts';
 import { buildScoreModel } from '../lib/score/notation.ts';
 import type { NamedTick, ScoreStaff } from '../lib/score/notation.ts';
-import { buildScorePages, pageIndexAt, pageStartTick, turnPage } from '../lib/score/pages.ts';
+import {
+  buildScorePages,
+  createWheelPager,
+  dragTurn,
+  pageIndexAt,
+  pageStartTick,
+  turnPage,
+  wheelTurn,
+} from '../lib/score/pages.ts';
 import type { ScorePage } from '../lib/score/pages.ts';
 import {
   momentumOffset,
@@ -49,9 +57,6 @@ const STAFF_KEY = 1000;
 // How far before the barline the end of a tie into the next page starts, in score units.
 const TIE_IN_LENGTH = 12;
 const DRAG_THRESHOLD_PX = 5;
-// A wheel gesture arrives as a run of events, which must not turn a page each.
-const PAGE_TURN_GAP_MS = 300;
-const PAGE_TURN_DRAG_PX = 50;
 const WHEEL_LINE_PX = 16;
 const GLIDE_MS = 250;
 // In client pixels per millisecond.
@@ -211,7 +216,7 @@ export function ScoreView({
     };
     // The page shown while paged through by hand; null follows playback.
     let viewPage: number | null = null;
-    let lastTurnMs = -Infinity;
+    const wheelPager = createWheelPager();
     let glide: { from: number; startMs: number } | null = null;
     let drag: {
       id: number;
@@ -258,15 +263,21 @@ export function ScoreView({
     const onWheel = (e: WheelEvent) => {
       coast = null;
       if (isPlaying()) return;
+      if (paged) {
+        const direction = wheelTurn(e.deltaX, e.deltaY, e.shiftKey);
+        if (direction === 0) return;
+        e.preventDefault();
+        const delta = wheelPixels(e, e.deltaX !== 0 ? e.deltaX : e.deltaY, viewport.clientWidth);
+        // Shift and line or page deltas come from a mouse wheel, which turns in notches.
+        const stepped = e.shiftKey || e.deltaMode !== WheelEvent.DOM_DELTA_PIXEL;
+        const step = wheelPager(delta, stepped, e.timeStamp);
+        if (step !== 0) turn(step);
+        return;
+      }
       const horizontal = e.deltaX !== 0 ? e.deltaX : e.shiftKey ? e.deltaY : 0;
       if (horizontal === 0) return;
       e.preventDefault();
-      if (!paged) {
-        scrollTo((viewX ?? shownX) + wheelPixels(e, horizontal, viewport.clientWidth) / SCALE);
-      } else if (e.timeStamp - lastTurnMs >= PAGE_TURN_GAP_MS) {
-        lastTurnMs = e.timeStamp;
-        turn(horizontal > 0 ? 1 : -1);
-      }
+      scrollTo((viewX ?? shownX) + wheelPixels(e, horizontal, viewport.clientWidth) / SCALE);
       // Cancelling the wheel also stops the page's vertical scroll.
       if (e.deltaX !== 0 && e.deltaY !== 0) {
         window.scrollBy(0, wheelPixels(e, e.deltaY, window.innerHeight));
@@ -327,13 +338,13 @@ export function ScoreView({
       coast = { startMs: now, vx, vy, fromX: viewX ?? shownX, scrolledY: 0 };
     };
 
-    const finishDrag = (clientX: number) => {
+    const finishDrag = (clientX: number, clientY: number) => {
       if (!drag) return;
-      const { moved, clickable, samples, source, startClientX } = drag;
+      const { moved, clickable, samples, source, startClientX, startClientY } = drag;
       endDrag();
       if (moved) {
-        const dx = clientX - startClientX;
-        if (paged && !isPlaying() && Math.abs(dx) >= PAGE_TURN_DRAG_PX) turn(dx < 0 ? 1 : -1);
+        const direction = dragTurn(clientX - startClientX, clientY - startClientY);
+        if (paged && !isPlaying() && direction !== 0) turn(direction);
         startCoast(samples, source);
         return;
       }
@@ -368,7 +379,7 @@ export function ScoreView({
       if (isPointerDrag(e)) moveDrag(e.clientX, e.clientY);
     };
     const onPointerUp = (e: PointerEvent) => {
-      if (isPointerDrag(e)) finishDrag(e.clientX);
+      if (isPointerDrag(e)) finishDrag(e.clientX, e.clientY);
     };
     const onPointerCancel = (e: PointerEvent) => {
       if (isPointerDrag(e)) endDrag();
@@ -402,7 +413,7 @@ export function ScoreView({
     };
     const onTouchEnd = (e: TouchEvent) => {
       const t = draggedTouch(e.changedTouches);
-      if (t) finishDrag(t.clientX);
+      if (t) finishDrag(t.clientX, t.clientY);
     };
     const onTouchCancel = (e: TouchEvent) => {
       if (draggedTouch(e.changedTouches)) endDrag();
