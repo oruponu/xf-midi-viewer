@@ -19,7 +19,16 @@ import {
   SAMPLE_WINDOW_MS,
 } from '../lib/momentum.ts';
 import type { MotionSample } from '../lib/momentum.ts';
-import { drawCell, measurePrefix, SCALE, STAFF_CENTER, STAFF_GAP, TOP } from './scoreCell.ts';
+import {
+  drawCell,
+  drawSignature,
+  measurePrefix,
+  measureSignature,
+  SCALE,
+  STAFF_CENTER,
+  STAFF_GAP,
+  TOP,
+} from './scoreCell.ts';
 
 const LABEL_WIDTH = 120;
 const PLAYHEAD_RATIO = 0.25;
@@ -37,6 +46,8 @@ const RENDER_MARGIN = 200;
 const HOST_PAD = 12;
 // Cells are keyed as bar * STAFF_KEY + staff.
 const STAFF_KEY = 1000;
+// How far before the barline the end of a tie into the next page starts, in score units.
+const TIE_IN_LENGTH = 12;
 const DRAG_THRESHOLD_PX = 5;
 const WHEEL_LINE_PX = 16;
 const GLIDE_MS = 250;
@@ -72,6 +83,30 @@ function labelPlacements(staves: readonly ScoreStaff[]): LabelPlacement[] {
     else out.push({ staff, first: si, count: 1 });
   });
   return out;
+}
+
+// A tie into the next bar is one path from the cell of the bar it starts in. Its thin end is all
+// that reaches past the barline, so a page that starts with the next bar shows a short copy instead.
+function addTieEnds(cell: HTMLElement, width: number): void {
+  for (const tie of cell.querySelectorAll<SVGPathElement>('.vf-stavetie path')) {
+    const n = tie
+      .getAttribute('d')
+      ?.match(/-?\d+(\.\d+)?/g)
+      ?.map(Number);
+    if (!n || n.length < 8) continue;
+    const [x1, y, over, x2, under] = [n[0]!, n[1]!, n[3]!, n[4]!, n[7]!];
+    if (x2 <= width + 1) continue;
+    const from = Math.max(x1, width - TIE_IN_LENGTH);
+    const mid = (from + x2) / 2;
+    const bend = (to: number) => y + (to - y) * 0.6;
+    const end = tie.cloneNode() as SVGPathElement;
+    end.setAttribute(
+      'd',
+      `M${from} ${y}Q${mid} ${bend(over)},${x2} ${y}Q${mid} ${bend(under)},${from} ${y}Z`,
+    );
+    end.classList.add('score-view-tie-in');
+    tie.after(end);
+  }
 }
 
 function labelIndexAt(labels: readonly NamedTick[], tick: number): number {
@@ -121,6 +156,10 @@ export function ScoreView({
   const viewportRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
   const pageEndRef = useRef<HTMLDivElement>(null);
+  const signatureRef = useRef<HTMLDivElement>(null);
+  // Where a page starts, in CSS pixels: right of the clef and key signature column, whose cells
+  // sit HOST_PAD inside it.
+  const signaturePx = useMemo(() => HOST_PAD + measureSignature(model) * SCALE, [model]);
   const [labelKey, setLabelKey] = useState('');
 
   useEffect(() => {
@@ -128,6 +167,7 @@ export function ScoreView({
     const viewport = viewportRef.current;
     const playhead = playheadRef.current;
     const pageEnd = pageEndRef.current;
+    const signature = signatureRef.current;
     if (!host || !viewport || !playhead) return;
     host.replaceChildren();
     const rendered = new Map<number, HTMLElement>();
@@ -141,8 +181,24 @@ export function ScoreView({
     let lastPosition = scheduler.getPosition();
     let pages: ScorePage[] = [];
     let pagesWidth = -1;
-    // Leaves room for the brace of the first bar.
-    const signaturePx = HOST_PAD;
+    let signatureKey: number | null = null;
+    const drawSignatures = (keySharps: number) => {
+      if (!signature) return;
+      signature.replaceChildren();
+      const width = (signaturePx - HOST_PAD) / SCALE;
+      model.staves.forEach((staff, si) => {
+        const div = document.createElement('div');
+        const renderer = new Renderer(div, Renderer.Backends.SVG);
+        renderer.resize(width * SCALE, STAFF_GAP * SCALE);
+        const ctx = renderer.getContext();
+        ctx.scale(SCALE, SCALE);
+        div.className = 'score-view-cell';
+        div.style.left = `${HOST_PAD}px`;
+        div.style.top = `${(pad.top + si * STAFF_GAP) * SCALE}px`;
+        drawSignature(ctx, staff, keySharps, width);
+        signature.appendChild(div);
+      });
+    };
     const offsets = new Map<HTMLElement, number>();
     // A paged score stands still between page turns, so its transforms are only written on change.
     const moveTo = (el: HTMLElement, px: number) => {
@@ -348,6 +404,7 @@ export function ScoreView({
       div.style.left = `${geometry.x[bi]! * SCALE + HOST_PAD}px`;
       div.style.top = `${(pad.top + si * STAFF_GAP) * SCALE}px`;
       if (drawCell(ctx, model, bi, si, geometry)) div.classList.add('score-view-cell--mark');
+      if (paged) addTieEnds(div, width);
       host.appendChild(div);
       rendered.set(bi * STAFF_KEY + si, div);
     };
@@ -398,6 +455,8 @@ export function ScoreView({
       let keepTo: number;
       let near: number;
       let labelTick: number;
+      let shown: ScorePage | null = null;
+      let shownTailBar = -1;
       if (paged) {
         if (viewport.clientWidth !== pagesWidth) {
           pagesWidth = viewport.clientWidth;
@@ -405,7 +464,7 @@ export function ScoreView({
         }
         const index = pageIndexAt(pages, geometry, model.bars, tick);
         const page = pages[index];
-        if (!page || !pageEnd) {
+        if (!page || !pageEnd || !signature) {
           raf = requestAnimationFrame(loop);
           return;
         }
@@ -414,11 +473,29 @@ export function ScoreView({
         shownX = page.start;
         moveTo(host, signaturePx - page.start * SCALE - HOST_PAD);
         moveTo(playhead, signaturePx + (lineX - page.start) * SCALE);
-        // One pixel keeps the closing barline of the page's last bar.
-        const endLeft = `${signaturePx + (page.end - page.start) * SCALE + 1}px`;
+        // The first bar of the song draws its own clef and key signature.
+        const firstPage = page.start === 0;
+        if (signature.hidden !== firstPage) signature.hidden = firstPage;
+        // Accidentals of the page's first notes reach over the column, which lies under the cells.
+        // A page that starts inside a bar has the column cover the part before it instead.
+        const zIndex = page.start > geometry.x[page.firstBar]! ? '1' : '';
+        if (signature.style.zIndex !== zIndex) signature.style.zIndex = zIndex;
+        shown = page;
+        const keySharps = model.bars[page.firstBar]!.keySharps;
+        if (!firstPage && signatureKey !== keySharps) {
+          signatureKey = keySharps;
+          drawSignatures(keySharps);
+        }
+        // Only a page that ends inside a bar has cells to cut off.
+        const barEnd = geometry.x[page.lastBar]! + geometry.width[page.lastBar]!;
+        const endLeft =
+          page.end < barEnd ? `${signaturePx + (page.end - page.start) * SCALE}px` : '100%';
         if (pageEnd.style.left !== endLeft) pageEnd.style.left = endLeft;
         // Half a unit keeps out the bars that only touch the range.
-        from = keepFrom = page.start + 0.5;
+        // The bar before the page stays for the ties it draws into the page.
+        const tailBar = page.start === geometry.x[page.firstBar]! ? page.firstBar - 1 : -1;
+        from = keepFrom = (tailBar < 0 ? page.start : geometry.x[tailBar]!) + 0.5;
+        shownTailBar = tailBar;
         to = keepTo = next.end - 0.5;
         near = lineX;
         labelTick = tick;
@@ -479,6 +556,16 @@ export function ScoreView({
         if (performance.now() - frameStart > FRAME_BUDGET_MS) break;
         renderCell(bi, si);
       }
+      if (shown) {
+        // Hidden rather than covered: a cell paints its accidentals and ties outside its box.
+        for (const [key, el] of rendered) {
+          const bi = Math.floor(key / STAFF_KEY);
+          const tail = bi === shownTailBar;
+          const visibility = bi < shown.firstBar || bi > shown.lastBar ? 'hidden' : '';
+          if (el.style.visibility !== visibility) el.style.visibility = visibility;
+          el.classList.toggle('score-view-cell--tail', tail);
+        }
+      }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
@@ -496,8 +583,9 @@ export function ScoreView({
       delete viewport.dataset.dragging;
       delete viewport.dataset.playing;
       host.replaceChildren();
+      signature?.replaceChildren();
     };
-  }, [model, geometry, placements, pad, scheduler, sequence, paged]);
+  }, [model, geometry, placements, pad, scheduler, sequence, paged, signaturePx]);
 
   if (model.staves.length === 0) {
     return (
@@ -531,6 +619,13 @@ export function ScoreView({
           aria-label={title ? `${title} の譜面` : '譜面'}
           style={{ left: LABEL_WIDTH }}
         >
+          {paged && (
+            <div
+              className="score-view-signature"
+              ref={signatureRef}
+              style={{ width: signaturePx }}
+            />
+          )}
           <div
             className="score-view-svg"
             ref={hostRef}
