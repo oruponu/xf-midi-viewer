@@ -10,6 +10,8 @@ import type { RehearsalMessage } from '../lib/xf/types.ts';
 import { barAtX, buildGeometry, staffOverhang, tickToX, xToTick } from '../lib/score/geometry.ts';
 import { buildScoreModel } from '../lib/score/notation.ts';
 import type { NamedTick, ScoreStaff } from '../lib/score/notation.ts';
+import { buildScorePages, pageIndexAt } from '../lib/score/pages.ts';
+import type { ScorePage } from '../lib/score/pages.ts';
 import {
   momentumOffset,
   momentumSpeed,
@@ -91,6 +93,7 @@ export function ScoreView({
   keyShifts,
   scheduler,
   title,
+  paged,
 }: ScoreViewProps) {
   const model = useMemo(
     () =>
@@ -117,12 +120,14 @@ export function ScoreView({
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
+  const pageEndRef = useRef<HTMLDivElement>(null);
   const [labelKey, setLabelKey] = useState('');
 
   useEffect(() => {
     const host = hostRef.current;
     const viewport = viewportRef.current;
     const playhead = playheadRef.current;
+    const pageEnd = pageEndRef.current;
     if (!host || !viewport || !playhead) return;
     host.replaceChildren();
     const rendered = new Map<number, HTMLElement>();
@@ -134,6 +139,17 @@ export function ScoreView({
     let viewX: number | null = null;
     let shownX = minX;
     let lastPosition = scheduler.getPosition();
+    let pages: ScorePage[] = [];
+    let pagesWidth = -1;
+    // Leaves room for the brace of the first bar.
+    const signaturePx = HOST_PAD;
+    const offsets = new Map<HTMLElement, number>();
+    // A paged score stands still between page turns, so its transforms are only written on change.
+    const moveTo = (el: HTMLElement, px: number) => {
+      if (offsets.get(el) === px) return;
+      offsets.set(el, px);
+      el.style.transform = `translate3d(${px}px, 0, 0)`;
+    };
     let glide: { from: number; startMs: number } | null = null;
     let drag: {
       id: number;
@@ -246,7 +262,7 @@ export function ScoreView({
         startCoast(samples, source);
         return;
       }
-      if (!clickable || isPlaying()) return;
+      if (!clickable || isPlaying() || paged) return;
       const offset = clientX - viewport.getBoundingClientRect().left;
       const x = shownX + (offset - viewport.clientWidth * PLAYHEAD_RATIO) / SCALE;
       const bar = model.bars[barAtX(geometry, x)];
@@ -373,19 +389,57 @@ export function ScoreView({
 
       const tick = secondsToTick(position, sequence);
       const playheadX = tickToX(geometry, model.bars, tick);
-      let x = viewX ?? playheadX;
-      if (glide) {
-        const t = (frameStart - glide.startMs) / GLIDE_MS;
-        if (t >= 1) glide = null;
-        else x = glide.from + (playheadX - glide.from) * (1 - (1 - t) ** 3);
-      }
-      shownX = x;
-      const labelTick = x === playheadX ? tick : xToTick(geometry, model.bars, x);
-      setLabelKey(placements.map((p) => labelIndexAt(p.staff.labels, labelTick)).join(','));
-
       const viewWidth = viewport.clientWidth / SCALE;
-      host.style.transform = `translate3d(${viewport.clientWidth * PLAYHEAD_RATIO - x * SCALE - HOST_PAD}px, 0, 0)`;
-      playhead.style.transform = `translate3d(${(playheadX - x) * SCALE}px, 0, 0)`;
+      // Cells are made from `from` to `to`, nearest to `near` first, and dropped outside
+      // `keepFrom` to `keepTo`.
+      let from: number;
+      let to: number;
+      let keepFrom: number;
+      let keepTo: number;
+      let near: number;
+      let labelTick: number;
+      if (paged) {
+        if (viewport.clientWidth !== pagesWidth) {
+          pagesWidth = viewport.clientWidth;
+          pages = buildScorePages(geometry, (pagesWidth - signaturePx) / SCALE);
+        }
+        const index = pageIndexAt(pages, geometry, model.bars, tick);
+        const page = pages[index];
+        if (!page || !pageEnd) {
+          raf = requestAnimationFrame(loop);
+          return;
+        }
+        const next = pages[index + 1] ?? page;
+        const lineX = Math.min(playheadX, page.end);
+        shownX = page.start;
+        moveTo(host, signaturePx - page.start * SCALE - HOST_PAD);
+        moveTo(playhead, signaturePx + (lineX - page.start) * SCALE);
+        // One pixel keeps the closing barline of the page's last bar.
+        const endLeft = `${signaturePx + (page.end - page.start) * SCALE + 1}px`;
+        if (pageEnd.style.left !== endLeft) pageEnd.style.left = endLeft;
+        // Half a unit keeps out the bars that only touch the range.
+        from = keepFrom = page.start + 0.5;
+        to = keepTo = next.end - 0.5;
+        near = lineX;
+        labelTick = tick;
+      } else {
+        let x = viewX ?? playheadX;
+        if (glide) {
+          const t = (frameStart - glide.startMs) / GLIDE_MS;
+          if (t >= 1) glide = null;
+          else x = glide.from + (playheadX - glide.from) * (1 - (1 - t) ** 3);
+        }
+        shownX = x;
+        host.style.transform = `translate3d(${viewport.clientWidth * PLAYHEAD_RATIO - x * SCALE - HOST_PAD}px, 0, 0)`;
+        playhead.style.transform = `translate3d(${(playheadX - x) * SCALE}px, 0, 0)`;
+        from = x - viewWidth * PLAYHEAD_RATIO - RENDER_MARGIN;
+        to = x + viewWidth * (1 - PLAYHEAD_RATIO) + RENDER_MARGIN;
+        keepFrom = from - viewWidth;
+        keepTo = to + viewWidth;
+        near = x;
+        labelTick = x === playheadX ? tick : xToTick(geometry, model.bars, x);
+      }
+      setLabelKey(placements.map((p) => labelIndexAt(p.staff.labels, labelTick)).join(','));
 
       const top = viewport.getBoundingClientRect().top + pad.top * SCALE;
       const rowHeight = STAFF_GAP * SCALE;
@@ -394,16 +448,14 @@ export function ScoreView({
         model.staves.length - 1,
         Math.floor((window.innerHeight - top + rowHeight) / rowHeight),
       );
-      const from = x - viewWidth * PLAYHEAD_RATIO - RENDER_MARGIN;
-      const to = x + viewWidth * (1 - PLAYHEAD_RATIO) + RENDER_MARGIN;
 
       for (const [key, el] of rendered) {
         const bi = Math.floor(key / STAFF_KEY);
         const si = key % STAFF_KEY;
         const bx = geometry.x[bi]!;
         const outside =
-          bx + geometry.width[bi]! < from - viewWidth ||
-          bx > to + viewWidth ||
+          bx + geometry.width[bi]! < keepFrom ||
+          bx > keepTo ||
           si < firstRow - 2 ||
           si > lastRow + 2;
         if (outside) {
@@ -420,7 +472,8 @@ export function ScoreView({
         }
       });
       wanted.sort(
-        (a, b) => Math.abs(geometry.x[a[0]]! - x) - Math.abs(geometry.x[b[0]]! - x) || a[1] - b[1],
+        (a, b) =>
+          Math.abs(geometry.x[a[0]]! - near) - Math.abs(geometry.x[b[0]]! - near) || a[1] - b[1],
       );
       for (const [bi, si] of wanted) {
         if (performance.now() - frameStart > FRAME_BUDGET_MS) break;
@@ -444,7 +497,7 @@ export function ScoreView({
       delete viewport.dataset.playing;
       host.replaceChildren();
     };
-  }, [model, geometry, placements, pad, scheduler, sequence]);
+  }, [model, geometry, placements, pad, scheduler, sequence, paged]);
 
   if (model.staves.length === 0) {
     return (
@@ -485,10 +538,11 @@ export function ScoreView({
             // reaches as far beyond it as the viewport can show.
             style={{ width: `calc(${geometry.total * SCALE + HOST_PAD}px + 100vw)`, height }}
           />
+          {paged && <div className="score-view-page-end" ref={pageEndRef} />}
           <div
             className="score-view-playhead"
             ref={playheadRef}
-            style={{ left: `${PLAYHEAD_RATIO * 100}%` }}
+            style={{ left: paged ? 0 : `${PLAYHEAD_RATIO * 100}%` }}
           />
         </div>
       </div>

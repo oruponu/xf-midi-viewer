@@ -2535,6 +2535,16 @@
   opacity: 0.8;
 }
 
+/* Hides the cells past the end of the page. */
+.score-view-page-end {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  background: var(--bg);
+}
+
 .score-view-cell {
   position: absolute;
   top: 0;
