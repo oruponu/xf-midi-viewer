@@ -10,7 +10,7 @@ import type { RehearsalMessage } from '../lib/xf/types.ts';
 import { barAtX, buildGeometry, staffOverhang, tickToX, xToTick } from '../lib/score/geometry.ts';
 import { buildScoreModel } from '../lib/score/notation.ts';
 import type { NamedTick, ScoreStaff } from '../lib/score/notation.ts';
-import { buildScorePages, pageIndexAt } from '../lib/score/pages.ts';
+import { buildScorePages, pageIndexAt, pageStartTick, turnPage } from '../lib/score/pages.ts';
 import type { ScorePage } from '../lib/score/pages.ts';
 import {
   momentumOffset,
@@ -49,6 +49,9 @@ const STAFF_KEY = 1000;
 // How far before the barline the end of a tie into the next page starts, in score units.
 const TIE_IN_LENGTH = 12;
 const DRAG_THRESHOLD_PX = 5;
+// A wheel gesture arrives as a run of events, which must not turn a page each.
+const PAGE_TURN_GAP_MS = 300;
+const PAGE_TURN_DRAG_PX = 50;
 const WHEEL_LINE_PX = 16;
 const GLIDE_MS = 250;
 // In client pixels per millisecond.
@@ -206,6 +209,9 @@ export function ScoreView({
       offsets.set(el, px);
       el.style.transform = `translate3d(${px}px, 0, 0)`;
     };
+    // The page shown while paged through by hand; null follows playback.
+    let viewPage: number | null = null;
+    let lastTurnMs = -Infinity;
     let glide: { from: number; startMs: number } | null = null;
     let drag: {
       id: number;
@@ -235,6 +241,12 @@ export function ScoreView({
       glide = null;
     };
 
+    const playheadPage = () =>
+      pageIndexAt(pages, geometry, model.bars, secondsToTick(scheduler.getPosition(), sequence));
+    const turn = (direction: 1 | -1) => {
+      viewPage = turnPage(pages, viewPage ?? playheadPage(), direction);
+    };
+
     const wheelPixels = (e: WheelEvent, delta: number, page: number) =>
       delta *
       (e.deltaMode === WheelEvent.DOM_DELTA_LINE
@@ -249,7 +261,12 @@ export function ScoreView({
       const horizontal = e.deltaX !== 0 ? e.deltaX : e.shiftKey ? e.deltaY : 0;
       if (horizontal === 0) return;
       e.preventDefault();
-      scrollTo((viewX ?? shownX) + wheelPixels(e, horizontal, viewport.clientWidth) / SCALE);
+      if (!paged) {
+        scrollTo((viewX ?? shownX) + wheelPixels(e, horizontal, viewport.clientWidth) / SCALE);
+      } else if (e.timeStamp - lastTurnMs >= PAGE_TURN_GAP_MS) {
+        lastTurnMs = e.timeStamp;
+        turn(horizontal > 0 ? 1 : -1);
+      }
       // Cancelling the wheel also stops the page's vertical scroll.
       if (e.deltaX !== 0 && e.deltaY !== 0) {
         window.scrollBy(0, wheelPixels(e, e.deltaY, window.innerHeight));
@@ -296,7 +313,7 @@ export function ScoreView({
         window.scrollBy(0, drag.lastClientY - clientY);
         drag.lastClientY = clientY;
       }
-      if (isPlaying()) return;
+      if (isPlaying() || paged) return;
       scrollTo(drag.startX - dx / SCALE);
     };
 
@@ -304,7 +321,7 @@ export function ScoreView({
       if (reducedMotion()) return;
       const now = performance.now();
       const v = releaseVelocity(samples, now);
-      const vx = isPlaying() ? 0 : v.vx;
+      const vx = isPlaying() || paged ? 0 : v.vx;
       const vy = source === 'mouse' ? v.vy : 0;
       if (Math.hypot(vx, vy) < COAST_START_SPEED) return;
       coast = { startMs: now, vx, vy, fromX: viewX ?? shownX, scrolledY: 0 };
@@ -312,22 +329,32 @@ export function ScoreView({
 
     const finishDrag = (clientX: number) => {
       if (!drag) return;
-      const { moved, clickable, samples, source } = drag;
+      const { moved, clickable, samples, source, startClientX } = drag;
       endDrag();
       if (moved) {
+        const dx = clientX - startClientX;
+        if (paged && !isPlaying() && Math.abs(dx) >= PAGE_TURN_DRAG_PX) turn(dx < 0 ? 1 : -1);
         startCoast(samples, source);
         return;
       }
-      if (!clickable || isPlaying() || paged) return;
+      if (!clickable || isPlaying()) return;
       const offset = clientX - viewport.getBoundingClientRect().left;
-      const x = shownX + (offset - viewport.clientWidth * PLAYHEAD_RATIO) / SCALE;
+      let x: number;
+      if (paged) {
+        const page = pages[viewPage ?? playheadPage()];
+        x = page ? page.start + (offset - signaturePx) / SCALE : -1;
+        if (!page || x < page.start || x >= page.end) return;
+      } else {
+        x = shownX + (offset - viewport.clientWidth * PLAYHEAD_RATIO) / SCALE;
+      }
       const bar = model.bars[barAtX(geometry, x)];
       if (!bar) return;
       const from = shownX;
       scheduler.seek(tickToSeconds(bar.startTick, sequence));
       lastPosition = scheduler.getPosition();
       viewX = null;
-      glide = reducedMotion() ? null : { from, startMs: performance.now() };
+      viewPage = null;
+      glide = paged || reducedMotion() ? null : { from, startMs: performance.now() };
     };
 
     const onPointerDown = (e: PointerEvent) => {
@@ -417,6 +444,7 @@ export function ScoreView({
       if (position !== lastPosition || playing) {
         lastPosition = position;
         viewX = null;
+        viewPage = null;
         glide = null;
         if (coast?.vx) coast = null;
       }
@@ -461,8 +489,11 @@ export function ScoreView({
         if (viewport.clientWidth !== pagesWidth) {
           pagesWidth = viewport.clientWidth;
           pages = buildScorePages(geometry, (pagesWidth - signaturePx) / SCALE);
+          viewPage = null;
         }
-        const index = pageIndexAt(pages, geometry, model.bars, tick);
+        const playIndex = pageIndexAt(pages, geometry, model.bars, tick);
+        const index = viewPage ?? playIndex;
+        const following = index === playIndex;
         const page = pages[index];
         if (!page || !pageEnd || !signature) {
           raf = requestAnimationFrame(loop);
@@ -473,6 +504,7 @@ export function ScoreView({
         shownX = page.start;
         moveTo(host, signaturePx - page.start * SCALE - HOST_PAD);
         moveTo(playhead, signaturePx + (lineX - page.start) * SCALE);
+        if (playhead.hidden === following) playhead.hidden = !following;
         // The first bar of the song draws its own clef and key signature.
         const firstPage = page.start === 0;
         if (signature.hidden !== firstPage) signature.hidden = firstPage;
@@ -497,8 +529,8 @@ export function ScoreView({
         from = keepFrom = (tailBar < 0 ? page.start : geometry.x[tailBar]!) + 0.5;
         shownTailBar = tailBar;
         to = keepTo = next.end - 0.5;
-        near = lineX;
-        labelTick = tick;
+        near = following ? lineX : page.start;
+        labelTick = following ? tick : pageStartTick(page, geometry, model.bars);
       } else {
         let x = viewX ?? playheadX;
         if (glide) {
@@ -582,6 +614,7 @@ export function ScoreView({
       viewport.removeEventListener('touchcancel', onTouchCancel);
       delete viewport.dataset.dragging;
       delete viewport.dataset.playing;
+      playhead.hidden = false;
       host.replaceChildren();
       signature?.replaceChildren();
     };
