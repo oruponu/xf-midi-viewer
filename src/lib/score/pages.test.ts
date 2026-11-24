@@ -8,6 +8,7 @@ import {
   dragTurn,
   pageIndexAt,
   pageStartTick,
+  pageViewStart,
   turnPage,
   wheelTurn,
 } from './pages.ts';
@@ -120,6 +121,23 @@ describe('pageStartTick', () => {
   test('is the tick at the page start inside a split bar', () => {
     const expected = 5 * BAR + (3500 - (2500 + LEFT_PAD)) / (2500 / BAR);
     expect(pageStartTick(pages[4]!, g, bars)).toBeCloseTo(expected);
+  });
+});
+
+describe('pageViewStart', () => {
+  const leads = [0, 0, 60, 0, 0, 80, 0];
+
+  test('skips the key signature of a first bar that changes key', () => {
+    expect(pageViewStart(pages[1]!, g, leads)).toBe(860);
+  });
+
+  test('is the page start when the first bar keeps the key', () => {
+    expect(pageViewStart(pages[2]!, g, leads)).toBe(1500);
+  });
+
+  test('skips the key signature only on the first page of a split bar', () => {
+    expect(pageViewStart(pages[3]!, g, leads)).toBe(2580);
+    expect(pageViewStart(pages[4]!, g, leads)).toBe(3500);
   });
 });
 

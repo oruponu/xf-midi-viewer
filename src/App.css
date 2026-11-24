@@ -2591,6 +2591,15 @@
   visibility: visible;
 }
 
+/* The column left of the page already shows the key a leading bar changes to. */
+.score-view-cell--lead .vf-keysignature {
+  visibility: hidden;
+}
+
+.score-view-cell--lead .score-view-lead-barline {
+  transform: translateX(var(--key-change));
+}
+
 .score-view-cell--mark {
   z-index: 1;
 }

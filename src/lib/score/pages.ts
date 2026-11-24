@@ -61,6 +61,17 @@ export function pageStartTick(page: ScorePage, g: BarGeometry, bars: readonly Sc
   return xToTick(g, bars, page.start);
 }
 
+// A first bar that changes key repeats what the clef and key signature column shows, so the view
+// starts after its key signature.
+export function pageViewStart(
+  page: ScorePage,
+  g: BarGeometry,
+  keyChangeWidths: readonly number[],
+): number {
+  if (page.start > g.x[page.firstBar]!) return page.start;
+  return page.start + keyChangeWidths[page.firstBar]!;
+}
+
 export function turnPage(pages: readonly ScorePage[], index: number, direction: 1 | -1): number {
   return Math.min(pages.length - 1, Math.max(0, index + direction));
 }

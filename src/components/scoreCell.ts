@@ -119,6 +119,16 @@ export function measurePrefix(model: ScoreModel, bi: number): number {
   return stave.getNoteStartX();
 }
 
+// Width of the cancelled and new key signatures at the start of a bar that changes key.
+export function measureKeyChange(model: ScoreModel, bi: number): number {
+  const bar = model.bars[bi]!;
+  if (bi === 0 || !bar.keyChanged) return 0;
+  if (!bar.timeChanged) return measurePrefix(model, bi);
+  const stave = new ScoreStave(0, 0, 1000);
+  stave.addTimeSignature(`${bar.numerator}/${bar.denominator}`);
+  return measurePrefix(model, bi) - stave.getNoteStartX();
+}
+
 // Room after the key signature, wide enough for the accidentals of the first notes, which are
 // drawn left of their bar.
 const SIGNATURE_GAP = 24;

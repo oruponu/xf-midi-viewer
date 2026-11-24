@@ -16,6 +16,7 @@ import {
   dragTurn,
   pageIndexAt,
   pageStartTick,
+  pageViewStart,
   turnPage,
   wheelTurn,
 } from '../lib/score/pages.ts';
@@ -30,6 +31,7 @@ import type { MotionSample } from '../lib/momentum.ts';
 import {
   drawCell,
   drawSignature,
+  measureKeyChange,
   measurePrefix,
   measureSignature,
   SCALE,
@@ -95,7 +97,7 @@ function labelPlacements(staves: readonly ScoreStaff[]): LabelPlacement[] {
 
 // A tie into the next bar is one path from the cell of the bar it starts in. Its thin end is all
 // that reaches past the barline, so a page that starts with the next bar shows a short copy instead.
-function addTieEnds(cell: HTMLElement, width: number): void {
+function addTieEnds(cell: HTMLElement, width: number, nextKeyChange: number): void {
   for (const tie of cell.querySelectorAll<SVGPathElement>('.vf-stavetie path')) {
     const n = tie
       .getAttribute('d')
@@ -104,7 +106,7 @@ function addTieEnds(cell: HTMLElement, width: number): void {
     if (!n || n.length < 8) continue;
     const [x1, y, over, x2, under] = [n[0]!, n[1]!, n[3]!, n[4]!, n[7]!];
     if (x2 <= width + 1) continue;
-    const from = Math.max(x1, width - TIE_IN_LENGTH);
+    const from = Math.max(x1, width + nextKeyChange - TIE_IN_LENGTH);
     const mid = (from + x2) / 2;
     const bend = (to: number) => y + (to - y) * 0.6;
     const end = tie.cloneNode() as SVGPathElement;
@@ -168,6 +170,10 @@ export function ScoreView({
   // Where a page starts, in CSS pixels: right of the clef and key signature column, whose cells
   // sit HOST_PAD inside it.
   const signaturePx = useMemo(() => HOST_PAD + measureSignature(model) * SCALE, [model]);
+  const keyChangeWidths = useMemo(
+    () => model.bars.map((_, bi) => measureKeyChange(model, bi)),
+    [model],
+  );
   const [labelKey, setLabelKey] = useState('');
 
   useEffect(() => {
@@ -353,8 +359,9 @@ export function ScoreView({
       let x: number;
       if (paged) {
         const page = pages[viewPage ?? playheadPage()];
-        x = page ? page.start + (offset - signaturePx) / SCALE : -1;
-        if (!page || x < page.start || x >= page.end) return;
+        const start = page ? pageViewStart(page, geometry, keyChangeWidths) : 0;
+        x = start + (offset - signaturePx) / SCALE;
+        if (!page || x < start || x >= page.end) return;
       } else {
         x = shownX + (offset - viewport.clientWidth * PLAYHEAD_RATIO) / SCALE;
       }
@@ -442,7 +449,15 @@ export function ScoreView({
       div.style.left = `${geometry.x[bi]! * SCALE + HOST_PAD}px`;
       div.style.top = `${(pad.top + si * STAFF_GAP) * SCALE}px`;
       if (drawCell(ctx, model, bi, si, geometry)) div.classList.add('score-view-cell--mark');
-      if (paged) addTieEnds(div, width);
+      if (paged) {
+        addTieEnds(div, width, keyChangeWidths[bi + 1] ?? 0);
+        const keyChange = keyChangeWidths[bi]!;
+        const barline = keyChange > 0 ? div.querySelector<SVGElement>('.vf-stavebarline') : null;
+        if (barline) {
+          barline.classList.add('score-view-lead-barline');
+          barline.style.setProperty('--key-change', `${keyChange}px`);
+        }
+      }
       host.appendChild(div);
       rendered.set(bi * STAFF_KEY + si, div);
     };
@@ -496,6 +511,7 @@ export function ScoreView({
       let labelTick: number;
       let shown: ScorePage | null = null;
       let shownTailBar = -1;
+      let shownLeadBar = -1;
       if (paged) {
         if (viewport.clientWidth !== pagesWidth) {
           pagesWidth = viewport.clientWidth;
@@ -512,9 +528,10 @@ export function ScoreView({
         }
         const next = pages[index + 1] ?? page;
         const lineX = Math.min(playheadX, page.end);
-        shownX = page.start;
-        moveTo(host, signaturePx - page.start * SCALE - HOST_PAD);
-        moveTo(playhead, signaturePx + (lineX - page.start) * SCALE);
+        const start = pageViewStart(page, geometry, keyChangeWidths);
+        shownX = start;
+        moveTo(host, signaturePx - start * SCALE - HOST_PAD);
+        moveTo(playhead, signaturePx + (lineX - start) * SCALE);
         if (playhead.hidden === following) playhead.hidden = !following;
         // The first bar of the song draws its own clef and key signature.
         const firstPage = page.start === 0;
@@ -532,13 +549,14 @@ export function ScoreView({
         // Only a page that ends inside a bar has cells to cut off.
         const barEnd = geometry.x[page.lastBar]! + geometry.width[page.lastBar]!;
         const endLeft =
-          page.end < barEnd ? `${signaturePx + (page.end - page.start) * SCALE}px` : '100%';
+          page.end < barEnd ? `${signaturePx + (page.end - start) * SCALE}px` : '100%';
         if (pageEnd.style.left !== endLeft) pageEnd.style.left = endLeft;
         // Half a unit keeps out the bars that only touch the range.
         // The bar before the page stays for the ties it draws into the page.
         const tailBar = page.start === geometry.x[page.firstBar]! ? page.firstBar - 1 : -1;
         from = keepFrom = (tailBar < 0 ? page.start : geometry.x[tailBar]!) + 0.5;
         shownTailBar = tailBar;
+        shownLeadBar = start > page.start ? page.firstBar : -1;
         to = keepTo = next.end - 0.5;
         near = following ? lineX : page.start;
         labelTick = following ? tick : pageStartTick(page, geometry, model.bars);
@@ -607,6 +625,7 @@ export function ScoreView({
           const visibility = bi < shown.firstBar || bi > shown.lastBar ? 'hidden' : '';
           if (el.style.visibility !== visibility) el.style.visibility = visibility;
           el.classList.toggle('score-view-cell--tail', tail);
+          el.classList.toggle('score-view-cell--lead', bi === shownLeadBar);
         }
       }
       raf = requestAnimationFrame(loop);
@@ -629,7 +648,7 @@ export function ScoreView({
       host.replaceChildren();
       signature?.replaceChildren();
     };
-  }, [model, geometry, placements, pad, scheduler, sequence, paged, signaturePx]);
+  }, [model, geometry, placements, pad, scheduler, sequence, paged, signaturePx, keyChangeWidths]);
 
   if (model.staves.length === 0) {
     return (
