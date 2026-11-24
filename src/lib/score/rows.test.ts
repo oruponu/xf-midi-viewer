@@ -94,3 +94,11 @@ describe('rowRange', () => {
     expect(rowRange(buildStaffRows([], GAP, null), 0, 100, 1)).toEqual([0, -1]);
   });
 });
+
+describe('buildStaffRows with stems', () => {
+  test('moves the band below stems that point down', () => {
+    const high = staff([[{ startGrid: 0, lenGrid: 12, keys: [71], tieFromPrev: false }]]);
+    const rows = buildStaffRows([high, staff()], GAP, band(0));
+    expect(rows.lyricTops[0]).toBe(110 + 23 + 10);
+  });
+});
