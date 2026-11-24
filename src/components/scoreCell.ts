@@ -119,6 +119,43 @@ export function measurePrefix(model: ScoreModel, bi: number): number {
   return stave.getNoteStartX();
 }
 
+// Width of the cancelled and new key signatures at the start of a bar that changes key.
+export function measureKeyChange(model: ScoreModel, bi: number): number {
+  const bar = model.bars[bi]!;
+  if (bi === 0 || !bar.keyChanged) return 0;
+  if (!bar.timeChanged) return measurePrefix(model, bi);
+  const stave = new ScoreStave(0, 0, 1000);
+  stave.addTimeSignature(`${bar.numerator}/${bar.denominator}`);
+  return measurePrefix(model, bi) - stave.getNoteStartX();
+}
+
+// Room after the key signature, wide enough for the accidentals of the first notes, which are
+// drawn left of their bar.
+const SIGNATURE_GAP = 24;
+
+// Width of a treble clef, the widest key signature in the song and the gap after it, in score
+// units.
+export function measureSignature(model: ScoreModel): number {
+  let width = 0;
+  for (const sharps of new Set(model.bars.map((bar) => bar.keySharps))) {
+    const stave = new ScoreStave(0, 0, 1000).addClef('treble').addKeySignature(keySpecOf(sharps));
+    width = Math.max(width, stave.getNoteStartX());
+  }
+  return width + SIGNATURE_GAP;
+}
+
+export function drawSignature(
+  ctx: RenderContext,
+  staff: ScoreStaff,
+  keySharps: number,
+  width: number,
+): void {
+  const stave = new ScoreStave(0, TOP, width).addClef(staff.clef);
+  if (staff.clef !== 'percussion') stave.addKeySignature(keySpecOf(keySharps));
+  stave.setBegBarType(BarlineType.NONE).setEndBarType(BarlineType.NONE);
+  stave.setContext(ctx).draw();
+}
+
 function makeNotes(
   items: readonly ScoreItem[],
   staff: ScoreStaff,

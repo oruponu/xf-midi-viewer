@@ -632,6 +632,7 @@ function PlayerScope({
         autoScrollLeadSheet={settings.autoScrollLeadSheet}
         autoScrollLyrics={settings.autoScrollLyrics}
         showPitchBar={settings.showPitchBar}
+        scorePaged={settings.scorePaged}
         chordDegrees={settings.chordDegrees}
         keyShifts={keyShifts}
         playbackRate={playbackRate}

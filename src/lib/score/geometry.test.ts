@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  barAtTick,
   barAtX,
   buildGeometry,
   LAST_ITEM_ROOM,
@@ -202,5 +203,24 @@ describe('staffOverhang', () => {
 
   test('ignores drum staves', () => {
     expect(staffOverhang(staff('treble', [36], 'drumSet'))).toEqual({ above: 0, below: 0 });
+  });
+});
+
+describe('barAtTick', () => {
+  const bars = [bar(0), bar(1), bar(2)];
+
+  test('returns the bar that contains the tick', () => {
+    expect(barAtTick(bars, 0)).toBe(0);
+    expect(barAtTick(bars, BAR - 1)).toBe(0);
+    expect(barAtTick(bars, BAR)).toBe(1);
+  });
+
+  test('clamps ticks outside the song', () => {
+    expect(barAtTick(bars, -5)).toBe(0);
+    expect(barAtTick(bars, Infinity)).toBe(2);
+  });
+
+  test('returns -1 without bars', () => {
+    expect(barAtTick([], 0)).toBe(-1);
   });
 });

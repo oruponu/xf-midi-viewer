@@ -11,13 +11,34 @@ import { barAtX, buildGeometry, staffOverhang, tickToX, xToTick } from '../lib/s
 import { buildScoreModel } from '../lib/score/notation.ts';
 import type { NamedTick, ScoreStaff } from '../lib/score/notation.ts';
 import {
+  buildScorePages,
+  createWheelPager,
+  dragTurn,
+  pageIndexAt,
+  pageStartTick,
+  pageViewStart,
+  turnPage,
+  wheelTurn,
+} from '../lib/score/pages.ts';
+import type { ScorePage } from '../lib/score/pages.ts';
+import {
   momentumOffset,
   momentumSpeed,
   releaseVelocity,
   SAMPLE_WINDOW_MS,
 } from '../lib/momentum.ts';
 import type { MotionSample } from '../lib/momentum.ts';
-import { drawCell, measurePrefix, SCALE, STAFF_CENTER, STAFF_GAP, TOP } from './scoreCell.ts';
+import {
+  drawCell,
+  drawSignature,
+  measureKeyChange,
+  measurePrefix,
+  measureSignature,
+  SCALE,
+  STAFF_CENTER,
+  STAFF_GAP,
+  TOP,
+} from './scoreCell.ts';
 
 const LABEL_WIDTH = 120;
 const PLAYHEAD_RATIO = 0.25;
@@ -35,6 +56,8 @@ const RENDER_MARGIN = 200;
 const HOST_PAD = 12;
 // Cells are keyed as bar * STAFF_KEY + staff.
 const STAFF_KEY = 1000;
+// How far before the barline the end of a tie into the next page starts, in score units.
+const TIE_IN_LENGTH = 12;
 const DRAG_THRESHOLD_PX = 5;
 const WHEEL_LINE_PX = 16;
 const GLIDE_MS = 250;
@@ -52,6 +75,7 @@ type ScoreViewProps = {
   keyShifts: readonly KeyShiftChange[];
   scheduler: MidiScheduler;
   title: string;
+  paged: boolean;
 };
 
 interface LabelPlacement {
@@ -69,6 +93,30 @@ function labelPlacements(staves: readonly ScoreStaff[]): LabelPlacement[] {
     else out.push({ staff, first: si, count: 1 });
   });
   return out;
+}
+
+// A tie into the next bar is one path from the cell of the bar it starts in. Its thin end is all
+// that reaches past the barline, so a page that starts with the next bar shows a short copy instead.
+function addTieEnds(cell: HTMLElement, width: number, nextKeyChange: number): void {
+  for (const tie of cell.querySelectorAll<SVGPathElement>('.vf-stavetie path')) {
+    const n = tie
+      .getAttribute('d')
+      ?.match(/-?\d+(\.\d+)?/g)
+      ?.map(Number);
+    if (!n || n.length < 8) continue;
+    const [x1, y, over, x2, under] = [n[0]!, n[1]!, n[3]!, n[4]!, n[7]!];
+    if (x2 <= width + 1) continue;
+    const from = Math.max(x1, width + nextKeyChange - TIE_IN_LENGTH);
+    const mid = (from + x2) / 2;
+    const bend = (to: number) => y + (to - y) * 0.6;
+    const end = tie.cloneNode() as SVGPathElement;
+    end.setAttribute(
+      'd',
+      `M${from} ${y}Q${mid} ${bend(over)},${x2} ${y}Q${mid} ${bend(under)},${from} ${y}Z`,
+    );
+    end.classList.add('score-view-tie-in');
+    tie.after(end);
+  }
 }
 
 function labelIndexAt(labels: readonly NamedTick[], tick: number): number {
@@ -90,6 +138,7 @@ export function ScoreView({
   keyShifts,
   scheduler,
   title,
+  paged,
 }: ScoreViewProps) {
   const model = useMemo(
     () =>
@@ -116,12 +165,23 @@ export function ScoreView({
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
+  const pageEndRef = useRef<HTMLDivElement>(null);
+  const signatureRef = useRef<HTMLDivElement>(null);
+  // Where a page starts, in CSS pixels: right of the clef and key signature column, whose cells
+  // sit HOST_PAD inside it.
+  const signaturePx = useMemo(() => HOST_PAD + measureSignature(model) * SCALE, [model]);
+  const keyChangeWidths = useMemo(
+    () => model.bars.map((_, bi) => measureKeyChange(model, bi)),
+    [model],
+  );
   const [labelKey, setLabelKey] = useState('');
 
   useEffect(() => {
     const host = hostRef.current;
     const viewport = viewportRef.current;
     const playhead = playheadRef.current;
+    const pageEnd = pageEndRef.current;
+    const signature = signatureRef.current;
     if (!host || !viewport || !playhead) return;
     host.replaceChildren();
     const rendered = new Map<number, HTMLElement>();
@@ -133,6 +193,36 @@ export function ScoreView({
     let viewX: number | null = null;
     let shownX = minX;
     let lastPosition = scheduler.getPosition();
+    let pages: ScorePage[] = [];
+    let pagesWidth = -1;
+    let signatureKey: number | null = null;
+    const drawSignatures = (keySharps: number) => {
+      if (!signature) return;
+      signature.replaceChildren();
+      const width = (signaturePx - HOST_PAD) / SCALE;
+      model.staves.forEach((staff, si) => {
+        const div = document.createElement('div');
+        const renderer = new Renderer(div, Renderer.Backends.SVG);
+        renderer.resize(width * SCALE, STAFF_GAP * SCALE);
+        const ctx = renderer.getContext();
+        ctx.scale(SCALE, SCALE);
+        div.className = 'score-view-cell';
+        div.style.left = `${HOST_PAD}px`;
+        div.style.top = `${(pad.top + si * STAFF_GAP) * SCALE}px`;
+        drawSignature(ctx, staff, keySharps, width);
+        signature.appendChild(div);
+      });
+    };
+    const offsets = new Map<HTMLElement, number>();
+    // A paged score stands still between page turns, so its transforms are only written on change.
+    const moveTo = (el: HTMLElement, px: number) => {
+      if (offsets.get(el) === px) return;
+      offsets.set(el, px);
+      el.style.transform = `translate3d(${px}px, 0, 0)`;
+    };
+    // The page shown while paged through by hand; null follows playback.
+    let viewPage: number | null = null;
+    const wheelPager = createWheelPager();
     let glide: { from: number; startMs: number } | null = null;
     let drag: {
       id: number;
@@ -162,6 +252,12 @@ export function ScoreView({
       glide = null;
     };
 
+    const playheadPage = () =>
+      pageIndexAt(pages, geometry, model.bars, secondsToTick(scheduler.getPosition(), sequence));
+    const turn = (direction: 1 | -1) => {
+      viewPage = turnPage(pages, viewPage ?? playheadPage(), direction);
+    };
+
     const wheelPixels = (e: WheelEvent, delta: number, page: number) =>
       delta *
       (e.deltaMode === WheelEvent.DOM_DELTA_LINE
@@ -173,6 +269,17 @@ export function ScoreView({
     const onWheel = (e: WheelEvent) => {
       coast = null;
       if (isPlaying()) return;
+      if (paged) {
+        const direction = wheelTurn(e.deltaX, e.deltaY, e.shiftKey);
+        if (direction === 0) return;
+        e.preventDefault();
+        const delta = wheelPixels(e, e.deltaX !== 0 ? e.deltaX : e.deltaY, viewport.clientWidth);
+        // Shift and line or page deltas come from a mouse wheel, which turns in notches.
+        const stepped = e.shiftKey || e.deltaMode !== WheelEvent.DOM_DELTA_PIXEL;
+        const step = wheelPager(delta, stepped, e.timeStamp);
+        if (step !== 0) turn(step);
+        return;
+      }
       const horizontal = e.deltaX !== 0 ? e.deltaX : e.shiftKey ? e.deltaY : 0;
       if (horizontal === 0) return;
       e.preventDefault();
@@ -223,7 +330,7 @@ export function ScoreView({
         window.scrollBy(0, drag.lastClientY - clientY);
         drag.lastClientY = clientY;
       }
-      if (isPlaying()) return;
+      if (isPlaying() || paged) return;
       scrollTo(drag.startX - dx / SCALE);
     };
 
@@ -231,30 +338,41 @@ export function ScoreView({
       if (reducedMotion()) return;
       const now = performance.now();
       const v = releaseVelocity(samples, now);
-      const vx = isPlaying() ? 0 : v.vx;
+      const vx = isPlaying() || paged ? 0 : v.vx;
       const vy = source === 'mouse' ? v.vy : 0;
       if (Math.hypot(vx, vy) < COAST_START_SPEED) return;
       coast = { startMs: now, vx, vy, fromX: viewX ?? shownX, scrolledY: 0 };
     };
 
-    const finishDrag = (clientX: number) => {
+    const finishDrag = (clientX: number, clientY: number) => {
       if (!drag) return;
-      const { moved, clickable, samples, source } = drag;
+      const { moved, clickable, samples, source, startClientX, startClientY } = drag;
       endDrag();
       if (moved) {
+        const direction = dragTurn(clientX - startClientX, clientY - startClientY);
+        if (paged && !isPlaying() && direction !== 0) turn(direction);
         startCoast(samples, source);
         return;
       }
       if (!clickable || isPlaying()) return;
       const offset = clientX - viewport.getBoundingClientRect().left;
-      const x = shownX + (offset - viewport.clientWidth * PLAYHEAD_RATIO) / SCALE;
+      let x: number;
+      if (paged) {
+        const page = pages[viewPage ?? playheadPage()];
+        const start = page ? pageViewStart(page, geometry, keyChangeWidths) : 0;
+        x = start + (offset - signaturePx) / SCALE;
+        if (!page || x < start || x >= page.end) return;
+      } else {
+        x = shownX + (offset - viewport.clientWidth * PLAYHEAD_RATIO) / SCALE;
+      }
       const bar = model.bars[barAtX(geometry, x)];
       if (!bar) return;
       const from = shownX;
       scheduler.seek(tickToSeconds(bar.startTick, sequence));
       lastPosition = scheduler.getPosition();
       viewX = null;
-      glide = reducedMotion() ? null : { from, startMs: performance.now() };
+      viewPage = null;
+      glide = paged || reducedMotion() ? null : { from, startMs: performance.now() };
     };
 
     const onPointerDown = (e: PointerEvent) => {
@@ -268,7 +386,7 @@ export function ScoreView({
       if (isPointerDrag(e)) moveDrag(e.clientX, e.clientY);
     };
     const onPointerUp = (e: PointerEvent) => {
-      if (isPointerDrag(e)) finishDrag(e.clientX);
+      if (isPointerDrag(e)) finishDrag(e.clientX, e.clientY);
     };
     const onPointerCancel = (e: PointerEvent) => {
       if (isPointerDrag(e)) endDrag();
@@ -302,7 +420,7 @@ export function ScoreView({
     };
     const onTouchEnd = (e: TouchEvent) => {
       const t = draggedTouch(e.changedTouches);
-      if (t) finishDrag(t.clientX);
+      if (t) finishDrag(t.clientX, t.clientY);
     };
     const onTouchCancel = (e: TouchEvent) => {
       if (draggedTouch(e.changedTouches)) endDrag();
@@ -331,6 +449,15 @@ export function ScoreView({
       div.style.left = `${geometry.x[bi]! * SCALE + HOST_PAD}px`;
       div.style.top = `${(pad.top + si * STAFF_GAP) * SCALE}px`;
       if (drawCell(ctx, model, bi, si, geometry)) div.classList.add('score-view-cell--mark');
+      if (paged) {
+        addTieEnds(div, width, keyChangeWidths[bi + 1] ?? 0);
+        const keyChange = keyChangeWidths[bi]!;
+        const barline = keyChange > 0 ? div.querySelector<SVGElement>('.vf-stavebarline') : null;
+        if (barline) {
+          barline.classList.add('score-view-lead-barline');
+          barline.style.setProperty('--key-change', `${keyChange}px`);
+        }
+      }
       host.appendChild(div);
       rendered.set(bi * STAFF_KEY + si, div);
     };
@@ -343,6 +470,7 @@ export function ScoreView({
       if (position !== lastPosition || playing) {
         lastPosition = position;
         viewX = null;
+        viewPage = null;
         glide = null;
         if (coast?.vx) coast = null;
       }
@@ -372,19 +500,84 @@ export function ScoreView({
 
       const tick = secondsToTick(position, sequence);
       const playheadX = tickToX(geometry, model.bars, tick);
-      let x = viewX ?? playheadX;
-      if (glide) {
-        const t = (frameStart - glide.startMs) / GLIDE_MS;
-        if (t >= 1) glide = null;
-        else x = glide.from + (playheadX - glide.from) * (1 - (1 - t) ** 3);
-      }
-      shownX = x;
-      const labelTick = x === playheadX ? tick : xToTick(geometry, model.bars, x);
-      setLabelKey(placements.map((p) => labelIndexAt(p.staff.labels, labelTick)).join(','));
-
       const viewWidth = viewport.clientWidth / SCALE;
-      host.style.transform = `translate3d(${viewport.clientWidth * PLAYHEAD_RATIO - x * SCALE - HOST_PAD}px, 0, 0)`;
-      playhead.style.transform = `translate3d(${(playheadX - x) * SCALE}px, 0, 0)`;
+      // Cells are made from `from` to `to`, nearest to `near` first, and dropped outside
+      // `keepFrom` to `keepTo`.
+      let from: number;
+      let to: number;
+      let keepFrom: number;
+      let keepTo: number;
+      let near: number;
+      let labelTick: number;
+      let shown: ScorePage | null = null;
+      let shownTailBar = -1;
+      let shownLeadBar = -1;
+      if (paged) {
+        if (viewport.clientWidth !== pagesWidth) {
+          pagesWidth = viewport.clientWidth;
+          pages = buildScorePages(geometry, (pagesWidth - signaturePx) / SCALE);
+          viewPage = null;
+        }
+        const playIndex = pageIndexAt(pages, geometry, model.bars, tick);
+        const index = viewPage ?? playIndex;
+        const following = index === playIndex;
+        const page = pages[index];
+        if (!page || !pageEnd || !signature) {
+          raf = requestAnimationFrame(loop);
+          return;
+        }
+        const next = pages[index + 1] ?? page;
+        const lineX = Math.min(playheadX, page.end);
+        const start = pageViewStart(page, geometry, keyChangeWidths);
+        shownX = start;
+        moveTo(host, signaturePx - start * SCALE - HOST_PAD);
+        moveTo(playhead, signaturePx + (lineX - start) * SCALE);
+        if (playhead.hidden === following) playhead.hidden = !following;
+        // The first bar of the song draws its own clef and key signature.
+        const firstPage = page.start === 0;
+        if (signature.hidden !== firstPage) signature.hidden = firstPage;
+        // Accidentals of the page's first notes reach over the column, which lies under the cells.
+        // A page that starts inside a bar has the column cover the part before it instead.
+        const zIndex = page.start > geometry.x[page.firstBar]! ? '1' : '';
+        if (signature.style.zIndex !== zIndex) signature.style.zIndex = zIndex;
+        shown = page;
+        const keySharps = model.bars[page.firstBar]!.keySharps;
+        if (!firstPage && signatureKey !== keySharps) {
+          signatureKey = keySharps;
+          drawSignatures(keySharps);
+        }
+        // Only a page that ends inside a bar has cells to cut off.
+        const barEnd = geometry.x[page.lastBar]! + geometry.width[page.lastBar]!;
+        const endLeft =
+          page.end < barEnd ? `${signaturePx + (page.end - start) * SCALE}px` : '100%';
+        if (pageEnd.style.left !== endLeft) pageEnd.style.left = endLeft;
+        // Half a unit keeps out the bars that only touch the range.
+        // The bar before the page stays for the ties it draws into the page.
+        const tailBar = page.start === geometry.x[page.firstBar]! ? page.firstBar - 1 : -1;
+        from = keepFrom = (tailBar < 0 ? page.start : geometry.x[tailBar]!) + 0.5;
+        shownTailBar = tailBar;
+        shownLeadBar = start > page.start ? page.firstBar : -1;
+        to = keepTo = next.end - 0.5;
+        near = following ? lineX : page.start;
+        labelTick = following ? tick : pageStartTick(page, geometry, model.bars);
+      } else {
+        let x = viewX ?? playheadX;
+        if (glide) {
+          const t = (frameStart - glide.startMs) / GLIDE_MS;
+          if (t >= 1) glide = null;
+          else x = glide.from + (playheadX - glide.from) * (1 - (1 - t) ** 3);
+        }
+        shownX = x;
+        host.style.transform = `translate3d(${viewport.clientWidth * PLAYHEAD_RATIO - x * SCALE - HOST_PAD}px, 0, 0)`;
+        playhead.style.transform = `translate3d(${(playheadX - x) * SCALE}px, 0, 0)`;
+        from = x - viewWidth * PLAYHEAD_RATIO - RENDER_MARGIN;
+        to = x + viewWidth * (1 - PLAYHEAD_RATIO) + RENDER_MARGIN;
+        keepFrom = from - viewWidth;
+        keepTo = to + viewWidth;
+        near = x;
+        labelTick = x === playheadX ? tick : xToTick(geometry, model.bars, x);
+      }
+      setLabelKey(placements.map((p) => labelIndexAt(p.staff.labels, labelTick)).join(','));
 
       const top = viewport.getBoundingClientRect().top + pad.top * SCALE;
       const rowHeight = STAFF_GAP * SCALE;
@@ -393,16 +586,14 @@ export function ScoreView({
         model.staves.length - 1,
         Math.floor((window.innerHeight - top + rowHeight) / rowHeight),
       );
-      const from = x - viewWidth * PLAYHEAD_RATIO - RENDER_MARGIN;
-      const to = x + viewWidth * (1 - PLAYHEAD_RATIO) + RENDER_MARGIN;
 
       for (const [key, el] of rendered) {
         const bi = Math.floor(key / STAFF_KEY);
         const si = key % STAFF_KEY;
         const bx = geometry.x[bi]!;
         const outside =
-          bx + geometry.width[bi]! < from - viewWidth ||
-          bx > to + viewWidth ||
+          bx + geometry.width[bi]! < keepFrom ||
+          bx > keepTo ||
           si < firstRow - 2 ||
           si > lastRow + 2;
         if (outside) {
@@ -419,11 +610,23 @@ export function ScoreView({
         }
       });
       wanted.sort(
-        (a, b) => Math.abs(geometry.x[a[0]]! - x) - Math.abs(geometry.x[b[0]]! - x) || a[1] - b[1],
+        (a, b) =>
+          Math.abs(geometry.x[a[0]]! - near) - Math.abs(geometry.x[b[0]]! - near) || a[1] - b[1],
       );
       for (const [bi, si] of wanted) {
         if (performance.now() - frameStart > FRAME_BUDGET_MS) break;
         renderCell(bi, si);
+      }
+      if (shown) {
+        // Hidden rather than covered: a cell paints its accidentals and ties outside its box.
+        for (const [key, el] of rendered) {
+          const bi = Math.floor(key / STAFF_KEY);
+          const tail = bi === shownTailBar;
+          const visibility = bi < shown.firstBar || bi > shown.lastBar ? 'hidden' : '';
+          if (el.style.visibility !== visibility) el.style.visibility = visibility;
+          el.classList.toggle('score-view-cell--tail', tail);
+          el.classList.toggle('score-view-cell--lead', bi === shownLeadBar);
+        }
       }
       raf = requestAnimationFrame(loop);
     };
@@ -441,9 +644,11 @@ export function ScoreView({
       viewport.removeEventListener('touchcancel', onTouchCancel);
       delete viewport.dataset.dragging;
       delete viewport.dataset.playing;
+      playhead.hidden = false;
       host.replaceChildren();
+      signature?.replaceChildren();
     };
-  }, [model, geometry, placements, pad, scheduler, sequence]);
+  }, [model, geometry, placements, pad, scheduler, sequence, paged, signaturePx, keyChangeWidths]);
 
   if (model.staves.length === 0) {
     return (
@@ -477,6 +682,13 @@ export function ScoreView({
           aria-label={title ? `${title} の譜面` : '譜面'}
           style={{ left: LABEL_WIDTH }}
         >
+          {paged && (
+            <div
+              className="score-view-signature"
+              ref={signatureRef}
+              style={{ width: signaturePx }}
+            />
+          )}
           <div
             className="score-view-svg"
             ref={hostRef}
@@ -484,10 +696,11 @@ export function ScoreView({
             // reaches as far beyond it as the viewport can show.
             style={{ width: `calc(${geometry.total * SCALE + HOST_PAD}px + 100vw)`, height }}
           />
+          {paged && <div className="score-view-page-end" ref={pageEndRef} />}
           <div
             className="score-view-playhead"
             ref={playheadRef}
-            style={{ left: `${PLAYHEAD_RATIO * 100}%` }}
+            style={{ left: paged ? 0 : `${PLAYHEAD_RATIO * 100}%` }}
           />
         </div>
       </div>

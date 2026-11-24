@@ -95,8 +95,7 @@ export function offsetInBar(g: BarGeometry, bi: number, intoTicks: number): numb
   return tail * g.pxPerTick + (intoTicks - tail) * g.tailPxPerTick[bi]!;
 }
 
-export function tickToX(g: BarGeometry, bars: readonly ScoreBar[], tick: number): number {
-  if (bars.length === 0) return 0;
+export function barAtTick(bars: readonly ScoreBar[], tick: number): number {
   let lo = 0;
   let hi = bars.length - 1;
   while (lo < hi) {
@@ -104,6 +103,12 @@ export function tickToX(g: BarGeometry, bars: readonly ScoreBar[], tick: number)
     if (bars[mid]!.startTick <= tick) lo = mid;
     else hi = mid - 1;
   }
+  return hi;
+}
+
+export function tickToX(g: BarGeometry, bars: readonly ScoreBar[], tick: number): number {
+  const lo = barAtTick(bars, tick);
+  if (lo < 0) return 0;
   const bar = bars[lo]!;
   const into = Math.min(bar.ticks, Math.max(0, tick - bar.startTick));
   return g.noteStart[lo]! + offsetInBar(g, lo, into);

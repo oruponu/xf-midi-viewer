@@ -2535,6 +2535,24 @@
   opacity: 0.8;
 }
 
+.score-view-signature {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: var(--bg);
+}
+
+/* Hides the rest of a bar that is wider than the page. */
+.score-view-page-end {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  background: var(--bg);
+}
+
 .score-view-cell {
   position: absolute;
   top: 0;
@@ -2561,6 +2579,25 @@
   stroke-width: 5px;
   stroke-linejoin: round;
   paint-order: stroke;
+}
+
+/* The bar before the page shows nothing but the ends of its ties into the page. */
+.score-view-cell--tail,
+.score-view-tie-in {
+  visibility: hidden;
+}
+
+.score-view-cell--tail .score-view-tie-in {
+  visibility: visible;
+}
+
+/* The column left of the page already shows the key a leading bar changes to. */
+.score-view-cell--lead .vf-keysignature {
+  visibility: hidden;
+}
+
+.score-view-cell--lead .score-view-lead-barline {
+  transform: translateX(var(--key-change));
 }
 
 .score-view-cell--mark {

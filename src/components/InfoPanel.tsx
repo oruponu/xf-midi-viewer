@@ -54,6 +54,7 @@ type InfoPanelProps = {
   autoScrollLeadSheet?: boolean;
   autoScrollLyrics?: boolean;
   showPitchBar?: boolean;
+  scorePaged?: boolean;
   chordDegrees?: boolean;
   keyShifts: readonly KeyShiftChange[];
   playbackRate?: number;
@@ -89,6 +90,7 @@ function ActiveView({
   autoScrollLeadSheet = true,
   autoScrollLyrics = true,
   showPitchBar = true,
+  scorePaged = false,
   chordDegrees = false,
   keyShifts,
   playbackRate = 1,
@@ -107,6 +109,7 @@ function ActiveView({
           keyShifts={keyShifts}
           scheduler={scheduler}
           title={file ? songHeading(data, file.name).title : ''}
+          paged={scorePaged}
         />
       </Suspense>
     );
