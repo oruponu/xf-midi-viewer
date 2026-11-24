@@ -21,6 +21,7 @@ import {
   wheelTurn,
 } from '../lib/score/pages.ts';
 import type { ScorePage } from '../lib/score/pages.ts';
+import { buildStaffRows, rowRange } from '../lib/score/rows.ts';
 import {
   momentumOffset,
   momentumSpeed,
@@ -153,6 +154,7 @@ export function ScoreView({
   );
   const geometry = useMemo(() => buildGeometry(model, (bi) => measurePrefix(model, bi)), [model]);
   const placements = useMemo(() => labelPlacements(model.staves), [model]);
+  const rows = useMemo(() => buildStaffRows(model.staves, STAFF_GAP, null), [model]);
   // The frame clips its content, so it grows to fit notes far above or below the outer staves.
   const pad = useMemo(() => {
     const first = model.staves[0];
@@ -208,7 +210,7 @@ export function ScoreView({
         ctx.scale(SCALE, SCALE);
         div.className = 'score-view-cell';
         div.style.left = `${HOST_PAD}px`;
-        div.style.top = `${(pad.top + si * STAFF_GAP) * SCALE}px`;
+        div.style.top = `${(pad.top + rows.tops[si]!) * SCALE}px`;
         drawSignature(ctx, staff, keySharps, width);
         signature.appendChild(div);
       });
@@ -447,7 +449,7 @@ export function ScoreView({
       div.style.width = `${width * SCALE}px`;
       div.style.height = `${STAFF_GAP * SCALE}px`;
       div.style.left = `${geometry.x[bi]! * SCALE + HOST_PAD}px`;
-      div.style.top = `${(pad.top + si * STAFF_GAP) * SCALE}px`;
+      div.style.top = `${(pad.top + rows.tops[si]!) * SCALE}px`;
       if (drawCell(ctx, model, bi, si, geometry)) div.classList.add('score-view-cell--mark');
       if (paged) {
         addTieEnds(div, width, keyChangeWidths[bi + 1] ?? 0);
@@ -580,11 +582,11 @@ export function ScoreView({
       setLabelKey(placements.map((p) => labelIndexAt(p.staff.labels, labelTick)).join(','));
 
       const top = viewport.getBoundingClientRect().top + pad.top * SCALE;
-      const rowHeight = STAFF_GAP * SCALE;
-      const firstRow = Math.max(0, Math.floor((-top - rowHeight) / rowHeight));
-      const lastRow = Math.min(
-        model.staves.length - 1,
-        Math.floor((window.innerHeight - top + rowHeight) / rowHeight),
+      const [firstRow, lastRow] = rowRange(
+        rows,
+        -top / SCALE,
+        (window.innerHeight - top) / SCALE,
+        1,
       );
 
       for (const [key, el] of rendered) {
@@ -648,7 +650,18 @@ export function ScoreView({
       host.replaceChildren();
       signature?.replaceChildren();
     };
-  }, [model, geometry, placements, pad, scheduler, sequence, paged, signaturePx, keyChangeWidths]);
+  }, [
+    model,
+    geometry,
+    placements,
+    rows,
+    pad,
+    scheduler,
+    sequence,
+    paged,
+    signaturePx,
+    keyChangeWidths,
+  ]);
 
   if (model.staves.length === 0) {
     return (
@@ -659,15 +672,15 @@ export function ScoreView({
   }
 
   const labelIndexes = labelKey ? labelKey.split(',').map(Number) : [];
-  const height =
-    (pad.top + TOP + model.staves.length * STAFF_GAP + BOTTOM_ROOM + pad.bottom) * SCALE;
+  const height = (pad.top + TOP + rows.height + BOTTOM_ROOM + pad.bottom) * SCALE;
   return (
     <div className="card score-view">
       <div className="score-view-frame" style={{ height }}>
         <div className="score-view-labels" style={{ width: LABEL_WIDTH }}>
           {placements.map((p, i) => {
-            const centre =
-              pad.top + p.first * STAFF_GAP + TOP + STAFF_CENTER + ((p.count - 1) * STAFF_GAP) / 2;
+            const first = rows.tops[p.first]!;
+            const last = rows.tops[p.first + p.count - 1]!;
+            const centre = pad.top + (first + last) / 2 + TOP + STAFF_CENTER;
             return (
               <div key={p.first} className="score-view-label" style={{ top: centre * SCALE }}>
                 {labelText(p.staff, labelIndexes[i] ?? -1)}
