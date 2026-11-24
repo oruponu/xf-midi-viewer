@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Renderer } from 'vexflow/bravura';
 import type { MidiScheduler } from '../lib/player/scheduler.ts';
 import type { ChannelPart } from '../lib/smf/channelVoices.ts';
@@ -6,8 +6,17 @@ import type { KeyShiftChange } from '../lib/smf/fixedKey.ts';
 import { secondsToTick, tickToSeconds } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
+import type { LyricSyllable } from '../lib/xf/lyrics.ts';
 import type { RehearsalMessage } from '../lib/xf/types.ts';
 import { barAtX, buildGeometry, staffOverhang, tickToX, xToTick } from '../lib/score/geometry.ts';
+import {
+  assignLyrics,
+  lyricOverhang,
+  lyricStaffIndexes,
+  placeLyrics,
+  visibleSyllables,
+} from '../lib/score/lyrics.ts';
+import type { PlacedLyric } from '../lib/score/lyrics.ts';
 import { buildScoreModel } from '../lib/score/notation.ts';
 import type { NamedTick, ScoreStaff } from '../lib/score/notation.ts';
 import {
@@ -40,6 +49,7 @@ import {
   STAFF_GAP,
   TOP,
 } from './scoreCell.ts';
+import { LYRIC_BAND_PX, LYRIC_GAP_PX, lyricElement, measureLyrics } from './scoreLyrics.ts';
 
 const LABEL_WIDTH = 120;
 const PLAYHEAD_RATIO = 0.25;
@@ -77,7 +87,12 @@ type ScoreViewProps = {
   scheduler: MidiScheduler;
   title: string;
   paged: boolean;
+  syllables: readonly LyricSyllable[];
+  // 1-based, as in the XF lyrics header.
+  melodyChannels: readonly number[];
 };
+
+const NO_WIDTHS: readonly number[] = [];
 
 interface LabelPlacement {
   staff: ScoreStaff;
@@ -140,6 +155,8 @@ export function ScoreView({
   scheduler,
   title,
   paged,
+  syllables,
+  melodyChannels,
 }: ScoreViewProps) {
   const model = useMemo(
     () =>
@@ -154,16 +171,91 @@ export function ScoreView({
   );
   const geometry = useMemo(() => buildGeometry(model, (bi) => measurePrefix(model, bi)), [model]);
   const placements = useMemo(() => labelPlacements(model.staves), [model]);
-  const rows = useMemo(() => buildStaffRows(model.staves, STAFF_GAP, null), [model]);
+  const lyricStaves = useMemo(
+    () => lyricStaffIndexes(model.staves, melodyChannels),
+    [model, melodyChannels],
+  );
+  const hasLyricStaff = lyricStaves.length > 0;
+  const shownSyllables = useMemo(
+    () => (hasLyricStaff ? visibleSyllables(syllables) : []),
+    [hasLyricStaff, syllables],
+  );
+  // The syllables under each lyric staff, as indexes into shownSyllables.
+  const staffLyrics = useMemo(() => {
+    const assigned = assignLyrics(model, lyricStaves, shownSyllables);
+    const byStaff = new Map<number, number[]>();
+    lyricStaves.forEach((si, i) => {
+      if (assigned[i]!.length > 0) byStaff.set(si, assigned[i]!);
+    });
+    return byStaff;
+  }, [model, lyricStaves, shownSyllables]);
+  const rows = useMemo(
+    () =>
+      buildStaffRows(
+        model.staves,
+        STAFF_GAP,
+        staffLyrics.size === 0
+          ? null
+          : {
+              staves: [...staffLyrics.keys()],
+              height: LYRIC_BAND_PX / SCALE,
+              staffBottom: TOP + STAFF_CENTER + HALF_STAFF,
+              margin: NOTE_MARGIN,
+            },
+      ),
+    [model, staffLyrics],
+  );
   // The frame clips its content, so it grows to fit notes far above or below the outer staves.
   const pad = useMemo(() => {
     const first = model.staves[0];
     const last = model.staves.at(-1);
+    // A lyric band under the last staff already clears its low notes.
+    const bandLast = rows.lyricTops.at(-1) != null;
     return {
       top: first ? Math.max(0, staffOverhang(first).above + NOTE_MARGIN - ROOM_ABOVE) : 0,
-      bottom: last ? Math.max(0, staffOverhang(last).below + NOTE_MARGIN - ROOM_BELOW) : 0,
+      bottom:
+        last && !bandLast ? Math.max(0, staffOverhang(last).below + NOTE_MARGIN - ROOM_BELOW) : 0,
     };
-  }, [model]);
+  }, [model, rows]);
+  // Syllable widths in score units. They change when a font the lyrics use finishes loading.
+  const [lyricWidths, setLyricWidths] = useState(NO_WIDTHS);
+  useLayoutEffect(() => {
+    if (shownSyllables.length === 0) return;
+    const measure = () => {
+      const next = measureLyrics(shownSyllables).map((w) => w / SCALE);
+      setLyricWidths((prev) =>
+        prev.length === next.length && prev.every((w, i) => w === next[i]) ? prev : next,
+      );
+    };
+    measure();
+    document.fonts.addEventListener('loadingdone', measure);
+    return () => document.fonts.removeEventListener('loadingdone', measure);
+  }, [shownSyllables]);
+  const lyricLayout = useMemo(() => {
+    const byStaff = new Map<number, Map<number, PlacedLyric[]>>();
+    let overhang = 0;
+    if (lyricWidths.length !== shownSyllables.length) return { byStaff, overhang };
+    for (const [si, indexes] of staffLyrics) {
+      const widths = indexes.map((i) => lyricWidths[i]!);
+      const placed = placeLyrics(
+        model,
+        geometry,
+        si,
+        indexes.map((i) => shownSyllables[i]!),
+        widths,
+        LYRIC_GAP_PX / SCALE,
+      );
+      const byBar = new Map<number, PlacedLyric[]>();
+      for (const lyric of placed) {
+        const list = byBar.get(lyric.bar);
+        if (list) list.push(lyric);
+        else byBar.set(lyric.bar, [lyric]);
+      }
+      byStaff.set(si, byBar);
+      overhang = Math.max(overhang, lyricOverhang(placed, widths, geometry));
+    }
+    return { byStaff, overhang };
+  }, [model, geometry, staffLyrics, shownSyllables, lyricWidths]);
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
@@ -451,6 +543,20 @@ export function ScoreView({
       div.style.left = `${geometry.x[bi]! * SCALE + HOST_PAD}px`;
       div.style.top = `${(pad.top + rows.tops[si]!) * SCALE}px`;
       if (drawCell(ctx, model, bi, si, geometry)) div.classList.add('score-view-cell--mark');
+      const lyrics = lyricLayout.byStaff.get(si)?.get(bi);
+      const lyricTop = rows.lyricTops[si];
+      if (lyrics && lyricTop != null) {
+        const band = document.createElement('div');
+        band.className = 'score-view-lyrics';
+        band.style.top = `${(lyricTop - rows.tops[si]!) * SCALE}px`;
+        band.style.height = `${LYRIC_BAND_PX}px`;
+        for (const lyric of lyrics) {
+          const el = lyricElement(lyric.syllable);
+          el.style.left = `${(lyric.x - geometry.x[bi]!) * SCALE}px`;
+          band.appendChild(el);
+        }
+        div.appendChild(band);
+      }
       if (paged) {
         addTieEnds(div, width, keyChangeWidths[bi + 1] ?? 0);
         const keyChange = keyChangeWidths[bi]!;
@@ -517,7 +623,9 @@ export function ScoreView({
       if (paged) {
         if (viewport.clientWidth !== pagesWidth) {
           pagesWidth = viewport.clientWidth;
-          pages = buildScorePages(geometry, (pagesWidth - signaturePx) / SCALE);
+          // A syllable on the last note of a page can end past the page's last barline.
+          const pageWidth = (pagesWidth - signaturePx) / SCALE - lyricLayout.overhang;
+          pages = buildScorePages(geometry, pageWidth);
           viewPage = null;
         }
         const playIndex = pageIndexAt(pages, geometry, model.bars, tick);
@@ -655,6 +763,7 @@ export function ScoreView({
     geometry,
     placements,
     rows,
+    lyricLayout,
     pad,
     scheduler,
     sequence,
