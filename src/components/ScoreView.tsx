@@ -44,6 +44,7 @@ import {
   measureKeyChange,
   measurePrefix,
   measureSignature,
+  measureStemReach,
   SCALE,
   STAFF_CENTER,
   STAFF_GAP,
@@ -197,7 +198,9 @@ export function ScoreView({
         staffLyrics.size === 0
           ? null
           : {
-              staves: [...staffLyrics.keys()],
+              stems: new Map(
+                [...staffLyrics.keys()].map((si) => [si, measureStemReach(model, si)]),
+              ),
               height: LYRIC_BAND_PX / SCALE,
               staffBottom: TOP + STAFF_CENTER + HALF_STAFF,
               margin: NOTE_MARGIN,

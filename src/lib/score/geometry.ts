@@ -1,7 +1,7 @@
 import type { ScoreBar } from './bars.ts';
 import type { Clef, ScoreModel, ScoreStaff } from './notation.ts';
 import type { ScoreItem } from './rhythm.ts';
-import { QUARTER, SIXTEENTH } from './subdivision.ts';
+import { SIXTEENTH } from './subdivision.ts';
 
 // All lengths are in VexFlow units, before the view scales them down.
 export const LEFT_PAD = 16;
@@ -141,7 +141,6 @@ export function xToTick(g: BarGeometry, bars: readonly ScoreBar[], x: number): n
 }
 
 const STEP = 5;
-const WHOLE = 4 * QUARTER;
 const NOTEHEAD_HALF = 5;
 // Diatonic step of each pitch class, with black keys spelled from the note below or above.
 const STEP_DOWN = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
@@ -179,36 +178,4 @@ export function stemReach(clef: Clef, keys: readonly number[], beamed: boolean):
   const lowest = Math.min(...keys.map((k) => diatonic(k, STEP_DOWN)));
   const reach = (OUTER_LINES[clef][1] - lowest) * STEP + STEM_LENGTH + (beamed ? BEAM_ROOM : 0);
   return Math.max(0, reach);
-}
-
-// How far stems pointing down reach below the bottom line. Notes shorter than a quarter take the
-// direction of their beat, as a beam gives its notes one direction.
-export function stemOverhang(staff: ScoreStaff): number {
-  if (staff.kind !== 'pitched' || staff.clef === 'percussion') return 0;
-  const [top, bottom] = OUTER_LINES[staff.clef];
-  const middle = (top + bottom) / 2;
-  const reach = (items: readonly ScoreItem[], beamed: boolean) => {
-    const steps = items.flatMap((it) => it.keys.map((k) => diatonic(k, STEP_DOWN)));
-    if (steps.length === 0) return 0;
-    const lowest = Math.min(...steps);
-    if ((lowest + Math.max(...steps)) / 2 < middle) return 0;
-    return (bottom - lowest) * STEP + STEM_LENGTH + (beamed ? BEAM_ROOM : 0);
-  };
-  let below = 0;
-  for (const items of staff.bars) {
-    const beats = new Map<number, ScoreItem[]>();
-    for (const it of items) {
-      if (it.lenGrid >= WHOLE) continue;
-      if (it.lenGrid >= QUARTER) {
-        below = Math.max(below, reach([it], false));
-        continue;
-      }
-      const beat = Math.floor(it.startGrid / QUARTER);
-      const group = beats.get(beat);
-      if (group) group.push(it);
-      else beats.set(beat, [it]);
-    }
-    for (const group of beats.values()) below = Math.max(below, reach(group, true));
-  }
-  return below;
 }

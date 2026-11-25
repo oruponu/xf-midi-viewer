@@ -1,10 +1,10 @@
-import { staffOverhang, stemOverhang } from './geometry.ts';
+import { staffOverhang } from './geometry.ts';
 import type { ScoreStaff } from './notation.ts';
 
 // All lengths are in VexFlow units, before the view scales them down.
 export interface LyricBand {
-  // Indexes of the staves a band follows.
-  staves: readonly number[];
+  // The staves a band follows, by index, with how far their stems reach below the bottom line.
+  stems: ReadonlyMap<number, number>;
   height: number;
   // Bottom staff line, measured from the top of a staff's row.
   staffBottom: number;
@@ -33,11 +33,12 @@ export function buildStaffRows(
   staves.forEach((staff, si) => {
     tops.push(cursor);
     cursor += staffGap;
-    if (!band?.staves.includes(si)) {
+    const stems = band?.stems.get(si);
+    if (!band || stems === undefined) {
       lyricTops.push(null);
       return;
     }
-    const below = Math.max(staffOverhang(staff).below, stemOverhang(staff));
+    const below = Math.max(staffOverhang(staff).below, stems);
     const noteRoom = band.staffBottom + below + band.margin;
     const lyricTop = tops[si]! + Math.max(staffGap, noteRoom);
     lyricTops.push(lyricTop);

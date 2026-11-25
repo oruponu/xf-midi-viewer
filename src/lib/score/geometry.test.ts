@@ -6,7 +6,6 @@ import {
   LAST_ITEM_ROOM,
   offsetInBar,
   staffOverhang,
-  stemOverhang,
   stemReach,
   tickToX,
   xToTick,
@@ -249,73 +248,5 @@ describe('stemReach', () => {
   test('is zero without notes and on percussion staves', () => {
     expect(stemReach('treble', [], false)).toBe(0);
     expect(stemReach('percussion', [38], false)).toBe(0);
-  });
-});
-
-describe('stemOverhang', () => {
-  const staff = (
-    items: [startGrid: number, lenGrid: number, keys: number[]][],
-    clef: 'treble' | 'bass' = 'treble',
-    kind: StaffKind = 'pitched',
-  ): ScoreStaff => ({
-    channel: 0,
-    kind,
-    clef,
-    bars: [
-      items.map(([startGrid, lenGrid, keys]) => ({ startGrid, lenGrid, keys, tieFromPrev: false })),
-    ],
-    continuation: false,
-    marks: [],
-    labels: [],
-  });
-
-  test('measures how far a stem pointing down reaches below the bottom line', () => {
-    expect(stemOverhang(staff([[0, 24, [71]]]))).toBe(15);
-    expect(stemOverhang(staff([[0, 24, [50]]], 'bass'))).toBe(15);
-  });
-
-  test('is zero for stems pointing up, whole notes and rests', () => {
-    expect(stemOverhang(staff([[0, 24, [69]]]))).toBe(0);
-    expect(stemOverhang(staff([[0, 96, [71]]]))).toBe(0);
-    expect(stemOverhang(staff([[0, 24, []]]))).toBe(0);
-  });
-
-  test('points the stem of a chord by the middle of its outer notes', () => {
-    expect(stemOverhang(staff([[0, 24, [64, 79]]]))).toBe(35);
-    expect(stemOverhang(staff([[0, 24, [64, 76]]]))).toBe(0);
-  });
-
-  test('adds room for the beam of notes shorter than a quarter', () => {
-    expect(
-      stemOverhang(
-        staff([
-          [0, 12, [71]],
-          [12, 12, [74]],
-        ]),
-      ),
-    ).toBe(23);
-  });
-
-  test('points the notes of one beat the same way', () => {
-    expect(
-      stemOverhang(
-        staff([
-          [0, 12, [64]],
-          [12, 12, [79]],
-        ]),
-      ),
-    ).toBe(43);
-    expect(
-      stemOverhang(
-        staff([
-          [0, 12, [69]],
-          [24, 12, [74]],
-        ]),
-      ),
-    ).toBe(13);
-  });
-
-  test('ignores drum staves', () => {
-    expect(stemOverhang(staff([[0, 24, [71]]], 'treble', 'drumSet'))).toBe(0);
   });
 });

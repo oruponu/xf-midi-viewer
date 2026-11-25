@@ -27,7 +27,7 @@ function staff(bars: ScoreItem[][] = [[note(67)]]): ScoreStaff {
 }
 
 const band = (...staves: number[]): LyricBand => ({
-  staves,
+  stems: new Map(staves.map((si) => [si, 0])),
   height: 46,
   staffBottom: 110,
   margin: 10,
@@ -96,9 +96,18 @@ describe('rowRange', () => {
 });
 
 describe('buildStaffRows with stems', () => {
+  const stems = (reach: number): LyricBand => ({ ...band(), stems: new Map([[0, reach]]) });
+
   test('moves the band below stems that point down', () => {
-    const high = staff([[{ startGrid: 0, lenGrid: 12, keys: [71], tieFromPrev: false }]]);
-    const rows = buildStaffRows([high, staff()], GAP, band(0));
+    const rows = buildStaffRows([staff(), staff()], GAP, stems(23));
     expect(rows.lyricTops[0]).toBe(110 + 23 + 10);
+  });
+
+  test('keeps the band below notes that reach lower than the stems', () => {
+    const low = staff([[note(48)]]);
+    const below = staffOverhang(low).below;
+    expect(below).toBeGreaterThan(23);
+    const rows = buildStaffRows([low, staff()], GAP, stems(23));
+    expect(rows.lyricTops[0]).toBe(110 + below + 10);
   });
 });
