@@ -7,6 +7,7 @@ import {
   offsetInBar,
   staffOverhang,
   stemOverhang,
+  stemReach,
   tickToX,
   xToTick,
 } from './geometry.ts';
@@ -223,6 +224,31 @@ describe('barAtTick', () => {
 
   test('returns -1 without bars', () => {
     expect(barAtTick([], 0)).toBe(-1);
+  });
+});
+
+describe('stemReach', () => {
+  test('measures how far a stem pointing down reaches below the bottom line', () => {
+    expect(stemReach('treble', [71], false)).toBe(15);
+    expect(stemReach('bass', [50], false)).toBe(15);
+  });
+
+  test('measures from the lowest note of a chord', () => {
+    expect(stemReach('treble', [64, 79], false)).toBe(35);
+  });
+
+  test('adds room for a beam', () => {
+    expect(stemReach('treble', [71], true)).toBe(23);
+    expect(stemReach('treble', [64], true)).toBe(43);
+  });
+
+  test('is zero when the stem ends above the bottom line', () => {
+    expect(stemReach('treble', [96], false)).toBe(0);
+  });
+
+  test('is zero without notes and on percussion staves', () => {
+    expect(stemReach('treble', [], false)).toBe(0);
+    expect(stemReach('percussion', [38], false)).toBe(0);
   });
 });
 
