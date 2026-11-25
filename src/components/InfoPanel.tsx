@@ -42,6 +42,8 @@ const ScoreView = lazy(() =>
   }),
 );
 
+const NO_CHANNELS: readonly number[] = [];
+
 export type InfoPanelTab = 'leadSheet' | 'score' | 'lyrics' | 'karaoke' | 'details';
 
 type InfoPanelProps = {
@@ -110,6 +112,8 @@ function ActiveView({
           scheduler={scheduler}
           title={file ? songHeading(data, file.name).title : ''}
           paged={scorePaged}
+          syllables={parsedKaraoke.syllables}
+          melodyChannels={data.karaoke.header?.melodyChannels ?? NO_CHANNELS}
         />
       </Suspense>
     );

@@ -1,5 +1,5 @@
 import type { ScoreBar } from './bars.ts';
-import type { ScoreModel, ScoreStaff } from './notation.ts';
+import type { Clef, ScoreModel, ScoreStaff } from './notation.ts';
 import type { ScoreItem } from './rhythm.ts';
 import { SIXTEENTH } from './subdivision.ts';
 
@@ -166,4 +166,16 @@ export function staffOverhang(staff: ScoreStaff): { above: number; below: number
     }
   }
   return { above, below };
+}
+
+const STEM_LENGTH = 35;
+// A beam is thicker than a stem tip and slopes below it.
+const BEAM_ROOM = 8;
+
+// How far the stem of a note reaches below the bottom line when it points down.
+export function stemReach(clef: Clef, keys: readonly number[], beamed: boolean): number {
+  if (clef === 'percussion' || keys.length === 0) return 0;
+  const lowest = Math.min(...keys.map((k) => diatonic(k, STEP_DOWN)));
+  const reach = (OUTER_LINES[clef][1] - lowest) * STEP + STEM_LENGTH + (beamed ? BEAM_ROOM : 0);
+  return Math.max(0, reach);
 }
