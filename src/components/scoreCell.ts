@@ -9,6 +9,7 @@ import {
   Metrics,
   ModifierPosition,
   Stave,
+  Stem,
   StaveConnector,
   StaveNote,
   StaveTie,
@@ -18,7 +19,7 @@ import {
 } from 'vexflow/bravura';
 import type { RenderContext } from 'vexflow/bravura';
 import { drumSetKey, OPEN_HI_HAT, percussionKey } from '../lib/score/drums.ts';
-import { LEFT_PAD, offsetInBar } from '../lib/score/geometry.ts';
+import { LEFT_PAD, offsetInBar, stemReach } from '../lib/score/geometry.ts';
 import type { BarGeometry } from '../lib/score/geometry.ts';
 import type { ScoreModel, ScoreStaff } from '../lib/score/notation.ts';
 import { beamGroups } from '../lib/score/rhythm.ts';
@@ -254,6 +255,47 @@ function connectGrandStaff(ctx: RenderContext, stave: Stave, bi: number, width: 
   if (bi === 0) new StaveConnector(stave, lower).setType('brace').setContext(ctx).draw();
 }
 
+function buildLayers(model: ScoreModel, bi: number, staff: ScoreStaff) {
+  const bar = model.bars[bi]!;
+  return cellLayers(staff, bi).map(({ items, drumVoice }) => {
+    const notes = makeNotes(items, staff, bar.keySharps, drumVoice);
+    const tuplets = makeTuplets(items, notes);
+    const voice = new Voice({ numBeats: bar.numerator, beatValue: bar.denominator }).setMode(
+      Voice.Mode.SOFT,
+    );
+    voice.addTickables(notes);
+    if (staff.kind === 'pitched') Accidental.applyAccidentals([voice], keySpecOf(bar.keySharps));
+    const groups = beamGroups(bar, items);
+    // Beams must exist before the voice is drawn, or beamed notes also get flags.
+    const beams = Beam.generateBeams(notes, {
+      groups: groups
+        ? groups.map(([n, d]) => new Fraction(n, d))
+        : Beam.getDefaultBeamGroups(`${bar.numerator}/${bar.denominator}`),
+      maintainStemDirections: staff.kind !== 'pitched',
+    });
+    bracketSharedBeams(tuplets, beams);
+    return { items, notes, voice, beams, tuplets };
+  });
+}
+
+// How far stems pointing down reach below the bottom line, anywhere on a pitched staff. The notes
+// and beams are built as the cells build them, so the stems point the way they are drawn.
+export function measureStemReach(model: ScoreModel, si: number): number {
+  const staff = model.staves[si];
+  if (!staff || staff.kind !== 'pitched') return 0;
+  let reach = 0;
+  model.bars.forEach((_, bi) => {
+    for (const { items, notes, beams } of buildLayers(model, bi, staff)) {
+      const beamed = new Set(beams.flatMap((b) => b.getNotes()));
+      notes.forEach((n, ni) => {
+        if (n.isRest() || !n.hasStem() || n.getStemDirection() !== Stem.DOWN) return;
+        reach = Math.max(reach, stemReach(staff.clef, items[ni]!.keys, beamed.has(n)));
+      });
+    }
+  });
+  return reach;
+}
+
 export function drawCell(
   ctx: RenderContext,
   model: ScoreModel,
@@ -273,25 +315,7 @@ export function drawCell(
   stave.setContext(ctx).draw();
   if (model.staves[si + 1]?.continuation) connectGrandStaff(ctx, stave, bi, width);
 
-  const layers = cellLayers(staff, bi).map(({ items, drumVoice }) => {
-    const notes = makeNotes(items, staff, bar.keySharps, drumVoice);
-    const tuplets = makeTuplets(items, notes);
-    const voice = new Voice({ numBeats: bar.numerator, beatValue: bar.denominator }).setMode(
-      Voice.Mode.SOFT,
-    );
-    voice.addTickables(notes);
-    if (staff.kind === 'pitched') Accidental.applyAccidentals([voice], keySpecOf(bar.keySharps));
-    const groups = beamGroups(bar, items);
-    // Beams must exist before the voice is drawn, or beamed notes also get flags.
-    const beams = Beam.generateBeams(notes, {
-      groups: groups
-        ? groups.map(([n, d]) => new Fraction(n, d))
-        : Beam.getDefaultBeamGroups(`${bar.numerator}/${bar.denominator}`),
-      maintainStemDirections: staff.kind !== 'pitched',
-    });
-    bracketSharedBeams(tuplets, beams);
-    return { items, notes, voice, beams, tuplets };
-  });
+  const layers = buildLayers(model, bi, staff);
   const voices = layers.map((l) => l.voice);
   new Formatter().joinVoices(voices).format(voices, Math.max(20, width - prefix - LEFT_PAD));
   const stavePadding = Metrics.get('Stave.padding', 0) as number;
