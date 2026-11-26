@@ -1,4 +1,4 @@
-import { barAtX, tickToX } from './geometry.ts';
+import { barAtX, labelOverhang, tickToX } from './geometry.ts';
 import type { BarGeometry } from './geometry.ts';
 import type { ScoreModel } from './notation.ts';
 
@@ -25,4 +25,22 @@ export function placeChords(
     free = x + (widths[i] ?? 0) + gap;
     return { bar: barAtX(geometry, x), x };
   });
+}
+
+// Chords pushed past the end of the score sit in the last bar and run into the room after it, so
+// the last bar does not count.
+export function chordOverhang(
+  placed: readonly PlacedChord[],
+  widths: readonly number[],
+  geometry: BarGeometry,
+): number {
+  const lastBar = geometry.width.length - 1;
+  const inner = placed.flatMap((chord, i) =>
+    chord.bar < lastBar ? [{ chord, width: widths[i] ?? 0 }] : [],
+  );
+  return labelOverhang(
+    inner.map((c) => c.chord),
+    inner.map((c) => c.width),
+    geometry,
+  );
 }

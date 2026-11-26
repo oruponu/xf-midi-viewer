@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { ScoreBar } from './bars.ts';
-import { placeChords } from './chords.ts';
+import { chordOverhang, placeChords } from './chords.ts';
 import { buildGeometry, tickToX } from './geometry.ts';
 import type { ScoreModel } from './notation.ts';
 import type { ScoreItem } from './rhythm.ts';
@@ -87,5 +87,22 @@ describe('placeChords', () => {
         4,
       ),
     ).toEqual([]);
+  });
+});
+
+describe('chordOverhang', () => {
+  const barEnd = (bi: number) => geometry.x[bi]! + geometry.width[bi]!;
+
+  test('returns how far a chord reaches past the end of its bar', () => {
+    const placed = [{ bar: 0, x: barEnd(0) - 10 }];
+    expect(chordOverhang(placed, [40], geometry)).toBe(30);
+  });
+
+  test('leaves out the last bar, whose chords run into the room after the score', () => {
+    const placed = [
+      { bar: 0, x: barEnd(0) - 10 },
+      { bar: 1, x: geometry.total + 500 },
+    ];
+    expect(chordOverhang(placed, [40, 40], geometry)).toBe(30);
   });
 });
