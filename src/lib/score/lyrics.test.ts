@@ -1,12 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { buildGeometry, tickToX } from './geometry.ts';
-import {
-  assignLyrics,
-  lyricOverhang,
-  lyricStaffIndexes,
-  placeLyrics,
-  visibleSyllables,
-} from './lyrics.ts';
+import { assignLyrics, lyricStaffIndexes, placeLyrics, visibleSyllables } from './lyrics.ts';
 import type { ScoreBar } from './bars.ts';
 import type { ScoreModel, ScoreStaff, StaffKind } from './notation.ts';
 import type { ScoreItem } from './rhythm.ts';
@@ -243,27 +237,6 @@ describe('placeLyrics', () => {
     const model = scoreModel([staff(0, [QUARTERS])], 1);
     expect(place(model, [syllable(0, 'か')], [1], 0, -1).placed).toEqual([]);
     expect(place(scoreModel([], 0), [syllable(0, 'か')]).placed).toEqual([]);
-  });
-});
-
-describe('lyricOverhang', () => {
-  test('returns how far the widest syllable reaches past the end of its bar', () => {
-    const model = scoreModel([staff(0, [QUARTERS, QUARTERS])], 2);
-    const widths = [10, 80, 60];
-    const { geometry, placed } = place(
-      model,
-      [syllable(0, 'か'), syllable(1440, 'え'), syllable(BAR + 1440, 'り')],
-      widths,
-    );
-    const barEnd = geometry.x[0]! + geometry.width[0]!;
-    expect(lyricOverhang(placed, widths, geometry)).toBe(placed[1]!.x + 80 - barEnd);
-  });
-
-  test('is zero when every syllable ends inside its bar', () => {
-    const model = scoreModel([staff(0, [QUARTERS])], 1);
-    const { geometry, placed } = place(model, [syllable(0, 'か'), syllable(480, 'え')]);
-    expect(lyricOverhang(placed, [1, 1], geometry)).toBe(0);
-    expect(lyricOverhang([], [], geometry)).toBe(0);
   });
 });
 

@@ -8,10 +8,16 @@ import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
 import type { LyricSyllable } from '../lib/xf/lyrics.ts';
 import type { RehearsalMessage } from '../lib/xf/types.ts';
-import { barAtX, buildGeometry, staffOverhang, tickToX, xToTick } from '../lib/score/geometry.ts';
+import {
+  barAtX,
+  buildGeometry,
+  labelOverhang,
+  staffOverhang,
+  tickToX,
+  xToTick,
+} from '../lib/score/geometry.ts';
 import {
   assignLyrics,
-  lyricOverhang,
   lyricStaffIndexes,
   placeLyrics,
   visibleSyllables,
@@ -255,7 +261,7 @@ export function ScoreView({
         else byBar.set(lyric.bar, [lyric]);
       }
       byStaff.set(si, byBar);
-      overhang = Math.max(overhang, lyricOverhang(placed, widths, geometry));
+      overhang = Math.max(overhang, labelOverhang(placed, widths, geometry));
     }
     return { byStaff, overhang };
   }, [model, geometry, staffLyrics, shownSyllables, lyricWidths]);
