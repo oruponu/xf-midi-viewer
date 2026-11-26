@@ -6,8 +6,10 @@ import type { KeyShiftChange } from '../lib/smf/fixedKey.ts';
 import { secondsToTick, tickToSeconds } from '../lib/smf/playback.ts';
 import type { PlaybackSequence } from '../lib/smf/playback.ts';
 import type { SmfTiming } from '../lib/smf/timing.ts';
+import { formatChordLabel } from '../lib/xf/chordLabel.ts';
 import type { LyricSyllable } from '../lib/xf/lyrics.ts';
-import type { RehearsalMessage } from '../lib/xf/types.ts';
+import type { ChordMessage, RehearsalMessage } from '../lib/xf/types.ts';
+import { chordOverhang, placeChords } from '../lib/score/chords.ts';
 import {
   barAtX,
   buildGeometry,
@@ -56,6 +58,7 @@ import {
   STAFF_GAP,
   TOP,
 } from './scoreCell.ts';
+import { CHORD_BAND_PX, CHORD_GAP_PX, chordElement, measureChords } from './scoreChords.ts';
 import { LYRIC_BAND_PX, LYRIC_GAP_PX, lyricElement, measureLyrics } from './scoreLyrics.ts';
 
 const LABEL_WIDTH = 120;
@@ -97,6 +100,8 @@ type ScoreViewProps = {
   syllables: readonly LyricSyllable[];
   // 1-based, as in the XF lyrics header.
   melodyChannels: readonly number[];
+  chords: readonly ChordMessage[];
+  chordDegrees: boolean;
 };
 
 const NO_WIDTHS: readonly number[] = [];
@@ -164,6 +169,8 @@ export function ScoreView({
   paged,
   syllables,
   melodyChannels,
+  chords,
+  chordDegrees,
 }: ScoreViewProps) {
   const model = useMemo(
     () =>
@@ -183,6 +190,12 @@ export function ScoreView({
     [model, melodyChannels],
   );
   const hasLyricStaff = lyricStaves.length > 0;
+  const shownChords = useMemo(() => (model.staves.length > 0 ? chords : []), [model, chords]);
+  const chordLabels = useMemo(
+    () => shownChords.map((c) => formatChordLabel(c, timing, keyShifts, chordDegrees)),
+    [shownChords, timing, keyShifts, chordDegrees],
+  );
+  const hasChords = shownChords.length > 0;
   const shownSyllables = useMemo(
     () => (hasLyricStaff ? visibleSyllables(syllables) : []),
     [hasLyricStaff, syllables],
@@ -211,8 +224,9 @@ export function ScoreView({
               staffBottom: TOP + STAFF_CENTER + HALF_STAFF,
               margin: NOTE_MARGIN,
             },
+        hasChords ? CHORD_BAND_PX / SCALE : 0,
       ),
-    [model, staffLyrics],
+    [model, staffLyrics, hasChords],
   );
   // The frame clips its content, so it grows to fit notes far above or below the outer staves.
   const pad = useMemo(() => {
@@ -265,6 +279,38 @@ export function ScoreView({
     }
     return { byStaff, overhang };
   }, [model, geometry, staffLyrics, shownSyllables, lyricWidths]);
+  // Chord widths in score units.
+  const [chordWidths, setChordWidths] = useState(NO_WIDTHS);
+  useLayoutEffect(() => {
+    if (chordLabels.length === 0) return;
+    const measure = () => {
+      const next = measureChords(chordLabels).map((w) => w / SCALE);
+      setChordWidths((prev) =>
+        prev.length === next.length && prev.every((w, i) => w === next[i]) ? prev : next,
+      );
+    };
+    measure();
+    document.fonts.addEventListener('loadingdone', measure);
+    return () => document.fonts.removeEventListener('loadingdone', measure);
+  }, [chordLabels]);
+  const chordLayout = useMemo(() => {
+    const byBar = new Map<number, { x: number; label: string }[]>();
+    if (chordWidths.length !== chordLabels.length) return { byBar, overhang: 0 };
+    const placed = placeChords(
+      model,
+      geometry,
+      shownChords.map((c) => c.tick),
+      chordWidths,
+      CHORD_GAP_PX / SCALE,
+    );
+    placed.forEach((chord, i) => {
+      const entry = { x: chord.x, label: chordLabels[i]! };
+      const list = byBar.get(chord.bar);
+      if (list) list.push(entry);
+      else byBar.set(chord.bar, [entry]);
+    });
+    return { byBar, overhang: chordOverhang(placed, chordWidths, geometry) };
+  }, [model, geometry, shownChords, chordLabels, chordWidths]);
   const hostRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
@@ -566,6 +612,19 @@ export function ScoreView({
         }
         div.appendChild(band);
       }
+      const barChords = si === 0 ? chordLayout.byBar.get(bi) : undefined;
+      if (barChords) {
+        const band = document.createElement('div');
+        band.className = 'score-view-chords';
+        band.style.top = `${-(pad.top + rows.tops[0]!) * SCALE}px`;
+        band.style.height = `${CHORD_BAND_PX}px`;
+        for (const chord of barChords) {
+          const el = chordElement(chord.label);
+          el.style.left = `${(chord.x - geometry.x[bi]!) * SCALE}px`;
+          band.appendChild(el);
+        }
+        div.appendChild(band);
+      }
       if (paged) {
         addTieEnds(div, width, keyChangeWidths[bi + 1] ?? 0);
         const keyChange = keyChangeWidths[bi]!;
@@ -632,8 +691,9 @@ export function ScoreView({
       if (paged) {
         if (viewport.clientWidth !== pagesWidth) {
           pagesWidth = viewport.clientWidth;
-          // A syllable on the last note of a page can end past the page's last barline.
-          const pageWidth = (pagesWidth - signaturePx) / SCALE - lyricLayout.overhang;
+          // A syllable or chord at the end of a page can end past the page's last barline.
+          const overhang = Math.max(lyricLayout.overhang, chordLayout.overhang);
+          const pageWidth = (pagesWidth - signaturePx) / SCALE - overhang;
           pages = buildScorePages(geometry, pageWidth);
           viewPage = null;
         }
@@ -773,6 +833,7 @@ export function ScoreView({
     placements,
     rows,
     lyricLayout,
+    chordLayout,
     pad,
     scheduler,
     sequence,
