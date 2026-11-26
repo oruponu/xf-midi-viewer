@@ -10,7 +10,7 @@ export interface PlacedChord {
 }
 
 // Each chord starts at its tick, or right of the chord before it when that one is too wide.
-// widths[i] is the width of the chord at ticks[i] in score units.
+// widths[i] is the width of the chord at ticks[i] in score units; the result keeps that order.
 export function placeChords(
   model: ScoreModel,
   geometry: BarGeometry,
@@ -19,12 +19,16 @@ export function placeChords(
   gap: number,
 ): PlacedChord[] {
   if (model.bars.length === 0) return [];
+  // Chords read from several tracks are not in tick order.
+  const order = ticks.map((_, i) => i).sort((a, b) => ticks[a]! - ticks[b]!);
+  const placed = new Array<PlacedChord>(ticks.length);
   let free = -Infinity;
-  return ticks.map((tick, i) => {
-    const x = Math.max(tickToX(geometry, model.bars, tick), free);
+  for (const i of order) {
+    const x = Math.max(tickToX(geometry, model.bars, ticks[i]!), free);
     free = x + (widths[i] ?? 0) + gap;
-    return { bar: barAtX(geometry, x), x };
-  });
+    placed[i] = { bar: barAtX(geometry, x), x };
+  }
+  return placed;
 }
 
 // Chords pushed past the end of the score sit in the last bar and run into the room after it, so

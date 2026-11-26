@@ -76,6 +76,11 @@ describe('placeChords', () => {
     expect(placed[2]!.x).toBeGreaterThan(geometry.total);
   });
 
+  test('spaces chords in tick order and keeps the order they were given in', () => {
+    const placed = placeChords(model, geometry, [BAR, 0, 20], [10, 50, 50], 4);
+    expect(placed.map((p) => p.x)).toEqual([xAt(BAR), xAt(0), xAt(0) + 54]);
+  });
+
   test('returns nothing for a score without bars', () => {
     const empty = scoreModel(0);
     expect(
