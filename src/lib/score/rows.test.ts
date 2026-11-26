@@ -106,6 +106,10 @@ describe('rowRange', () => {
     expect(rowRange(rows, -500, 5000, 2)).toEqual([0, 2]);
   });
 
+  test('keeps a range above the staves at the first staff alone', () => {
+    expect(rowRange(rows, -500, -100, 1)).toEqual([0, 0]);
+  });
+
   test('returns an empty range without staves', () => {
     expect(rowRange(buildStaffRows([], GAP, null), 0, 100, 1)).toEqual([0, -1]);
   });

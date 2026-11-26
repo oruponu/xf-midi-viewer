@@ -56,11 +56,10 @@ export function rowRange(
   to: number,
   extra: number,
 ): [first: number, last: number] {
-  // A position above the first staff counts as the first staff.
-  const at = (y: number) =>
-    Math.max(
-      0,
-      rows.tops.findLastIndex((top) => top <= y),
-    );
+  // A position between the top and the first staff counts as the first staff.
+  const at = (y: number) => {
+    const index = rows.tops.findLastIndex((top) => top <= y);
+    return index < 0 && y >= 0 ? 0 : index;
+  };
   return [Math.max(0, at(from) - extra), Math.min(rows.tops.length - 1, at(to) + extra)];
 }
