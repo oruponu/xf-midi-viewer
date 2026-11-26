@@ -13,7 +13,7 @@ export interface LyricBand {
 }
 
 export interface StaffRows {
-  // Top of each staff's row, from the top of the first row.
+  // Top of each staff's row, on the axis `top` is given on.
   tops: number[];
   // Top of the lyric band below each staff, or null without one.
   lyricTops: (number | null)[];
@@ -21,15 +21,16 @@ export interface StaffRows {
 }
 
 // A band sits below the lowest note or stem of its staff anywhere in the song, so it never
-// moves.
+// moves. `top` is where the first staff's row starts, below anything drawn above the staves.
 export function buildStaffRows(
   staves: readonly ScoreStaff[],
   staffGap: number,
   band: LyricBand | null,
+  top = 0,
 ): StaffRows {
   const tops: number[] = [];
   const lyricTops: (number | null)[] = [];
-  let cursor = 0;
+  let cursor = top;
   staves.forEach((staff, si) => {
     tops.push(cursor);
     cursor += staffGap;
@@ -55,6 +56,10 @@ export function rowRange(
   to: number,
   extra: number,
 ): [first: number, last: number] {
-  const at = (y: number) => rows.tops.findLastIndex((top) => top <= y);
+  // A position between the top and the first staff counts as the first staff.
+  const at = (y: number) => {
+    const index = rows.tops.findLastIndex((top) => top <= y);
+    return index < 0 && y >= 0 ? 0 : index;
+  };
   return [Math.max(0, at(from) - extra), Math.min(rows.tops.length - 1, at(to) + extra)];
 }

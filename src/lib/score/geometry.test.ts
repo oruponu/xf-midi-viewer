@@ -3,6 +3,7 @@ import {
   barAtTick,
   barAtX,
   buildGeometry,
+  labelOverhang,
   LAST_ITEM_ROOM,
   offsetInBar,
   staffOverhang,
@@ -70,6 +71,28 @@ function slopeAt(g: BarGeometry, bars: readonly ScoreBar[], tick: number): numbe
   const bi = bars.findLastIndex((b) => b.startTick <= tick);
   return tick - bars[bi]!.startTick < g.tailStart[bi]! ? g.pxPerTick : g.tailPxPerTick[bi]!;
 }
+
+describe('labelOverhang', () => {
+  const barEnd = (bi: number) => geometry.x[bi]! + geometry.width[bi]!;
+
+  test('returns how far the widest label reaches past the end of its bar', () => {
+    const placed = [
+      { bar: 0, x: geometry.x[0]! },
+      { bar: 0, x: barEnd(0) - 30 },
+      { bar: 1, x: barEnd(1) - 30 },
+    ];
+    expect(labelOverhang(placed, [10, 80, 60], geometry)).toBe(50);
+  });
+
+  test('is zero when every label ends inside its bar', () => {
+    const placed = [
+      { bar: 0, x: geometry.x[0]! },
+      { bar: 1, x: geometry.x[1]! },
+    ];
+    expect(labelOverhang(placed, [1, 1], geometry)).toBe(0);
+    expect(labelOverhang([], [], geometry)).toBe(0);
+  });
+});
 
 describe('buildGeometry', () => {
   test('uses one rate across a bar with no signature after it', () => {

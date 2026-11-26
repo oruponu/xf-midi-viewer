@@ -115,15 +115,3 @@ export function placeLyrics(
     return { syllable, bar: barAtX(geometry, x), x };
   });
 }
-
-// The most any syllable reaches past the end of the bar it sits in.
-export function lyricOverhang(
-  placed: readonly PlacedLyric[],
-  widths: readonly number[],
-  geometry: BarGeometry,
-): number {
-  return placed.reduce((max, lyric, i) => {
-    const barEnd = geometry.x[lyric.bar]! + geometry.width[lyric.bar]!;
-    return Math.max(max, lyric.x + (widths[i] ?? 0) - barEnd);
-  }, 0);
-}

@@ -22,10 +22,8 @@ import type {
   TimeSignature,
   TimeSignatureChange,
 } from '../lib/smf/timing.ts';
-import { formatDegreeChord } from '../lib/xf/degree.ts';
-import { formatChord } from '../lib/xf/format.ts';
+import { formatChordLabel } from '../lib/xf/chordLabel.ts';
 import type { LyricSyllable } from '../lib/xf/lyrics.ts';
-import { transposeChord } from '../lib/xf/transpose.ts';
 import type { ChordMessage, RehearsalMessage } from '../lib/xf/types.ts';
 import { AccidentalText } from './AccidentalText.tsx';
 
@@ -595,35 +593,6 @@ function findSignatureAt(tick: number, signatures: TimeSignatureChange[]): TimeS
     else break;
   }
   return result;
-}
-
-const C_MAJOR: KeySignature = { sharps: 0, mode: 'major' };
-
-function findKeySignatureAt(tick: number, changes: KeySignatureChange[]): KeySignature {
-  if (changes.length === 0) return C_MAJOR;
-  let result = changes[0]!.signature;
-  for (const c of changes) {
-    if (c.tick <= tick) result = c.signature;
-    else break;
-  }
-  return result;
-}
-
-function formatChordLabel(
-  chord: ChordMessage,
-  timing: SmfTiming,
-  keyShifts: readonly KeyShiftChange[],
-  degrees: boolean,
-): string {
-  if (degrees && timing.keySignatures.length > 0) {
-    const key = findKeySignatureAt(chord.tick, timing.keySignatures);
-    return formatDegreeChord(chord.root, chord.typeIndex, chord.bass, key);
-  }
-  const keyShift = keyShiftAt(chord.tick, keyShifts);
-  if (keyShift === 0) return formatChord(chord.root, chord.typeIndex, chord.bass);
-  const key = shiftKeySignature(findKeySignatureAt(chord.tick, timing.keySignatures), keyShift);
-  const { root, bass } = transposeChord(chord.root, chord.typeIndex, chord.bass, keyShift, key);
-  return formatChord(root, chord.typeIndex, bass);
 }
 
 function barPositionAt(tick: number, timing: SmfTiming): number {

@@ -129,6 +129,19 @@ export function barAtX(g: BarGeometry, x: number): number {
   return lastAtOrBefore(g.x, x);
 }
 
+// The most any label reaches past the end of the bar it sits in. widths[i] is the width of
+// placed[i].
+export function labelOverhang(
+  placed: readonly { bar: number; x: number }[],
+  widths: readonly number[],
+  geometry: BarGeometry,
+): number {
+  return placed.reduce((max, label, i) => {
+    const barEnd = geometry.x[label.bar]! + geometry.width[label.bar]!;
+    return Math.max(max, label.x + (widths[i] ?? 0) - barEnd);
+  }, 0);
+}
+
 export function xToTick(g: BarGeometry, bars: readonly ScoreBar[], x: number): number {
   if (bars.length === 0) return 0;
   const bi = lastAtOrBefore(g.noteStart, x);

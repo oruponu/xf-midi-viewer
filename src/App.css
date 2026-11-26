@@ -2638,3 +2638,18 @@
   line-height: 1;
   white-space: nowrap;
 }
+
+.score-view-chords {
+  position: absolute;
+  left: 0;
+}
+
+.score-view-chord {
+  position: absolute;
+  bottom: 2px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-h);
+  white-space: nowrap;
+  line-height: 1;
+}

@@ -114,6 +114,8 @@ function ActiveView({
           paged={scorePaged}
           syllables={parsedKaraoke.syllables}
           melodyChannels={data.karaoke.header?.melodyChannels ?? NO_CHANNELS}
+          chords={chords}
+          chordDegrees={chordDegrees}
         />
       </Suspense>
     );

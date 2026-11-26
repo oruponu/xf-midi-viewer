@@ -24,15 +24,18 @@ export function lyricElement(syllable: LyricSyllable): HTMLSpanElement {
   return el;
 }
 
-// Widths in CSS pixels, read from the same elements the score shows.
-export function measureLyrics(syllables: readonly LyricSyllable[]): number[] {
-  if (syllables.length === 0) return [];
+// Widths in CSS pixels of the elements as the page lays them out.
+export function measureWidths(elements: readonly HTMLElement[]): number[] {
+  if (elements.length === 0) return [];
   const box = document.createElement('div');
   box.style.cssText = 'position: absolute; top: 0; left: 0; visibility: hidden;';
-  const elements = syllables.map(lyricElement);
   box.append(...elements);
   document.body.appendChild(box);
   const widths = elements.map((el) => el.getBoundingClientRect().width);
   box.remove();
   return widths;
+}
+
+export function measureLyrics(syllables: readonly LyricSyllable[]): number[] {
+  return measureWidths(syllables.map(lyricElement));
 }

@@ -74,6 +74,22 @@ describe('buildStaffRows', () => {
   });
 });
 
+describe('buildStaffRows below a band at the top', () => {
+  test('starts the first staff below the band', () => {
+    const staves = [staff(), staff()];
+    const plain = buildStaffRows(staves, GAP, band(0));
+    const shifted = buildStaffRows(staves, GAP, band(0), 30);
+    expect(shifted.tops).toEqual(plain.tops.map((t) => t + 30));
+    expect(shifted.lyricTops).toEqual(plain.lyricTops.map((t) => (t === null ? null : t + 30)));
+    expect(shifted.height).toBe(plain.height + 30);
+  });
+
+  test('finds the first staff for a position inside the band', () => {
+    const rows = buildStaffRows([staff(), staff()], GAP, null, 30);
+    expect(rowRange(rows, 0, 10, 0)).toEqual([0, 0]);
+  });
+});
+
 describe('rowRange', () => {
   const rows = buildStaffRows([staff(), staff(), staff()], GAP, band(1));
 
@@ -88,6 +104,10 @@ describe('rowRange', () => {
 
   test('clamps to the staves', () => {
     expect(rowRange(rows, -500, 5000, 2)).toEqual([0, 2]);
+  });
+
+  test('keeps a range above the staves at the first staff alone', () => {
+    expect(rowRange(rows, -500, -100, 1)).toEqual([0, 0]);
   });
 
   test('returns an empty range without staves', () => {
